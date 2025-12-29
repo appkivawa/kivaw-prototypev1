@@ -71,7 +71,6 @@ export default function App() {
             </button>
 
             <h2 className="kivaw-h2">What’s your current state?</h2>
-            <p className="kivaw-help">Choose what feels closest.</p>
 
             {[
               { key: "minimizer", label: "🧩 Minimizer" },
@@ -133,17 +132,25 @@ export default function App() {
               ← Back
             </button>
 
-            <div className="kcard">
-              <h3>Your Kivaw State — Current Temper</h3>
+            <div className="kcard" style={{ textAlign: "center" }}>
+              <img
+                src="/favicon.svg"
+                alt="Kivaw"
+                style={{
+                  width: 44,
+                  marginBottom: 12,
+                  opacity: 0.8,
+                }}
+              />
 
-              <p style={{ marginTop: 8, fontWeight: 600 }}>
-                You’re in a{" "}
+              <p style={{ fontSize: 14, opacity: 0.7 }}>
+                You’re currently in a{" "}
                 <span style={{ color: "#5d70ae" }}>{state}</span> state,
-                drawn to{" "}
+                drawn toward{" "}
                 <span style={{ color: "#5d70ae" }}>{focus}</span>.
               </p>
 
-              <p style={{ marginTop: 12, color: "rgba(0,0,0,0.7)" }}>
+              <p style={{ marginTop: 14, color: "rgba(0,0,0,0.65)", lineHeight: 1.6 }}>
                 {state && focus && recommendations[state][focus]}
               </p>
             </div>
