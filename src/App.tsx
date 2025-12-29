@@ -137,20 +137,26 @@ export default function App() {
                 src="/favicon.svg"
                 alt="Kivaw"
                 style={{
-                  width: 44,
-                  marginBottom: 12,
-                  opacity: 0.8,
+                  width: 60,
+                  marginBottom: 16,
+                  opacity: 0.85,
                 }}
               />
 
-              <p style={{ fontSize: 14, opacity: 0.7 }}>
+              <p style={{ fontSize: 15, fontWeight: 500, marginBottom: 6 }}>
                 You’re currently in a{" "}
                 <span style={{ color: "#5d70ae" }}>{state}</span> state,
                 drawn toward{" "}
                 <span style={{ color: "#5d70ae" }}>{focus}</span>.
               </p>
 
-              <p style={{ marginTop: 14, color: "rgba(0,0,0,0.65)", lineHeight: 1.6 }}>
+              <p
+                style={{
+                  fontSize: 14,
+                  color: "rgba(0,0,0,0.6)",
+                  lineHeight: 1.6,
+                }}
+              >
                 {state && focus && recommendations[state][focus]}
               </p>
             </div>
@@ -180,3 +186,4 @@ export default function App() {
     </div>
   );
 }
+
