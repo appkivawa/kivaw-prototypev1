@@ -1,7 +1,8 @@
 /* ============================================================
-   KIVAW UI — FINAL (NO BLACK TEXT IN LIGHT MODE)
+   KIVAW UI — CLEAN (NO BLACK TEXT IN LIGHT MODE)
 ============================================================ */
 
+/* ---------- Base Reset ---------- */
 *, *::before, *::after { box-sizing: border-box; }
 html, body, #root { min-height: 100%; }
 
@@ -16,17 +17,16 @@ body {
 }
 
 /* ============================================================
-   LIGHT MODE “NO BLACK” OVERRIDES
-   (keeps everything in the periwinkle/soft-gray family)
+   LIGHT MODE “NO BLACK” INK SYSTEM
 ============================================================ */
 :root:not([data-theme="dark"]) {
-  --ink: rgba(80, 92, 140, 0.92);      /* main readable text (NOT black) */
+  --ink: rgba(80, 92, 140, 0.92);
   --ink-soft: rgba(92, 106, 156, 0.78);
   --ink-muted: rgba(92, 106, 156, 0.60);
   --ink-line: rgba(92, 106, 156, 0.22);
 }
 
-/* Apply light-mode ink to common elements so nothing goes near-black */
+/* Apply ink defaults so nothing goes near-black in light mode */
 :root:not([data-theme="dark"]) body,
 :root:not([data-theme="dark"]) .card,
 :root:not([data-theme="dark"]) .btn-back,
@@ -49,10 +49,9 @@ body {
   min-height: calc(100vh - 120px);
   display: flex;
   justify-content: center;
-  align-items: flex-start; /* 👈 important */
-  padding-top: 80px;       /* 👈 locks position */
+  align-items: flex-start;
+  padding-top: 80px; /* locks position; prevents “jumping” */
 }
-
 
 /* ============================================================
    CARD
@@ -141,21 +140,20 @@ body {
   box-shadow: var(--btn-shadow);
 }
 
-/* Ghost default */
 .btn-ghost {
   background: transparent;
   border: 1px solid var(--border);
   color: var(--soft);
 }
 
-/* ✅ Light-mode: softer ghost text (NO black) */
+/* Light-mode ghost: softer, NO black */
 :root:not([data-theme="dark"]) .btn-ghost {
   color: var(--ink-soft);
   border-color: var(--ink-line);
   font-weight: 500;
 }
 
-/* Dark mode buttons — keep as-is (your flawless vibe) */
+/* Dark-mode buttons (keep your vibe) */
 :root[data-theme="dark"] .btn-primary {
   background: rgba(255,255,255,0.18);
   color: rgba(255,255,255,0.92);
@@ -185,25 +183,26 @@ body {
   margin-bottom: 18px;
 }
 
-/* ✅ Light-mode back: NO black */
+/* Light-mode back: NO black */
 :root:not([data-theme="dark"]) .btn-back {
   color: var(--ink-soft);
   border-color: var(--ink-line);
   font-weight: 500;
 }
 
-/* Actions layout (results page) */
+/* Actions layout (results page, home page wrapper uses home-actions) */
 .actions {
-  margin-top: 18px;
+  margin-top: 22px;
   display: flex;
   flex-direction: column;
   align-items: stretch;
 }
 
-.actions .btn + .btn { margin-top: 12px; }
-@media (max-width: 520px) {
-  .actions .btn + .btn { margin-top: 14px; }
-}
+.actions .btn + .btn { margin-top: 16px; }
+
+/* Home page spacing override */
+.home-actions { margin-top: 26px; }
+.home-actions .btn + .btn { margin-top: 18px; }
 
 /* ============================================================
    QUIZ OPTIONS (PILLS)
@@ -227,7 +226,7 @@ body {
   transform: translateY(-1px);
 }
 
-/* ✅ Light-mode pill text (NO black) */
+/* Light-mode pill text: NO black */
 :root:not([data-theme="dark"]) .pill {
   color: var(--ink);
   border-color: var(--ink-line);
@@ -260,7 +259,7 @@ body {
   gap: 14px;
 }
 
-/* Brand button reset */
+/* Brand reset */
 .brand {
   background: none;
   border: none;
@@ -268,7 +267,7 @@ body {
   cursor: pointer;
 }
 
-/* ✅ Bigger logo */
+/* Logo sizing */
 .brand__logo {
   height: 120px;
   max-height: 120px;
@@ -277,14 +276,12 @@ body {
 }
 
 @media (min-width: 900px) {
-  .brand__logo {
-    height: 132px;
-    max-height: 132px;
-  }
+  .brand__logo { height: 132px; max-height: 132px; }
 }
 
 /* Nav links */
-.navlinks {
+.navlinks,
+.navlinks--desktop {
   justify-self: center;
   display: flex;
   align-items: center;
@@ -292,7 +289,6 @@ body {
   font-weight: 650;
 }
 
-/* ✅ Light-mode links: NO black */
 .navlink {
   padding: 10px 12px;
   border-radius: 999px;
@@ -301,23 +297,18 @@ body {
   color: rgba(92, 106, 156, 0.72);
 }
 
-/* ✅ Active link: still periwinkle (NOT black) */
 .navlink.active,
 .navlink[aria-current="page"] {
   background: var(--surface-2);
   color: rgba(92, 106, 156, 0.92);
 }
 
-/* Dark mode nav unchanged */
-:root[data-theme="dark"] .navlink {
-  color: rgba(255,255,255,0.82);
-}
+/* Dark mode nav */
+:root[data-theme="dark"] .navlink { color: rgba(255,255,255,0.82); }
 :root[data-theme="dark"] .navlink.active,
-:root[data-theme="dark"] .navlink[aria-current="page"] {
-  color: rgba(255,255,255,0.92);
-}
+:root[data-theme="dark"] .navlink[aria-current="page"] { color: rgba(255,255,255,0.92); }
 
-/* Theme toggle button */
+/* Theme toggle */
 .moon {
   justify-self: end;
   border: 1px solid var(--border);
@@ -330,10 +321,109 @@ body {
   padding: 10px 12px;
 }
 
-/* ✅ Light-mode moon: NO black */
+/* Light-mode toggle: NO black */
 :root:not([data-theme="dark"]) .moon {
   color: var(--ink);
   border-color: var(--ink-line);
+}
+
+/* ============================================================
+   QUIZ HEADER ROW (Back + Help)
+============================================================ */
+.quiz-top {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 6px;
+}
+
+.quiz-top .btn-back { margin-bottom: 0; }
+
+/* help chip */
+.help-chip {
+  display: inline-grid;
+  place-items: center;
+  width: 32px;
+  height: 32px;
+  border-radius: 999px;
+  border: 1px solid rgba(92, 106, 156, 0.22);
+  background: var(--surface);
+  color: rgba(92, 106, 156, 0.82);
+  font-weight: 800;
+  font-size: 14px;
+  cursor: pointer;
+}
+
+:root[data-theme="dark"] .help-chip {
+  border-color: rgba(255, 255, 255, 0.18);
+  background: rgba(255, 255, 255, 0.08);
+  color: rgba(255, 255, 255, 0.88);
+}
+
+/* ============================================================
+   POPOVER (click/tap help)
+============================================================ */
+.popover {
+  position: relative;
+  display: inline-block;
+}
+
+.popover__trigger {
+  background: transparent;
+  border: none;
+  padding: 0;
+  margin-left: 0; /* important: don’t add weird spacing */
+  cursor: pointer;
+}
+
+.popover__icon {
+  width: 18px;
+  height: 18px;
+  border-radius: 50%;
+  border: 1px solid rgba(120,130,180,0.35);
+  display: inline-grid;
+  place-items: center;
+  font-size: 12px;
+  font-weight: 700;
+  color: rgba(120,130,180,0.9);
+}
+
+.popover__panel {
+  position: absolute;
+  top: 36px;
+  left: 50%;
+  transform: translateX(-50%);
+  width: min(340px, calc(100vw - 40px));
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 16px;
+  box-shadow: var(--shadow);
+  padding: 14px;
+  z-index: 999;
+  backdrop-filter: blur(14px);
+  text-align: left;
+}
+
+.popover__title {
+  font-size: 14px;
+  font-weight: 800;
+  margin: 0 0 6px 0;
+  color: rgba(92, 106, 156, 0.92);
+}
+:root[data-theme="dark"] .popover__title {
+  color: rgba(255,255,255,0.92);
+}
+
+.popover__panel p {
+  margin: 0;
+  font-size: 14px;
+  color: var(--muted);
+  line-height: 1.4;
+}
+.popover__panel p + p { margin-top: 10px; }
+
+@media (max-width: 520px) {
+  .popover__panel { left: 0; transform: none; }
 }
 
 /* ============================================================
@@ -344,14 +434,9 @@ body {
 @media (max-width: 720px) {
   .navlinks--desktop { display: none; }
 
-  .topnav__inner {
-    grid-template-columns: 1fr 90px;
-  }
+  .topnav__inner { grid-template-columns: 1fr 90px; }
 
-  .brand__logo {
-    height: 84px;
-    max-height: 84px;
-  }
+  .brand__logo { height: 84px; max-height: 84px; }
 
   .tabbar {
     display: grid;
@@ -394,30 +479,25 @@ body {
     opacity: 0.88;
   }
 
-  .tabbar__label {
-    font-size: 12px;
-    line-height: 1;
-  }
+  .tabbar__label { font-size: 12px; line-height: 1; }
 
-  /* ✅ Light-mode active tab: periwinkle, NOT black */
-  :root:not([data-theme="dark"]) .tabbar__item {
-    color: var(--ink-soft);
-  }
-  :root:not([data-theme="dark"]) .tabbar__icon {
-    color: var(--ink-soft);
-  }
+  /* Light-mode active tab: periwinkle, NOT black */
+  :root:not([data-theme="dark"]) .tabbar__item { color: var(--ink-soft); }
+  :root:not([data-theme="dark"]) .tabbar__icon { color: var(--ink-soft); }
+
   :root:not([data-theme="dark"]) .tabbar__item.active,
   :root:not([data-theme="dark"]) .tabbar__item[aria-current="page"] {
     background: var(--surface-2);
     color: rgba(92, 106, 156, 0.92);
   }
+
   :root:not([data-theme="dark"]) .tabbar__item.active .tabbar__icon,
   :root:not([data-theme="dark"]) .tabbar__item[aria-current="page"] .tabbar__icon {
     color: rgba(92, 106, 156, 0.92);
     opacity: 1;
   }
 
-  /* Dark mode active tab unchanged */
+  /* Dark mode active tab */
   :root[data-theme="dark"] .tabbar__item.active,
   :root[data-theme="dark"] .tabbar__item[aria-current="page"] {
     background: var(--surface-2);
@@ -449,24 +529,75 @@ body {
     border-radius: 16px;
   }
 }
-
-/* FINAL spacing fix for action buttons */
-.actions {
-  margin-top: 22px;
+/* ===== Help chip (smaller + lighter) ===== */
+.help-chip {
+  display: inline-grid;
+  place-items: center;
+  width: 22px;
+  height: 22px;
+  border-radius: 999px;
+  border: 1px solid rgba(92, 106, 156, 0.18);
+  background: transparent;
+  color: rgba(92, 106, 156, 0.65);
+  font-weight: 600;
+  font-size: 12px;
+  cursor: pointer;
+  transition: background 0.15s ease, color 0.15s ease, border-color 0.15s ease;
 }
 
-.actions .btn + .btn {
-  margin-top: 16px; /* 👈 this is the sweet spot */
-}
-/* Fix homepage button spacing only */
-.home-actions {
-  margin-top: 26px;
+.help-chip:hover {
+  background: rgba(92, 106, 156, 0.06);
+  color: rgba(92, 106, 156, 0.85);
+  border-color: rgba(92, 106, 156, 0.22);
 }
 
-.home-actions .btn + .btn {
-  margin-top: 18px;
+/* Dark mode */
+:root[data-theme="dark"] .help-chip {
+  border-color: rgba(255, 255, 255, 0.16);
+  color: rgba(255, 255, 255, 0.70);
 }
-/* Home page: slightly more breathing room between the two buttons */
-.home-actions .btn + .btn {
-  margin-top: 18px;
+
+:root[data-theme="dark"] .help-chip:hover {
+  background: rgba(255, 255, 255, 0.08);
+  color: rgba(255, 255, 255, 0.92);
+  border-color: rgba(255, 255, 255, 0.22);
+}
+/* ===== Guide page typography (lighter) ===== */
+.guide-sub {
+  margin: 6px 0 18px;
+  color: rgba(92, 106, 156, 0.62);
+  font-size: 15px;
+  line-height: 1.5;
+}
+
+:root[data-theme="dark"] .guide-sub {
+  color: rgba(255, 255, 255, 0.72);
+}
+
+/* Use same layout as FAQ but lighter feel */
+.faq { text-align: left; }
+
+.faq__item + .faq__item { margin-top: 18px; }
+
+.faq__q {
+  margin: 0 0 6px 0;
+  font-size: 15px;
+  font-weight: 600;
+  color: rgba(92, 106, 156, 0.82);
+}
+
+.faq__a {
+  margin: 0;
+  font-size: 15px;
+  font-weight: 450;
+  color: rgba(92, 106, 156, 0.68);
+  line-height: 1.55;
+}
+
+:root[data-theme="dark"] .faq__q {
+  color: rgba(255, 255, 255, 0.88);
+}
+
+:root[data-theme="dark"] .faq__a {
+  color: rgba(255, 255, 255, 0.72);
 }
