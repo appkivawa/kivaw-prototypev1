@@ -23,14 +23,17 @@ export default function QuizResult() {
             ← Back
           </button>
 
-          <div style={{ marginTop: 18, fontSize: 18, fontWeight: 600, color: "var(--soft)" }}>
-            You’re currently in a <span style={{ color: "var(--primary)" }}>{state}</span> state, drawn toward{" "}
-            <span style={{ color: "var(--primary)" }}>{focus}</span>.
-          </div>
+          {/* Cohesive spacing + typography controlled in ui.css */}
+<div className="result-text">
+  <p style={{ fontSize: 18, fontWeight: 600, color: "var(--soft)" }}>
+    You’re currently in a <span style={{ color: "var(--primary)" }}>{state}</span> state, drawn toward{" "}
+    <span style={{ color: "var(--primary)" }}>{focus}</span>.
+  </p>
+  <p style={{ color: "var(--muted)", fontSize: 17 }}>
+    Purpose-centered reflection and meaning.
+  </p>
+</div>
 
-          <div style={{ color: "var(--muted)", fontSize: 17, marginTop: 10 }}>
-            Purpose-centered reflection and meaning.
-          </div>
 
           <div className="actions">
             <button className="btn btn-primary" onClick={() => navigate("/quiz/focus")}>
@@ -46,7 +49,3 @@ export default function QuizResult() {
     </div>
   );
 }
-
-
-
-

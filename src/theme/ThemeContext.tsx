@@ -1,44 +1,38 @@
 import React, { createContext, useContext, useEffect, useMemo, useState } from "react";
 
-type ThemeMode = "light" | "dark";
+type Theme = "light" | "dark";
 
-type ThemeContextValue = {
-  theme: ThemeMode;
+type ThemeCtx = {
+  theme: Theme;
   toggle: () => void;
-  setTheme: (t: ThemeMode) => void;
+  setTheme: (t: Theme) => void;
 };
 
-const ThemeContext = createContext<ThemeContextValue | null>(null);
+const ThemeContext = createContext<ThemeCtx | null>(null);
 const STORAGE_KEY = "kivaw_theme";
 
 export function ThemeProvider({ children }: { children: React.ReactNode }) {
-  const [theme, setThemeState] = useState<ThemeMode>("light");
+  const [theme, setThemeState] = useState<Theme>(() => {
+    const saved = localStorage.getItem(STORAGE_KEY);
+    return saved === "dark" || saved === "light" ? (saved as Theme) : "light";
+  });
+
+  const setTheme = (t: Theme) => setThemeState(t);
+  const toggle = () => setThemeState((prev) => (prev === "dark" ? "light" : "dark"));
 
   useEffect(() => {
-    const saved = localStorage.getItem(STORAGE_KEY) as ThemeMode | null;
-    if (saved === "light" || saved === "dark") setThemeState(saved);
-  }, []);
-
-  useEffect(() => {
-    document.documentElement.setAttribute("data-theme", theme);
+    const root = document.documentElement; // <html>
+    root.setAttribute("data-theme", theme);
     localStorage.setItem(STORAGE_KEY, theme);
   }, [theme]);
 
-  const value = useMemo<ThemeContextValue>(() => {
-    return {
-      theme,
-      toggle: () => setThemeState((t) => (t === "light" ? "dark" : "light")),
-      setTheme: (t) => setThemeState(t),
-    };
-  }, [theme]);
+  const value = useMemo(() => ({ theme, toggle, setTheme }), [theme]);
 
   return <ThemeContext.Provider value={value}>{children}</ThemeContext.Provider>;
 }
 
 export function useTheme() {
   const ctx = useContext(ThemeContext);
-  if (!ctx) throw new Error("useTheme must be used inside ThemeProvider");
+  if (!ctx) throw new Error("useTheme must be used within ThemeProvider");
   return ctx;
 }
-
-

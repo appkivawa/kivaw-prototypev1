@@ -9,22 +9,33 @@ export default function Home() {
       <div className="center-wrap">
         <Card className="center">
           <div className="mini-star">✦</div>
+
           <p className="kivaw-sub" style={{ marginTop: 0 }}>
             Find what fits your mood.
           </p>
 
-          <button className="btn btn-primary" onClick={() => navigate("/quiz/state")}>
-            Get Recommendations →
-          </button>
+          {/* IMPORTANT: wrap buttons so spacing rules apply */}
+          <div className="actions home-actions">
+            <button
+              className="btn btn-primary"
+              onClick={() => navigate("/quiz/state")}
+            >
+              Get Recommendations →
+            </button>
 
-          <button className="btn btn-ghost" onClick={() => navigate("/explore")}>
-            Browse as guest
-          </button>
+            <button
+              className="btn btn-ghost"
+              onClick={() => navigate("/explore")}
+            >
+              Browse as guest
+            </button>
+          </div>
         </Card>
       </div>
     </div>
   );
 }
+
 
 
 

@@ -1,25 +1,43 @@
-* { box-sizing: border-box; }
-html, body { height: 100%; }
+/* index.css — reset only (DO NOT set theme colors here) */
+
+*,
+*::before,
+*::after {
+  box-sizing: border-box;
+}
+
+html,
+body,
+#root {
+  min-height: 100%;
+}
 
 body {
   margin: 0;
-  font-family: var(--font-sans);
-  color: var(--text);
-  background: linear-gradient(180deg, var(--bg), var(--bg2));
 }
 
-.app { min-height: 100vh; }
-
-.main {
-  min-height: calc(100vh - 72px);
-  display: flex;
-  justify-content: center;
-  align-items: center;
-  padding: 24px;
+/* Better default text rendering */
+html {
+  -webkit-text-size-adjust: 100%;
+  text-rendering: optimizeLegibility;
 }
 
-.card {
-  margin: 0 auto;
+img,
+svg,
+video {
+  max-width: 100%;
+  display: block;
+}
+
+button,
+input,
+textarea,
+select {
+  font: inherit;
+}
+
+a {
+  color: inherit;
 }
 
 

@@ -1,66 +1,79 @@
+/* ============================================================
+   KIVAW THEME TOKENS (single source of truth)
+============================================================ */
+
 :root {
-  --font-sans: ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI",
-    Roboto, Arial, "Apple Color Emoji", "Segoe UI Emoji";
-
-  /* LIGHT */
-  --bg: #eef2ff;
-  --bg2: #f6f7fb;
-
-  --card: rgba(255, 255, 255, 0.82);
-  --text: #111827;
-  --muted: #6b7280;
-  --border: rgba(17, 24, 39, 0.10);
-  --shadow: 0 18px 48px rgba(17, 24, 39, 0.12);
-
-  /* Brand blues */
+  /* Brand */
   --primary: #5d70ae;
-  --primary2: #6f83cf;
+  --primary2: #7a8fd6;
 
-  /* Soft “gray-blue” for secondary text/buttons */
-  --soft: rgba(93, 112, 174, 0.72);
-  --soft2: rgba(93, 112, 174, 0.16);
+  /* Background */
+  --bg: #f6f7fc;
+  --bg-glow: rgba(93, 112, 174, 0.14);
+
+  /* Surfaces */
+  --surface: rgba(255, 255, 255, 0.86);
+  --surface-2: rgba(93, 112, 174, 0.10);
+
+  /* Text */
+  --text: #121727;
+  --muted: rgba(18, 23, 39, 0.60);
+  --soft: rgba(18, 23, 39, 0.70);
+
+  /* Lines */
+  --border: rgba(18, 23, 39, 0.10);
 
   /* Nav */
-  --nav-bg: rgba(255, 255, 255, 0.55);
-  --nav-border: rgba(17, 24, 39, 0.06);
-  --nav-divider: rgba(93, 112, 174, 0.10);
+  --nav-bg: rgba(246, 247, 252, 0.86);
+  --nav-border: rgba(18, 23, 39, 0.08);
 
+  /* Shape + shadows */
+  --radius-sm: 10px;
+  --radius-md: 16px;
+  --radius-lg: 22px;
   --radius-xl: 28px;
-  --radius-lg: 20px;
-  --radius-md: 14px;
+
+  --shadow: 0 18px 45px rgba(17, 24, 39, 0.10);
+  --shadow-soft: 0 10px 24px rgba(17, 24, 39, 0.08);
+  --btn-shadow: 0 12px 22px rgba(93, 112, 174, 0.20);
+
+  /* Focus */
+  --focus: rgba(93, 112, 174, 0.28);
 }
 
+/* ============================================================
+   DARK THEME — “Periwinkle Night” (matches your screenshot vibe)
+============================================================ */
 :root[data-theme="dark"] {
-  /* DARK */
-  --bg: #5d70ae;
-  --bg2: #5d70ae;
+  /* Brand stays soft (not electric) */
+  --primary: rgba(255,255,255,0.92);
+  --primary2: rgba(255,255,255,0.88);
 
-  --card: rgba(255, 255, 255, 0.12);
+  /* Background: the periwinkle tone you liked */
+  --bg: #6f7fb3;
+  --bg-glow: rgba(255, 255, 255, 0.10);
+
+  /* Surfaces: glassy */
+  --surface: rgba(255, 255, 255, 0.14);
+  --surface-2: rgba(255, 255, 255, 0.10);
+
+  /* Text */
   --text: rgba(255, 255, 255, 0.92);
   --muted: rgba(255, 255, 255, 0.72);
-  --border: rgba(255, 255, 255, 0.14);
-  --shadow: 0 18px 50px rgba(0, 0, 0, 0.25);
+  --soft: rgba(255, 255, 255, 0.82);
 
-  --primary: rgba(255, 255, 255, 0.92);
-  --primary2: rgba(255, 255, 255, 0.88);
+  /* Lines */
+  --border: rgba(255, 255, 255, 0.18);
 
-  --soft: rgba(255, 255, 255, 0.78);
-  --soft2: rgba(255, 255, 255, 0.14);
+  /* Nav */
+  --nav-bg: rgba(79, 92, 144, 0.62);
+  --nav-border: rgba(255, 255, 255, 0.18);
 
-  --nav-bg: rgba(255, 255, 255, 0.10);
-  --nav-border: rgba(255, 255, 255, 0.12);
-  --nav-divider: rgba(255, 255, 255, 0.14);
-}
+  /* Shadows */
+  --shadow: 0 18px 55px rgba(0, 0, 0, 0.30);
+  --shadow-soft: 0 10px 28px rgba(0, 0, 0, 0.22);
+  --btn-shadow: none;
 
-html, body {
-  height: 100%;
-}
-
-body {
-  margin: 0;
-  font-family: var(--font-sans);
-  color: var(--text);
-  background:
-    radial-gradient(1200px 600px at 50% 15%, rgba(93,112,174,0.14), transparent 60%),
-    linear-gradient(180deg, var(--bg), var(--bg2));
+  /* Focus */
+  --focus: rgba(255, 255, 255, 0.22);
 }

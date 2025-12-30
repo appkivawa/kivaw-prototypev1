@@ -1,132 +1,86 @@
-/* ---------- Top Nav ---------- */
-.topnav {
-  position: sticky;
-  top: 0;
-  z-index: 20;
-  backdrop-filter: blur(12px);
-  background: var(--nav-bg);
-  border-bottom: 1px solid var(--nav-border);
-}
+/* ============================================================
+   KIVAW UI — FINAL (NO BLACK TEXT IN LIGHT MODE)
+============================================================ */
 
-.topnav__inner {
-  max-width: 1040px;
-  margin: 0 auto;
-  padding: 18px 22px;
-  display: grid;
-  grid-template-columns: 240px 1fr 80px;
-  align-items: center;
-  gap: 14px;
-}
+*, *::before, *::after { box-sizing: border-box; }
+html, body, #root { min-height: 100%; }
 
-
-.topnav__divider {
-  height: 1px;
-  background: var(--nav-divider);
-}
-
-/* =====================
-   LOGO (FINAL)
-===================== */
-
-.brand {
-  background: none;
-  border: none;
-  padding: 0;
-  cursor: pointer;
-}
-
-.brand__logo {
-  height: 96px;
-  width: auto;
-  display: block;
-}
-
-@media (min-width: 900px) {
-  .brand__logo {
-    height: 112px;
-  }
-}
-
-
-
-.navlinks {
-  justify-self: center;
-  display: flex;
-  align-items: center;
-  gap: 26px;
-  font-weight: 600;
-  color: var(--soft);
-}
-
-.navlink {
-  padding: 10px 12px;
-  border-radius: 999px;
-  text-decoration: none;
-  color: inherit;
-  line-height: 1;
-}
-
-.navlink.is-active {
-  color: var(--primary);
-  background: var(--soft2);
-  box-shadow: inset 0 0 0 1px rgba(93, 112, 174, 0.14);
-}
-
-:root[data-theme="dark"] .navlink.is-active {
-  color: rgba(255,255,255,0.92);
-  background: rgba(255,255,255,0.12);
-  box-shadow: inset 0 0 0 1px rgba(255,255,255,0.18);
-}
-
-.moon {
-  justify-self: end;
-  border: 0;
-  background: transparent;
-  cursor: pointer;
-  font-size: 22px;
-  line-height: 1;
+body {
+  margin: 0;
   color: var(--text);
+  background:
+    radial-gradient(1200px 700px at 50% 12%, var(--bg-glow), transparent 60%),
+    var(--bg);
+  font-family: ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI",
+    Roboto, Helvetica, Arial, "Apple Color Emoji", "Segoe UI Emoji";
 }
 
-/* ---------- Layout helpers ---------- */
+/* ============================================================
+   LIGHT MODE “NO BLACK” OVERRIDES
+   (keeps everything in the periwinkle/soft-gray family)
+============================================================ */
+:root:not([data-theme="dark"]) {
+  --ink: rgba(80, 92, 140, 0.92);      /* main readable text (NOT black) */
+  --ink-soft: rgba(92, 106, 156, 0.78);
+  --ink-muted: rgba(92, 106, 156, 0.60);
+  --ink-line: rgba(92, 106, 156, 0.22);
+}
+
+/* Apply light-mode ink to common elements so nothing goes near-black */
+:root:not([data-theme="dark"]) body,
+:root:not([data-theme="dark"]) .card,
+:root:not([data-theme="dark"]) .btn-back,
+:root:not([data-theme="dark"]) .btn-ghost,
+:root:not([data-theme="dark"]) .navlink,
+:root:not([data-theme="dark"]) .tabbar__item,
+:root:not([data-theme="dark"]) .pill {
+  color: var(--ink);
+}
+
+/* ============================================================
+   PAGE LAYOUT
+============================================================ */
 .page {
+  min-height: 100vh;
   padding: 28px 18px 60px;
 }
 
 .center-wrap {
-  min-height: calc(100vh - 140px);
+  min-height: calc(100vh - 120px);
   display: flex;
-  justify-content: flex-start;
-  align-items: flex-start;
-  padding-top: 160px; /* THIS controls vertical position */
+  justify-content: center;
+  align-items: flex-start; /* 👈 important */
+  padding-top: 80px;       /* 👈 locks position */
 }
 
 
-
-
-/* ---------- Card ---------- */
+/* ============================================================
+   CARD
+============================================================ */
 .card {
-  width: min(720px, 100%);
-  background: var(--card);
+  width: 100%;
+  max-width: 720px;
+  margin: 0 auto;
+  background: var(--surface);
   border: 1px solid var(--border);
   border-radius: var(--radius-xl);
   box-shadow: var(--shadow);
+  backdrop-filter: blur(14px);
   padding: 28px;
+  text-align: center;
 }
 
 .center { text-align: center; }
 
-/* ---------- Typography ---------- */
+/* ============================================================
+   TYPOGRAPHY
+============================================================ */
 .kivaw-title {
   font-size: 46px;
   letter-spacing: 0.06em;
   font-weight: 700;
   margin: 0;
   color: var(--primary);
-}
-
-:root[data-theme="dark"] .kivaw-title {
-  color: rgba(255,255,255,0.92);
 }
 
 .kivaw-sub {
@@ -143,11 +97,6 @@
   color: var(--primary);
 }
 
-:root[data-theme="dark"] .h1 {
-  color: rgba(255,255,255,0.92);
-}
-
-/* Small star above text sections */
 .mini-star {
   font-size: 14px;
   line-height: 1;
@@ -156,7 +105,17 @@
   margin-bottom: 10px;
 }
 
-/* ---------- Buttons ---------- */
+/* Result spacing helper */
+.result-text {
+  margin-top: 14px;
+  margin-bottom: 22px;
+}
+.result-text p { margin: 0; }
+.result-text p + p { margin-top: 10px; }
+
+/* ============================================================
+   BUTTONS
+============================================================ */
 .btn {
   border: 0;
   cursor: pointer;
@@ -165,91 +124,143 @@
   font-weight: 650;
   font-size: 16px;
   width: 100%;
+  margin: 0;
+  transition: transform 0.15s ease, box-shadow 0.15s ease, background 0.15s ease;
+}
+
+.btn:active { transform: scale(0.98); }
+
+.btn:focus-visible {
+  outline: 3px solid var(--focus);
+  outline-offset: 2px;
 }
 
 .btn-primary {
   background: linear-gradient(90deg, var(--primary), var(--primary2));
   color: rgba(255,255,255,0.92);
-  box-shadow: 0 12px 22px rgba(93, 112, 174, 0.22);
+  box-shadow: var(--btn-shadow);
 }
 
+/* Ghost default */
+.btn-ghost {
+  background: transparent;
+  border: 1px solid var(--border);
+  color: var(--soft);
+}
+
+/* ✅ Light-mode: softer ghost text (NO black) */
+:root:not([data-theme="dark"]) .btn-ghost {
+  color: var(--ink-soft);
+  border-color: var(--ink-line);
+  font-weight: 500;
+}
+
+/* Dark mode buttons — keep as-is (your flawless vibe) */
 :root[data-theme="dark"] .btn-primary {
   background: rgba(255,255,255,0.18);
   color: rgba(255,255,255,0.92);
+  border: 1px solid rgba(255,255,255,0.18);
   box-shadow: none;
-  border: 1px solid rgba(255,255,255,0.20);
-}
-
-.btn-ghost {
-  background: transparent;
-  color: var(--soft);              /* soft gray-blue */
-  border: 1px solid var(--border);
-  margin-top: 12px;
 }
 
 :root[data-theme="dark"] .btn-ghost {
-  color: rgba(255,255,255,0.78);
+  background: rgba(255,255,255,0.10);
+  color: rgba(255,255,255,0.86);
+  border: 1px solid rgba(255,255,255,0.16);
 }
 
-/* Back button: black (light mode), not bold */
+/* Back button */
 .btn-back {
   width: auto;
-  padding: 8px 12px;
+  padding: 10px 14px;
   font-size: 14px;
-  font-weight: 500;
-  background: transparent;
-  border: 1px solid var(--border);
-  color: var(--text);
+  font-weight: 650;
   border-radius: 999px;
   cursor: pointer;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  color: var(--text);
+  box-shadow: var(--shadow-soft);
+  backdrop-filter: blur(12px);
+  margin-bottom: 18px;
 }
 
-/* ---------- Quiz list buttons ---------- */
+/* ✅ Light-mode back: NO black */
+:root:not([data-theme="dark"]) .btn-back {
+  color: var(--ink-soft);
+  border-color: var(--ink-line);
+  font-weight: 500;
+}
+
+/* Actions layout (results page) */
+.actions {
+  margin-top: 18px;
+  display: flex;
+  flex-direction: column;
+  align-items: stretch;
+}
+
+.actions .btn + .btn { margin-top: 12px; }
+@media (max-width: 520px) {
+  .actions .btn + .btn { margin-top: 14px; }
+}
+
+/* ============================================================
+   QUIZ OPTIONS (PILLS)
+============================================================ */
 .stack { display: grid; gap: 14px; }
 
 .pill {
   width: 100%;
   padding: 18px 16px;
-  border-radius: 18px;
+  border-radius: var(--radius-md);
   border: 1px solid var(--border);
-  background: rgba(255,255,255,0.62);
-  color: var(--soft);              /* soft gray-blue */
+  background: var(--surface);
+  color: var(--soft);
   cursor: pointer;
-  font-weight: 650;                /* bold but not “black-bold” */
+  font-weight: 650;
+  transition: transform 0.15s ease, box-shadow 0.15s ease;
 }
 
 .pill:hover {
-  box-shadow: 0 10px 24px rgba(93,112,174,0.12);
+  box-shadow: var(--shadow-soft);
   transform: translateY(-1px);
+}
+
+/* ✅ Light-mode pill text (NO black) */
+:root:not([data-theme="dark"]) .pill {
+  color: var(--ink);
+  border-color: var(--ink-line);
 }
 
 :root[data-theme="dark"] .pill {
   background: rgba(255,255,255,0.10);
-  color: rgba(255,255,255,0.84);
+  color: rgba(255,255,255,0.90);
 }
 
-/* ---------- Result actions row ---------- */
-.actions {
-  margin-top: 18px;
-  display: flex;
-  gap: 18px;              /* more space between buttons */
-  justify-content: center;
-  flex-wrap: wrap;
+/* ============================================================
+   TOP NAV
+============================================================ */
+.topnav {
+  position: sticky;
+  top: 0;
+  z-index: 20;
+  backdrop-filter: blur(12px);
+  background: var(--nav-bg);
+  border-bottom: 1px solid var(--nav-border);
 }
 
-.actions .btn {
-  width: auto;            /* don’t force full width here */
-  min-width: 190px;
+.topnav__inner {
+  max-width: 1040px;
+  margin: 0 auto;
+  padding: 16px 22px;
+  display: grid;
+  grid-template-columns: 240px 1fr 90px;
+  align-items: center;
+  gap: 14px;
 }
 
-.actions .btn-ghost {
-  margin-top: 0;
-}
-
-/* =====================
-   LOGO SIZE FIX
-===================== */
-
+/* Brand button reset */
 .brand {
   background: none;
   border: none;
@@ -257,24 +268,205 @@
   cursor: pointer;
 }
 
+/* ✅ Bigger logo */
 .brand__logo {
-  height: 300px;
+  height: 120px;
+  max-height: 120px;
   width: auto;
   display: block;
 }
 
-/* Larger on desktop */
 @media (min-width: 900px) {
   .brand__logo {
-    height: 112px;
+    height: 132px;
+    max-height: 132px;
   }
 }
 
+/* Nav links */
+.navlinks {
+  justify-self: center;
+  display: flex;
+  align-items: center;
+  gap: 26px;
+  font-weight: 650;
+}
 
+/* ✅ Light-mode links: NO black */
+.navlink {
+  padding: 10px 12px;
+  border-radius: 999px;
+  text-decoration: none;
+  line-height: 1;
+  color: rgba(92, 106, 156, 0.72);
+}
 
+/* ✅ Active link: still periwinkle (NOT black) */
+.navlink.active,
+.navlink[aria-current="page"] {
+  background: var(--surface-2);
+  color: rgba(92, 106, 156, 0.92);
+}
 
+/* Dark mode nav unchanged */
+:root[data-theme="dark"] .navlink {
+  color: rgba(255,255,255,0.82);
+}
+:root[data-theme="dark"] .navlink.active,
+:root[data-theme="dark"] .navlink[aria-current="page"] {
+  color: rgba(255,255,255,0.92);
+}
 
+/* Theme toggle button */
+.moon {
+  justify-self: end;
+  border: 1px solid var(--border);
+  background: transparent;
+  cursor: pointer;
+  font-size: 18px;
+  line-height: 1;
+  color: var(--text);
+  border-radius: 12px;
+  padding: 10px 12px;
+}
 
+/* ✅ Light-mode moon: NO black */
+:root:not([data-theme="dark"]) .moon {
+  color: var(--ink);
+  border-color: var(--ink-line);
+}
 
+/* ============================================================
+   MOBILE TAB BAR (Option A)
+============================================================ */
+.tabbar { display: none; }
 
+@media (max-width: 720px) {
+  .navlinks--desktop { display: none; }
 
+  .topnav__inner {
+    grid-template-columns: 1fr 90px;
+  }
+
+  .brand__logo {
+    height: 84px;
+    max-height: 84px;
+  }
+
+  .tabbar {
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
+    position: fixed;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    z-index: 30;
+    background: var(--nav-bg);
+    border-top: 1px solid var(--nav-border);
+    backdrop-filter: blur(12px);
+    padding: 10px 10px calc(10px + env(safe-area-inset-bottom));
+  }
+
+  .tabbar__item {
+    display: grid;
+    gap: 6px;
+    place-items: center;
+    text-decoration: none;
+    color: var(--soft);
+    font-weight: 650;
+    padding: 8px 6px;
+    border-radius: 14px;
+    border: 1px solid transparent;
+    background: transparent;
+  }
+
+  .tabbar__btn {
+    border: 0;
+    cursor: pointer;
+    font: inherit;
+    background: transparent;
+  }
+
+  .tabbar__icon {
+    width: 20px;
+    height: 20px;
+    color: var(--text);
+    opacity: 0.88;
+  }
+
+  .tabbar__label {
+    font-size: 12px;
+    line-height: 1;
+  }
+
+  /* ✅ Light-mode active tab: periwinkle, NOT black */
+  :root:not([data-theme="dark"]) .tabbar__item {
+    color: var(--ink-soft);
+  }
+  :root:not([data-theme="dark"]) .tabbar__icon {
+    color: var(--ink-soft);
+  }
+  :root:not([data-theme="dark"]) .tabbar__item.active,
+  :root:not([data-theme="dark"]) .tabbar__item[aria-current="page"] {
+    background: var(--surface-2);
+    color: rgba(92, 106, 156, 0.92);
+  }
+  :root:not([data-theme="dark"]) .tabbar__item.active .tabbar__icon,
+  :root:not([data-theme="dark"]) .tabbar__item[aria-current="page"] .tabbar__icon {
+    color: rgba(92, 106, 156, 0.92);
+    opacity: 1;
+  }
+
+  /* Dark mode active tab unchanged */
+  :root[data-theme="dark"] .tabbar__item.active,
+  :root[data-theme="dark"] .tabbar__item[aria-current="page"] {
+    background: var(--surface-2);
+    color: rgba(255,255,255,0.92);
+  }
+  :root[data-theme="dark"] .tabbar__item.active .tabbar__icon,
+  :root[data-theme="dark"] .tabbar__item[aria-current="page"] .tabbar__icon {
+    color: rgba(255,255,255,0.92);
+    opacity: 1;
+  }
+
+  .page { padding-bottom: 120px; }
+}
+
+/* ============================================================
+   SMALL PHONE POLISH
+============================================================ */
+@media (max-width: 520px) {
+  .center-wrap { padding: 16px 12px; }
+  .card { padding: 18px; border-radius: var(--radius-lg); }
+
+  .kivaw-title { font-size: 34px; }
+  .h1 { font-size: 24px; letter-spacing: -0.2px; }
+  .kivaw-sub { font-size: 16px; }
+
+  .btn {
+    padding: 12px 16px;
+    font-size: 15px;
+    border-radius: 16px;
+  }
+}
+
+/* FINAL spacing fix for action buttons */
+.actions {
+  margin-top: 22px;
+}
+
+.actions .btn + .btn {
+  margin-top: 16px; /* 👈 this is the sweet spot */
+}
+/* Fix homepage button spacing only */
+.home-actions {
+  margin-top: 26px;
+}
+
+.home-actions .btn + .btn {
+  margin-top: 18px;
+}
+/* Home page: slightly more breathing room between the two buttons */
+.home-actions .btn + .btn {
+  margin-top: 18px;
+}
