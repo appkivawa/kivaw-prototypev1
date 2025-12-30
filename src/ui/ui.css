@@ -601,3 +601,75 @@ body {
 :root[data-theme="dark"] .faq__a {
   color: rgba(255, 255, 255, 0.72);
 }
+
+/* ===============================
+   DARK MODE POPOVER FIX
+================================ */
+
+:root[data-theme="dark"] .popover__panel {
+  background: #1c1f2b; /* solid, not transparent */
+  border: 1px solid rgba(255, 255, 255, 0.14);
+  box-shadow: 0 16px 40px rgba(0, 0, 0, 0.55);
+  backdrop-filter: none; /* key fix */
+}
+
+:root[data-theme="dark"] .popover__title {
+  color: rgba(255, 255, 255, 0.92);
+}
+
+:root[data-theme="dark"] .popover__panel {
+  background: linear-gradient(
+    180deg,
+    rgba(34, 38, 55, 0.98),
+    rgba(22, 25, 40, 0.98)
+  );
+}
+
+/* ===== Mobile fit + no weird clipping ===== */
+@media (max-width: 720px) {
+  .page {
+    padding-top: 16px;
+    padding-bottom: 120px; /* room for tabbar if you have it */
+  }
+
+  .center-wrap {
+    min-height: auto;
+    padding-top: 18px;      /* stop pushing content down */
+    padding-bottom: 18px;
+    align-items: flex-start;
+  }
+
+  .card {
+    width: 100%;
+    max-width: 520px;
+    margin: 0 auto;
+  }
+}
+/* ===== Popover: mobile-safe sizing ===== */
+@media (max-width: 520px) {
+  .popover__panel {
+    left: 50%;
+    transform: translateX(-50%);
+    width: calc(100vw - 32px); /* always fits screen */
+    max-width: 360px;
+    max-height: 55vh;          /* don't exceed screen height */
+    overflow: auto;
+  }
+}
+/* ===== Popover: ALWAYS stay on-screen (mobile) ===== */
+@media (max-width: 520px) {
+  .popover__panel {
+    position: fixed !important;
+    left: 16px !important;
+    right: 16px !important;
+    top: 92px !important; /* below your sticky nav */
+    transform: none !important;
+
+    width: auto !important;
+    max-width: none !important;
+
+    max-height: calc(100vh - 160px) !important; /* avoids bottom tab bar */
+    overflow: auto !important;
+  }
+}
+
