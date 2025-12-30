@@ -1,43 +1,44 @@
 import { NavLink, useNavigate } from "react-router-dom";
 import { useTheme } from "../theme/ThemeContext";
 
-import markLight from "../assets/kivaw-mark-light.svg";
-import markDark from "../assets/kivaw-mark-dark.svg";
+import logoLight from "../assets/kivaw-logo-light.png";
+import logoDark from "../assets/kivaw-logo-dark.png";
 
 export default function TopNav() {
   const { theme, toggle } = useTheme();
   const navigate = useNavigate();
 
-  const markSrc = theme === "dark" ? markDark : markLight;
+  const logo = theme === "dark" ? logoDark : logoLight;
 
   return (
     <header className="topnav">
       <div className="topnav__inner">
-        <button className="brand" onClick={() => navigate("/")} aria-label="Go home">
-          <img className="brand__mark" src={markSrc} alt="KIVAW" />
+        <button className="brand" onClick={() => navigate("/")}>
+          <img className="brand__logo" src={logo} alt="Kivaw" />
         </button>
 
-        <nav className="navlinks" aria-label="Primary">
-          <NavLink to="/" className={({ isActive }) => `navlink ${isActive ? "is-active" : ""}`}>
-            Home
-          </NavLink>
-          <NavLink to="/explore" className={({ isActive }) => `navlink ${isActive ? "is-active" : ""}`}>
-            Explore
-          </NavLink>
-          <NavLink to="/saved" className={({ isActive }) => `navlink ${isActive ? "is-active" : ""}`}>
-            Saved
-          </NavLink>
+        <nav className="navlinks">
+          <NavLink to="/" className="navlink">Home</NavLink>
+          <NavLink to="/explore" className="navlink">Explore</NavLink>
+          <NavLink to="/saved" className="navlink">Saved</NavLink>
         </nav>
 
-        <button className="moon" onClick={toggle} aria-label="Toggle theme">
-          {theme === "light" ? "🌙" : "☾"}
+        <button className="moon" onClick={toggle}>
+          {theme === "dark" ? "☀" : "🌙"}
         </button>
       </div>
-
-      <div className="topnav__divider" />
     </header>
   );
 }
+
+
+
+
+
+
+
+
+
 
 
 
