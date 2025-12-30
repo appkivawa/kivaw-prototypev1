@@ -1,7 +1,7 @@
 import { useNavigate } from "react-router-dom";
 import Card from "../../ui/Card";
 import Popover from "../../ui/Popover";
-import { FAQ } from "../../data/faq";
+
 
 const FOCUSES = [
   { key: "music", label: "🎵 Music" },
