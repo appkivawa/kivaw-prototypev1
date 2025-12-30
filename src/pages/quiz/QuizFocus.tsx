@@ -19,15 +19,27 @@ export default function QuizFocus() {
   }
 
   return (
-    <Card>
-      <h1 className="h1">Choose your focus</h1>
-      <div className="stack">
-        {FOCUSES.map((f) => (
-          <button key={f.key} className="pill" onClick={() => choose(f.key)}>
-            {f.label}
+    <div className="page">
+      <div className="center-wrap">
+        <Card className="center">
+          <button className="btn-back" onClick={() => navigate(-1)}>
+            ← Back
           </button>
-        ))}
+
+          <h1 className="h1" style={{ marginTop: 14 }}>
+            Choose your focus
+          </h1>
+
+          <div className="stack" style={{ marginTop: 16 }}>
+            {FOCUSES.map((f) => (
+              <button key={f.key} className="pill" onClick={() => choose(f.key)}>
+                {f.label}
+              </button>
+            ))}
+          </div>
+        </Card>
       </div>
-    </Card>
+    </div>
   );
 }
+

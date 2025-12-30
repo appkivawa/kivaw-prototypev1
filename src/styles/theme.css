@@ -1,40 +1,66 @@
 :root {
-  --font-sans: ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont,
-    "Segoe UI", Roboto, Arial;
+  --font-sans: ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI",
+    Roboto, Arial, "Apple Color Emoji", "Segoe UI Emoji";
 
+  /* LIGHT */
   --bg: #eef2ff;
   --bg2: #f6f7fb;
-  --card: rgba(255, 255, 255, 0.9);
 
+  --card: rgba(255, 255, 255, 0.82);
   --text: #111827;
   --muted: #6b7280;
+  --border: rgba(17, 24, 39, 0.10);
+  --shadow: 0 18px 48px rgba(17, 24, 39, 0.12);
 
+  /* Brand blues */
   --primary: #5d70ae;
   --primary2: #6f83cf;
 
-  --border: rgba(17, 24, 39, 0.08);
-  --shadow: 0 14px 40px rgba(17, 24, 39, 0.12);
+  /* Soft “gray-blue” for secondary text/buttons */
+  --soft: rgba(93, 112, 174, 0.72);
+  --soft2: rgba(93, 112, 174, 0.16);
+
+  /* Nav */
+  --nav-bg: rgba(255, 255, 255, 0.55);
+  --nav-border: rgba(17, 24, 39, 0.06);
+  --nav-divider: rgba(93, 112, 174, 0.10);
+
+  --radius-xl: 28px;
+  --radius-lg: 20px;
+  --radius-md: 14px;
 }
 
 :root[data-theme="dark"] {
+  /* DARK */
   --bg: #5d70ae;
   --bg2: #5d70ae;
+
   --card: rgba(255, 255, 255, 0.12);
+  --text: rgba(255, 255, 255, 0.92);
+  --muted: rgba(255, 255, 255, 0.72);
+  --border: rgba(255, 255, 255, 0.14);
+  --shadow: 0 18px 50px rgba(0, 0, 0, 0.25);
 
-  --text: rgba(255, 255, 255, 0.95);
-  --muted: rgba(255, 255, 255, 0.75);
+  --primary: rgba(255, 255, 255, 0.92);
+  --primary2: rgba(255, 255, 255, 0.88);
 
-  --primary: rgba(255, 255, 255, 0.22);
-  --primary2: rgba(255, 255, 255, 0.3);
+  --soft: rgba(255, 255, 255, 0.78);
+  --soft2: rgba(255, 255, 255, 0.14);
 
-  --border: rgba(255, 255, 255, 0.12);
-  --shadow: 0 18px 40px rgba(0, 0, 0, 0.35);
+  --nav-bg: rgba(255, 255, 255, 0.10);
+  --nav-border: rgba(255, 255, 255, 0.12);
+  --nav-divider: rgba(255, 255, 255, 0.14);
+}
+
+html, body {
+  height: 100%;
 }
 
 body {
   margin: 0;
   font-family: var(--font-sans);
-  background: linear-gradient(var(--bg), var(--bg2));
   color: var(--text);
+  background:
+    radial-gradient(1200px 600px at 50% 15%, rgba(93,112,174,0.14), transparent 60%),
+    linear-gradient(180deg, var(--bg), var(--bg2));
 }
-

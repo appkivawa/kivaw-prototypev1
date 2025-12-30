@@ -17,15 +17,29 @@ export default function QuizState() {
   }
 
   return (
-    <Card>
-      <h1 className="h1">What’s your current state?</h1>
-      <div className="stack">
-        {STATES.map((s) => (
-          <button key={s.key} className="pill" onClick={() => choose(s.key)}>
-            {s.label}
+    <div className="page">
+      <div className="center-wrap">
+        <Card className="center">
+          <button className="btn-back" onClick={() => navigate(-1)}>
+            ← Back
           </button>
-        ))}
+
+          <h1 className="h1" style={{ marginTop: 14 }}>
+            What’s your current state?
+          </h1>
+
+          <div className="stack" style={{ marginTop: 16 }}>
+            {STATES.map((s) => (
+              <button key={s.key} className="pill" onClick={() => choose(s.key)}>
+                {s.label}
+              </button>
+            ))}
+          </div>
+        </Card>
       </div>
-    </Card>
+    </div>
   );
 }
+
+
+

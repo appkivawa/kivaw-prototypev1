@@ -1,20 +1,26 @@
+/* ---------- Top Nav ---------- */
 .topnav {
   position: sticky;
   top: 0;
-  z-index: 10;
+  z-index: 20;
   backdrop-filter: blur(12px);
   background: var(--nav-bg);
   border-bottom: 1px solid var(--nav-border);
 }
 
 .topnav__inner {
-  max-width: 980px;
+  max-width: 1040px;
   margin: 0 auto;
-  padding: 14px 16px;
-  display: flex;
+  padding: 18px 22px; /* bigger header */
+  display: grid;
+  grid-template-columns: 160px 1fr 80px;
   align-items: center;
-  justify-content: space-between;
   gap: 14px;
+}
+
+.topnav__divider {
+  height: 1px;
+  background: var(--nav-divider);
 }
 
 .brand {
@@ -24,42 +30,53 @@
   border: 0;
   background: transparent;
   cursor: pointer;
+  padding: 0;
 }
 
-.brand__name {
-  font-weight: 600;
-  letter-spacing: 0.2px;
-  color: var(--primary);
-  font-size: 18px;
+.brand__mark {
+  width: 64px;     /* bigger logo */
+  height: 64px;
+  display: block;
+}
+
+@media (min-width: 900px) {
+  .brand__mark {
+    width: 72px;
+    height: 72px;
+  }
 }
 
 .navlinks {
+  justify-self: center;
   display: flex;
   align-items: center;
-  gap: 22px;
-  font-weight: 500;
-  color: var(--muted);
+  gap: 26px;
+  font-weight: 600;
+  color: var(--soft);
 }
 
 .navlink {
-  padding: 8px 10px;
+  padding: 10px 12px;
   border-radius: 999px;
   text-decoration: none;
   color: inherit;
+  line-height: 1;
 }
 
 .navlink.is-active {
-  color: var(--text);
-  background: rgba(93, 112, 174, 0.10);
-  box-shadow: inset 0 0 0 1px rgba(93, 112, 174, 0.12);
+  color: var(--primary);
+  background: var(--soft2);
+  box-shadow: inset 0 0 0 1px rgba(93, 112, 174, 0.14);
 }
 
 :root[data-theme="dark"] .navlink.is-active {
-  background: rgba(255,255,255,0.10);
-  box-shadow: inset 0 0 0 1px rgba(255,255,255,0.16);
+  color: rgba(255,255,255,0.92);
+  background: rgba(255,255,255,0.12);
+  box-shadow: inset 0 0 0 1px rgba(255,255,255,0.18);
 }
 
 .moon {
+  justify-self: end;
   border: 0;
   background: transparent;
   cursor: pointer;
@@ -68,17 +85,30 @@
   color: var(--text);
 }
 
+/* ---------- Layout helpers ---------- */
+.page {
+  padding: 28px 18px 60px;
+}
+
+.center-wrap {
+  min-height: calc(100vh - 120px);
+  display: grid;
+  place-items: center;
+}
+
+/* ---------- Card ---------- */
 .card {
-  width: min(760px, 100%);
+  width: min(720px, 100%);
   background: var(--card);
   border: 1px solid var(--border);
   border-radius: var(--radius-xl);
   box-shadow: var(--shadow);
-  padding: 26px;
+  padding: 28px;
 }
 
 .center { text-align: center; }
 
+/* ---------- Typography ---------- */
 .kivaw-title {
   font-size: 46px;
   letter-spacing: 0.06em;
@@ -97,19 +127,41 @@
   font-size: 18px;
 }
 
+.h1 {
+  font-size: 34px;
+  margin: 0 0 12px;
+  font-weight: 700;
+  letter-spacing: -0.4px;
+  color: var(--primary);
+}
+
+:root[data-theme="dark"] .h1 {
+  color: rgba(255,255,255,0.92);
+}
+
+/* Small star above text sections */
+.mini-star {
+  font-size: 14px;
+  line-height: 1;
+  color: var(--soft);
+  display: inline-block;
+  margin-bottom: 10px;
+}
+
+/* ---------- Buttons ---------- */
 .btn {
   border: 0;
   cursor: pointer;
   padding: 16px 18px;
   border-radius: 999px;
-  font-weight: 600;
+  font-weight: 650;
   font-size: 16px;
   width: 100%;
 }
 
 .btn-primary {
   background: linear-gradient(90deg, var(--primary), var(--primary2));
-  color: white;
+  color: rgba(255,255,255,0.92);
   box-shadow: 0 12px 22px rgba(93, 112, 174, 0.22);
 }
 
@@ -122,18 +174,29 @@
 
 .btn-ghost {
   background: transparent;
-  color: var(--muted);
+  color: var(--soft);              /* soft gray-blue */
   border: 1px solid var(--border);
-  margin-top: 10px;
+  margin-top: 12px;
 }
 
-.h1 {
-  font-size: 34px;
-  margin: 0 0 10px;
-  font-weight: 700;
-  letter-spacing: -0.4px;
+:root[data-theme="dark"] .btn-ghost {
+  color: rgba(255,255,255,0.78);
 }
 
+/* Back button: black (light mode), not bold */
+.btn-back {
+  width: auto;
+  padding: 8px 12px;
+  font-size: 14px;
+  font-weight: 500;
+  background: transparent;
+  border: 1px solid var(--border);
+  color: var(--text);
+  border-radius: 999px;
+  cursor: pointer;
+}
+
+/* ---------- Quiz list buttons ---------- */
 .stack { display: grid; gap: 14px; }
 
 .pill {
@@ -141,12 +204,41 @@
   padding: 18px 16px;
   border-radius: 18px;
   border: 1px solid var(--border);
-  background: rgba(255,255,255,0.60);
-  color: var(--text);
+  background: rgba(255,255,255,0.62);
+  color: var(--soft);              /* soft gray-blue */
   cursor: pointer;
-  font-weight: 600;
+  font-weight: 650;                /* bold but not “black-bold” */
+}
+
+.pill:hover {
+  box-shadow: 0 10px 24px rgba(93,112,174,0.12);
+  transform: translateY(-1px);
 }
 
 :root[data-theme="dark"] .pill {
   background: rgba(255,255,255,0.10);
+  color: rgba(255,255,255,0.84);
 }
+
+/* ---------- Result actions row ---------- */
+.actions {
+  margin-top: 18px;
+  display: flex;
+  gap: 18px;              /* more space between buttons */
+  justify-content: center;
+  flex-wrap: wrap;
+}
+
+.actions .btn {
+  width: auto;            /* don’t force full width here */
+  min-width: 190px;
+}
+
+.actions .btn-ghost {
+  margin-top: 0;
+}
+
+
+
+
+
