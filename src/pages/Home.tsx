@@ -37,8 +37,9 @@ export default function Home() {
         label: "Destructive",
         description: "Need to release energy",
       },
-      { key: "expansive", emoji: "🌸", label: "Expansive", description: "Want to grow" },
-      { key: "minimizer", emoji: "🌙", label: "Minimizer", description: "Need simplicity" },
+      { key: "expansive", emoji: "🌱", label: "Expansive", description: "Want to grow" },
+      // ✅ label updated, key unchanged
+      { key: "minimizer", emoji: "🌙", label: "Minimize", description: "Need simplicity" },
     ],
     []
   );
@@ -58,8 +59,10 @@ export default function Home() {
             {greetingEmoji}
           </div>
 
-          <h1 className="homev2__title">How are you feeling?</h1>
-          <p className="homev2__sub">We&apos;ll find what you need</p>
+          <h1 className="homev2__title">What would you like to do right now?</h1>
+          <p className="homev2__sub">
+            We&apos;ll help you find something that fits your energy.
+          </p>
         </header>
 
         {/* Mood picker */}
@@ -95,7 +98,7 @@ export default function Home() {
             className="homev2__skip"
             onClick={() => navigate("/explore")}
           >
-            Skip and browse →
+            Just browsing →
           </button>
         </Card>
 
@@ -110,11 +113,12 @@ export default function Home() {
               <span className="homev2__actionEmoji" aria-hidden="true">
                 🌊
               </span>
-              <span className="homev2__actionTitle">See what&apos;s trending</span>
+              <span className="homev2__actionTitle">What&apos;s working for others</span>
             </div>
-            <div className="homev2__actionSub">Live feed of what&apos;s working</div>
+            <div className="homev2__actionSub">Live, real-time favorites</div>
           </button>
 
+          {/* ✅ keep this button */}
           <button
             type="button"
             className="homev2__actionCard"
@@ -133,6 +137,8 @@ export default function Home() {
     </div>
   );
 }
+
+
 
 
 
