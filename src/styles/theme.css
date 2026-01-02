@@ -1,79 +1,91 @@
 /* ============================================================
-   KIVAW THEME TOKENS (single source of truth)
+   KIVAW THEME TOKENS (single source of truth) + SYSTEM UI FONT
+   Goal: airy periwinkle, blue-gray text, NO harsh black.
 ============================================================ */
 
 :root {
+  /* Font */
+  --font: ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI",
+    Roboto, Helvetica, Arial, "Apple Color Emoji", "Segoe UI Emoji";
+
   /* Brand */
-  --primary: #5d70ae;
-  --primary2: #7a8fd6;
+  --primary: #5d70ae;   /* base periwinkle */
+  --primary2: #7a8fd6;  /* glow periwinkle */
 
   /* Background */
   --bg: #f6f7fc;
-  --bg-glow: rgba(93, 112, 174, 0.14);
+  --bg-glow: rgba(122, 143, 214, 0.18);
 
   /* Surfaces */
   --surface: rgba(255, 255, 255, 0.86);
-  --surface-2: rgba(93, 112, 174, 0.10);
+  --surface-2: rgba(122, 143, 214, 0.10);
 
-  /* Text */
-  --text: #121727;
-  --muted: rgba(18, 23, 39, 0.60);
-  --soft: rgba(18, 23, 39, 0.70);
+  /* Text (blue-gray, not charcoal) */
+  --text: #2a2f4f;              /* headline */
+  --muted: rgba(42, 47, 79, 0.62);
+  --soft: rgba(42, 47, 79, 0.74);
+  --text-soft: rgba(42, 47, 79, 0.70);
 
-  /* Lines */
-  --border: rgba(18, 23, 39, 0.10);
+  /* Borders / shadows */
+  --border: rgba(93, 112, 174, 0.18);
+  --border-strong: rgba(93, 112, 174, 0.28);
+
+  --shadow: 0 18px 40px rgba(25, 28, 55, 0.10);
+  --shadow-soft: 0 12px 26px rgba(25, 28, 55, 0.08);
+
+  /* Radius */
+  --r-lg: 18px;
+  --r-xl: 24px;
+
+  /* Focus ring */
+  --focus: rgba(122, 143, 214, 0.28);
 
   /* Nav */
-  --nav-bg: rgba(246, 247, 252, 0.86);
-  --nav-border: rgba(18, 23, 39, 0.08);
+  --nav-bg: rgba(255, 255, 255, 0.78);
+  --nav-border: rgba(93, 112, 174, 0.16);
 
-  /* Shape + shadows */
-  --radius-sm: 10px;
-  --radius-md: 16px;
-  --radius-lg: 22px;
-  --radius-xl: 28px;
+  /* Controls */
+  --control-bg: rgba(255, 255, 255, 0.70);
+  --control-ring: rgba(122, 143, 214, 0.22);
 
-  --shadow: 0 18px 45px rgba(17, 24, 39, 0.10);
-  --shadow-soft: 0 10px 24px rgba(17, 24, 39, 0.08);
-  --btn-shadow: 0 12px 22px rgba(93, 112, 174, 0.20);
-
-  /* Focus */
-  --focus: rgba(93, 112, 174, 0.28);
+  /* Buttons */
+  --btn-shadow: 0 14px 28px rgba(93, 112, 174, 0.18);
 }
 
-/* ============================================================
-   DARK THEME — “Periwinkle Night” (matches your screenshot vibe)
-============================================================ */
+/* Dark theme (still periwinkle + soft, NO pure black) */
 :root[data-theme="dark"] {
-  /* Brand stays soft (not electric) */
-  --primary: rgba(255,255,255,0.92);
-  --primary2: rgba(255,255,255,0.88);
+  --bg: #141733; /* deep indigo-periwinkle (not black) */
+  --bg-glow: rgba(122, 143, 214, 0.22);
 
-  /* Background: the periwinkle tone you liked */
-  --bg: #6f7fb3;
-  --bg-glow: rgba(255, 255, 255, 0.10);
+  --surface: rgba(22, 26, 56, 0.72);
+  --surface-2: rgba(122, 143, 214, 0.14);
 
-  /* Surfaces: glassy */
-  --surface: rgba(255, 255, 255, 0.14);
-  --surface-2: rgba(255, 255, 255, 0.10);
+  --text: rgba(240, 242, 255, 0.94);
+  --muted: rgba(240, 242, 255, 0.62);
+  --soft: rgba(240, 242, 255, 0.78);
+  --text-soft: rgba(240, 242, 255, 0.74);
 
-  /* Text */
-  --text: rgba(255, 255, 255, 0.92);
-  --muted: rgba(255, 255, 255, 0.72);
-  --soft: rgba(255, 255, 255, 0.82);
+  --border: rgba(240, 242, 255, 0.14);
+  --border-strong: rgba(240, 242, 255, 0.22);
 
-  /* Lines */
-  --border: rgba(255, 255, 255, 0.18);
+  --shadow: 0 22px 46px rgba(8, 10, 24, 0.42);
+  --shadow-soft: 0 16px 34px rgba(8, 10, 24, 0.34);
 
-  /* Nav */
-  --nav-bg: rgba(79, 92, 144, 0.62);
-  --nav-border: rgba(255, 255, 255, 0.18);
+  --focus: rgba(122, 143, 214, 0.30);
 
-  /* Shadows */
-  --shadow: 0 18px 55px rgba(0, 0, 0, 0.30);
-  --shadow-soft: 0 10px 28px rgba(0, 0, 0, 0.22);
-  --btn-shadow: none;
+  --nav-bg: rgba(22, 26, 56, 0.74);
+  --nav-border: rgba(240, 242, 255, 0.10);
 
-  /* Focus */
-  --focus: rgba(255, 255, 255, 0.22);
+  --control-bg: rgba(22, 26, 56, 0.62);
+  --control-ring: rgba(122, 143, 214, 0.24);
+
+  --btn-shadow: 0 18px 34px rgba(8, 10, 24, 0.35);
 }
+
+
+
+
+
+
+
+

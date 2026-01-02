@@ -1,19 +1,32 @@
+import { useMemo } from "react";
 import { useNavigate } from "react-router-dom";
 import Card from "../../ui/Card";
-import Popover from "../../ui/Popover";
-
 
 const FOCUSES = [
-  { key: "music", label: "🎵 Music" },
-  { key: "logic", label: "🧠 Logic" },
-  { key: "art", label: "🎨 Art" },
-  { key: "faith", label: "🙏 Faith" },
-  { key: "movement", label: "🏃 Movement" },
-  { key: "beauty", label: "✨ Beauty" },
+  { key: "music", emoji: "🎵", label: "Music" },
+  { key: "watch", emoji: "📺", label: "Watch" },
+  { key: "read", emoji: "📚", label: "Read" },
+  { key: "move", emoji: "🏃", label: "Move" },
+  { key: "create", emoji: "✍️", label: "Create" },
+  { key: "reset", emoji: "🧘", label: "Reset" },
 ] as const;
+
+function titleCase(s: string) {
+  if (!s) return "";
+  return s.charAt(0).toUpperCase() + s.slice(1);
+}
 
 export default function QuizFocus() {
   const navigate = useNavigate();
+
+  const stateRaw = sessionStorage.getItem("kivaw_state") || "blank";
+  const stateLabel = titleCase(stateRaw);
+
+  const viewTarget = useMemo(() => {
+    // If focus already chosen, allow quick jump to results
+    const hasFocus = !!sessionStorage.getItem("kivaw_focus");
+    return hasFocus ? "/quiz/result" : null;
+  }, []);
 
   function choose(focus: string) {
     sessionStorage.setItem("kivaw_focus", focus);
@@ -23,47 +36,58 @@ export default function QuizFocus() {
   return (
     <div className="page">
       <div className="center-wrap">
-        <Card className="center">
-          <div className="quiz-top">
-            <button className="btn-back" onClick={() => navigate(-1)}>
+        <div className="quiz-shell">
+          <div className="quiz-shell__top">
+            <button className="btn-ghost" onClick={() => navigate(-1)} type="button">
               ← Back
             </button>
 
-            <Popover
-              label="Help"
-              content={
-                <div>
-                  <div className="popover__title">Quick definitions</div>
-                  <p>
-                    <strong>Focus</strong> = the area of life you’re aiming at.
-                  </p>
-                  <p>
-                    <strong>State</strong> = your current mode (how you’re processing today).
-                  </p>
-                  <p>
-                    <strong>State + Focus</strong> = your recommendation style for right now.
-                  </p>
-                </div>
-              }
-            >
-              <span className="help-chip">?</span>
-            </Popover>
-          </div>
-
-          <h1 className="h1" style={{ marginTop: 12 }}>
-            Choose your focus
-          </h1>
-
-          <div className="stack" style={{ marginTop: 16 }}>
-            {FOCUSES.map((f) => (
-              <button key={f.key} className="pill" onClick={() => choose(f.key)}>
-                {f.label}
+            <div className="quiz-view">
+              <div className="quiz-view__label">VIEW:</div>
+              <button
+                className="quiz-view__pill"
+                type="button"
+                onClick={() => {
+                  if (viewTarget) navigate(viewTarget);
+                }}
+                disabled={!viewTarget}
+                aria-disabled={!viewTarget}
+                title={!viewTarget ? "Pick a focus first" : "Go to results"}
+              >
+                Results
               </button>
-            ))}
+            </div>
           </div>
-        </Card>
+
+          <h1 className="quiz-title">What’s your focus?</h1>
+          <div className="quiz-subline">
+            State: <strong>{stateLabel}</strong>
+          </div>
+
+          <Card className="quiz-card">
+            <div className="focus-list">
+              {FOCUSES.map((f) => (
+                <button
+                  key={f.key}
+                  className="focus-row"
+                  type="button"
+                  onClick={() => choose(f.key)}
+                >
+                  <span className="focus-row__emoji" aria-hidden="true">
+                    {f.emoji}
+                  </span>
+                  <span className="focus-row__label">{f.label}</span>
+                </button>
+              ))}
+            </div>
+          </Card>
+        </div>
       </div>
     </div>
   );
 }
+
+
+
+
 

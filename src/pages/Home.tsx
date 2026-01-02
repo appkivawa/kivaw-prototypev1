@@ -1,40 +1,148 @@
+import { useEffect, useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import Card from "../ui/Card";
 
+type MoodKey = "blank" | "destructive" | "expansive" | "minimizer";
+
 export default function Home() {
   const navigate = useNavigate();
+  const [timeOfDay, setTimeOfDay] = useState<"morning" | "afternoon" | "evening">(
+    "evening"
+  );
+
+  useEffect(() => {
+    const hour = new Date().getHours();
+    if (hour < 12) setTimeOfDay("morning");
+    else if (hour < 18) setTimeOfDay("afternoon");
+    else setTimeOfDay("evening");
+  }, []);
+
+  const greetingEmoji = useMemo(() => {
+    if (timeOfDay === "morning") return "☀️";
+    if (timeOfDay === "afternoon") return "🌤️";
+    return "🌙";
+  }, [timeOfDay]);
+
+  const moods: Array<{
+    key: MoodKey;
+    emoji: string;
+    label: string;
+    description: string;
+  }> = useMemo(
+    () => [
+      { key: "blank", emoji: "☁️", label: "Blank", description: "Need to zone out" },
+      {
+        key: "destructive",
+        emoji: "🔥",
+        label: "Destructive",
+        description: "Need to release energy",
+      },
+      { key: "expansive", emoji: "🌸", label: "Expansive", description: "Want to grow" },
+      { key: "minimizer", emoji: "🌙", label: "Minimizer", description: "Need simplicity" },
+    ],
+    []
+  );
+
+  function chooseMood(mood: MoodKey) {
+    sessionStorage.setItem("kivaw_state", mood);
+    // send them straight to focus selection since state is now chosen
+    navigate("/quiz/focus");
+  }
 
   return (
-    <div className="page">
-      <div className="center-wrap">
-        <Card className="center">
-          <div className="mini-star">✦</div>
-
-          <p className="kivaw-sub" style={{ marginTop: 0 }}>
-            Find what fits your mood.
-          </p>
-
-          {/* IMPORTANT: wrap buttons so spacing rules apply */}
-          <div className="actions home-actions">
-            <button
-              className="btn btn-primary"
-              onClick={() => navigate("/quiz/state")}
-            >
-              Get Recommendations →
-            </button>
-
-            <button
-              className="btn btn-ghost"
-              onClick={() => navigate("/explore")}
-            >
-              Browse as guest
-            </button>
+    <div className="page homev2">
+      <div className="homev2__wrap">
+        {/* Header */}
+        <header className="homev2__header">
+          <div className="homev2__greeting" aria-hidden="true">
+            {greetingEmoji}
           </div>
+
+          <h1 className="homev2__title">How are you feeling?</h1>
+          <p className="homev2__sub">We&apos;ll find what you need</p>
+        </header>
+
+        {/* Mood picker */}
+        <Card className="homev2__card">
+          <div className="homev2__moods" role="list">
+            {moods.map((m) => (
+              <button
+                key={m.key}
+                type="button"
+                className="homev2__mood"
+                onClick={() => chooseMood(m.key)}
+              >
+                <span className="homev2__moodLeft">
+                  <span className="homev2__moodEmoji" aria-hidden="true">
+                    {m.emoji}
+                  </span>
+
+                  <span className="homev2__moodText">
+                    <span className="homev2__moodLabel">{m.label}</span>
+                    <span className="homev2__moodDesc">{m.description}</span>
+                  </span>
+                </span>
+
+                <span className="homev2__moodArrow" aria-hidden="true">
+                  →
+                </span>
+              </button>
+            ))}
+          </div>
+
+          <button
+            type="button"
+            className="homev2__skip"
+            onClick={() => navigate("/explore")}
+          >
+            Skip and browse →
+          </button>
         </Card>
+
+        {/* Secondary actions */}
+        <div className="homev2__actions">
+          <button
+            type="button"
+            className="homev2__actionCard"
+            onClick={() => navigate("/waves")}
+          >
+            <div className="homev2__actionTop">
+              <span className="homev2__actionEmoji" aria-hidden="true">
+                🌊
+              </span>
+              <span className="homev2__actionTitle">See what&apos;s trending</span>
+            </div>
+            <div className="homev2__actionSub">Live feed of what&apos;s working</div>
+          </button>
+
+          <button
+            type="button"
+            className="homev2__actionCard"
+            onClick={() => navigate("/explore")}
+          >
+            <div className="homev2__actionTop">
+              <span className="homev2__actionEmoji" aria-hidden="true">
+                🧭
+              </span>
+              <span className="homev2__actionTitle">Browse everything</span>
+            </div>
+            <div className="homev2__actionSub">Explore by category and vibe</div>
+          </button>
+        </div>
       </div>
     </div>
   );
 }
+
+
+
+
+
+
+
+
+
+
 
 
 

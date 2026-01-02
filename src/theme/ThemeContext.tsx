@@ -2,13 +2,13 @@ import React, { createContext, useContext, useEffect, useMemo, useState } from "
 
 type Theme = "light" | "dark";
 
-type ThemeCtx = {
+type ThemeContextType = {
   theme: Theme;
   toggle: () => void;
   setTheme: (t: Theme) => void;
 };
 
-const ThemeContext = createContext<ThemeCtx | null>(null);
+const ThemeContext = createContext<ThemeContextType | null>(null);
 const STORAGE_KEY = "kivaw_theme";
 
 export function ThemeProvider({ children }: { children: React.ReactNode }) {
@@ -17,14 +17,13 @@ export function ThemeProvider({ children }: { children: React.ReactNode }) {
     return saved === "dark" || saved === "light" ? (saved as Theme) : "light";
   });
 
-  const setTheme = (t: Theme) => setThemeState(t);
-  const toggle = () => setThemeState((prev) => (prev === "dark" ? "light" : "dark"));
-
   useEffect(() => {
-    const root = document.documentElement; // <html>
-    root.setAttribute("data-theme", theme);
+    document.documentElement.setAttribute("data-theme", theme);
     localStorage.setItem(STORAGE_KEY, theme);
   }, [theme]);
+
+  const toggle = () => setThemeState((prev) => (prev === "dark" ? "light" : "dark"));
+  const setTheme = (t: Theme) => setThemeState(t);
 
   const value = useMemo(() => ({ theme, toggle, setTheme }), [theme]);
 
@@ -36,3 +35,4 @@ export function useTheme() {
   if (!ctx) throw new Error("useTheme must be used within ThemeProvider");
   return ctx;
 }
+

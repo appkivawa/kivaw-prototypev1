@@ -2,11 +2,12 @@ import React from "react";
 import ReactDOM from "react-dom/client";
 import { BrowserRouter } from "react-router-dom";
 import App from "./App";
-import { ThemeProvider } from "./theme/ThemeContext";
 
-import "./index.css";
-import "./styles/theme.css";
+// global styles
 import "./ui/ui.css";
+
+// ✅ correct path based on your folder: src/theme/ThemeContext.tsx
+import { ThemeProvider } from "./theme/ThemeContext";
 
 ReactDOM.createRoot(document.getElementById("root")!).render(
   <React.StrictMode>
@@ -17,4 +18,12 @@ ReactDOM.createRoot(document.getElementById("root")!).render(
     </ThemeProvider>
   </React.StrictMode>
 );
+
+
+
+
+
+
+
+
 
