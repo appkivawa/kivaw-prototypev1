@@ -3,10 +3,17 @@ import Card from "../../ui/Card";
 import Popover from "../../ui/Popover";
 
 const STATES = [
-  { key: "minimizer", label: "Minimizer", emoji: "🧩" },
-  { key: "destructivist", label: "Destructivist", emoji: "🔥" },
-  { key: "expansivist", label: "Expansivist", emoji: "🌿" },
-  { key: "blank", label: "Blank", emoji: "🫧" },
+  // ✅ key stays "minimizer" (DB + Home), label updated, emoji aligned
+  { key: "minimizer", label: "Minimize", emoji: "🌙" },
+
+  // ✅ key updated to match DB + Home
+  { key: "destructive", label: "Destructive", emoji: "🔥" },
+
+  // ✅ key updated to match DB + Home, emoji agreed (🌱)
+  { key: "expansive", label: "Expansive", emoji: "🌱" },
+
+  // ✅ blank stays blank; emoji aligned to Home vibe (☁️)
+  { key: "blank", label: "Blank", emoji: "☁️" },
 ] as const;
 
 export default function QuizState() {
@@ -22,7 +29,7 @@ export default function QuizState() {
       <div className="quiz-wrap">
         <Card className="quiz-card">
           <div className="quiz-top">
-            <button className="quiz-back" onClick={() => navigate(-1)}>
+            <button className="quiz-back" onClick={() => navigate(-1)} type="button">
               ← Back
             </button>
 
@@ -51,8 +58,15 @@ export default function QuizState() {
 
           <div className="quiz-options">
             {STATES.map((s) => (
-              <button key={s.key} className="quiz-option" onClick={() => choose(s.key)}>
-                <span className="quiz-emoji">{s.emoji}</span>
+              <button
+                key={s.key}
+                className="quiz-option"
+                onClick={() => choose(s.key)}
+                type="button"
+              >
+                <span className="quiz-emoji" aria-hidden="true">
+                  {s.emoji}
+                </span>
                 <span>{s.label}</span>
               </button>
             ))}
@@ -62,6 +76,7 @@ export default function QuizState() {
     </div>
   );
 }
+
 
 
 

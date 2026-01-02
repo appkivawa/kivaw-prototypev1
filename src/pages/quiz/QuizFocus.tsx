@@ -1,4 +1,4 @@
-import { useMemo } from "react";
+import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import Card from "../../ui/Card";
 
@@ -7,9 +7,14 @@ const FOCUSES = [
   { key: "watch", emoji: "📺", label: "Watch" },
   { key: "read", emoji: "📚", label: "Read" },
   { key: "move", emoji: "🏃", label: "Move" },
-  { key: "create", emoji: "✍️", label: "Create" },
+
+  // ✅ Create includes sound/music creation too (key stays "create")
+  { key: "create", emoji: "🎨", label: "Create" },
+
   { key: "reset", emoji: "🧘", label: "Reset" },
 ] as const;
+
+type FocusKey = (typeof FOCUSES)[number]["key"];
 
 function titleCase(s: string) {
   if (!s) return "";
@@ -19,17 +24,24 @@ function titleCase(s: string) {
 export default function QuizFocus() {
   const navigate = useNavigate();
 
-  const stateRaw = sessionStorage.getItem("kivaw_state") || "blank";
-  const stateLabel = titleCase(stateRaw);
+  const [selectedFocus, setSelectedFocus] = useState<string>(
+    () => sessionStorage.getItem("kivaw_focus") || ""
+  );
 
-  const viewTarget = useMemo(() => {
-    // If focus already chosen, allow quick jump to results
-    const hasFocus = !!sessionStorage.getItem("kivaw_focus");
-    return hasFocus ? "/quiz/result" : null;
+  // Keep UI in sync if user navigates back here after selecting a focus
+  useEffect(() => {
+    const current = sessionStorage.getItem("kivaw_focus") || "";
+    setSelectedFocus(current);
   }, []);
 
-  function choose(focus: string) {
+  const stateRaw = sessionStorage.getItem("kivaw_state") || "blank";
+  const stateLabel = stateRaw === "blank" ? "Blank" : titleCase(stateRaw);
+
+  const hasFocus = !!selectedFocus;
+
+  function choose(focus: FocusKey) {
     sessionStorage.setItem("kivaw_focus", focus);
+    setSelectedFocus(focus);
     navigate("/quiz/result");
   }
 
@@ -38,7 +50,11 @@ export default function QuizFocus() {
       <div className="center-wrap">
         <div className="quiz-shell">
           <div className="quiz-shell__top">
-            <button className="btn-ghost" onClick={() => navigate(-1)} type="button">
+            <button
+              className="btn-ghost"
+              onClick={() => navigate(-1)}
+              type="button"
+            >
               ← Back
             </button>
 
@@ -48,11 +64,11 @@ export default function QuizFocus() {
                 className="quiz-view__pill"
                 type="button"
                 onClick={() => {
-                  if (viewTarget) navigate(viewTarget);
+                  if (hasFocus) navigate("/quiz/result");
                 }}
-                disabled={!viewTarget}
-                aria-disabled={!viewTarget}
-                title={!viewTarget ? "Pick a focus first" : "Go to results"}
+                disabled={!hasFocus}
+                aria-disabled={!hasFocus}
+                title={!hasFocus ? "Pick a focus first" : "Go to results"}
               >
                 Results
               </button>
@@ -66,19 +82,38 @@ export default function QuizFocus() {
 
           <Card className="quiz-card">
             <div className="focus-list">
-              {FOCUSES.map((f) => (
-                <button
-                  key={f.key}
-                  className="focus-row"
-                  type="button"
-                  onClick={() => choose(f.key)}
-                >
-                  <span className="focus-row__emoji" aria-hidden="true">
-                    {f.emoji}
-                  </span>
-                  <span className="focus-row__label">{f.label}</span>
-                </button>
-              ))}
+              {FOCUSES.map((f) => {
+                const isSelected = selectedFocus === f.key;
+
+                return (
+                  <button
+                    key={f.key}
+                    className="focus-row"
+                    type="button"
+                    onClick={() => choose(f.key)}
+                    aria-pressed={isSelected}
+                    aria-label={`Choose focus: ${f.label}`}
+                    title={isSelected ? "Selected" : `Choose ${f.label}`}
+                  >
+                    <span className="focus-row__emoji" aria-hidden="true">
+                      {f.emoji}
+                    </span>
+                    <span className="focus-row__label">{f.label}</span>
+
+                    {/* Optional subtle indicator without requiring CSS changes */}
+                    {isSelected ? (
+                      <span
+                        aria-hidden="true"
+                        style={{ marginLeft: "auto", opacity: 0.8 }}
+                      >
+                        ✓
+                      </span>
+                    ) : (
+                      <span aria-hidden="true" style={{ marginLeft: "auto" }} />
+                    )}
+                  </button>
+                );
+              })}
             </div>
           </Card>
         </div>
@@ -86,6 +121,9 @@ export default function QuizFocus() {
     </div>
   );
 }
+
+
+
 
 
 
