@@ -1,62 +1,50 @@
-// src/data/contentApi.ts
+import { supabase } from "../lib/supabaseClient";
+
 export type ContentItem = {
   id: string;
+  external_id: string;
+  kind: string;
   title: string;
-  kind?: string;       // e.g. "Playlist", "Exercise", "Visual"
-  category?: string;   // e.g. "Background calm"
-  source?: string;     // e.g. "Kivaw"
-  icon?: string;       // emoji or short label
-  tags?: string[];
+
+  byline: string | null;
+  meta: string | null;
+  image_url: string | null;
+  url: string | null;
+
+  state_tags: string[] | null;
+  focus_tags: string[] | null;
+  usage_tags: string[] | null;
+
+  source: string | null;
+  created_at: string;
 };
 
-// ---- local "DB" (swap later with Supabase/Firebase without touching UI) ----
-const LS_SAVED_KEY = "kivaw_saved_ids_v1";
+export async function listContentItems(params?: {
+  kind?: string; // "All" | "Playlist" | ...
+  q?: string; // search string
+  limit?: number;
+}) {
+  const kind = params?.kind && params.kind !== "All" ? params.kind : null;
+  const q = (params?.q || "").trim();
+  const limit = params?.limit ?? 80;
 
-// You likely already have real content somewhere.
-// If you already have a listContentItems implementation, keep yours and delete this sample.
-const SAMPLE: ContentItem[] = [
-  { id: "neutral-sounds", title: "Neutral Sounds", kind: "Playlist", category: "Background calm", source: "Kivaw", icon: "🎧", tags: ["#windingdown"] },
-  { id: "soft-reset", title: "Soft Reset", kind: "Playlist", category: "Calm, grounding sounds", source: "Kivaw", icon: "🎵", tags: ["#latenight", "#emotionalreset"] },
-  { id: "release-playlist", title: "Release Playlist", kind: "Playlist", category: "Let it out safely", source: "Kivaw", icon: "🎶", tags: ["#burnenergy"] },
-  { id: "faith-vision", title: "Faith & Vision", kind: "Reflection", category: "Purpose alignment", source: "Kivaw", icon: "✦", tags: ["#prayer"] },
-  { id: "creative-sprint", title: "Creative Sprint", kind: "Exercise", category: "Make something fast", source: "Kivaw", icon: "✦", tags: ["#create"] },
-];
+  let query = supabase
+    .from("content_items")
+    .select(
+      "id,external_id,kind,title,byline,meta,image_url,url,state_tags,focus_tags,usage_tags,source,created_at"
+    )
+    .order("created_at", { ascending: false })
+    .limit(limit);
 
-function readSavedSet(): Set<string> {
-  try {
-    const raw = localStorage.getItem(LS_SAVED_KEY);
-    if (!raw) return new Set();
-    const arr = JSON.parse(raw);
-    if (!Array.isArray(arr)) return new Set();
-    return new Set(arr.filter((x) => typeof x === "string"));
-  } catch {
-    return new Set();
+  if (kind) query = query.eq("kind", kind);
+
+  if (q) {
+    query = query.or(`title.ilike.%${q}%,byline.ilike.%${q}%,meta.ilike.%${q}%`);
   }
+
+  const { data, error } = await query;
+  if (error) throw error;
+  return (data || []) as ContentItem[];
 }
 
-function writeSavedSet(set: Set<string>) {
-  try {
-    localStorage.setItem(LS_SAVED_KEY, JSON.stringify(Array.from(set)));
-  } catch {
-    // ignore
-  }
-}
-
-export async function listContentItems(): Promise<ContentItem[]> {
-  // Replace with real fetch later
-  return SAMPLE;
-}
-
-export async function readMySavedIds(): Promise<string[]> {
-  return Array.from(readSavedSet());
-}
-
-export async function toggleSavedForItem(contentId: string): Promise<boolean> {
-  const set = readSavedSet();
-  const nextSaved = !set.has(contentId);
-  if (nextSaved) set.add(contentId);
-  else set.delete(contentId);
-  writeSavedSet(set);
-  return nextSaved;
-}
 

@@ -276,7 +276,8 @@ export default function ItemDetail() {
                       onError={() => setImgFailed(true)}
                     />
                   ) : (
-                    <div style={{ fontSize: 34, opacity: 0.9 }}>{kindEmoji(item.kind)}</div>
+                    // ✅ FIX: item.kind can be undefined, so provide a fallback
+                    <div style={{ fontSize: 34, opacity: 0.9 }}>{kindEmoji(item.kind || "Other")}</div>
                   )}
                 </div>
 
@@ -353,15 +354,11 @@ export default function ItemDetail() {
                 >
                   <div style={{ display: "flex", alignItems: "baseline", justifyContent: "space-between" }}>
                     <div style={{ fontWeight: 800, color: "var(--text)" }}>Echo</div>
-                    <div style={{ fontSize: 12, color: "var(--muted)" }}>
-                      Private log (you only)
-                    </div>
+                    <div style={{ fontSize: 12, color: "var(--muted)" }}>Private log (you only)</div>
                   </div>
 
                   {!isAuthed ? (
-                    <p style={{ color: "var(--muted)", marginTop: 10 }}>
-                      Sign in to log echoes.
-                    </p>
+                    <p style={{ color: "var(--muted)", marginTop: 10 }}>Sign in to log echoes.</p>
                   ) : (
                     <>
                       <div style={{ display: "grid", gap: 10, marginTop: 10 }}>
@@ -417,9 +414,7 @@ export default function ItemDetail() {
                       {/* My echoes for this item */}
                       {myEchoes.length > 0 && (
                         <div style={{ marginTop: 14, display: "grid", gap: 10 }}>
-                          <div style={{ fontSize: 12, color: "var(--muted)" }}>
-                            Recent echoes
-                          </div>
+                          <div style={{ fontSize: 12, color: "var(--muted)" }}>Recent echoes</div>
                           {myEchoes.slice(0, 6).map((e: any) => (
                             <div
                               key={e.id}
@@ -434,9 +429,7 @@ export default function ItemDetail() {
                               }}
                             >
                               <div style={{ minWidth: 0 }}>
-                                <div style={{ fontWeight: 800, color: "var(--primary)" }}>
-                                  {e.usage_tag}
-                                </div>
+                                <div style={{ fontWeight: 800, color: "var(--primary)" }}>{e.usage_tag}</div>
                                 {e.note && (
                                   <div style={{ fontSize: 12, color: "var(--muted)", marginTop: 4 }}>
                                     {e.note}
@@ -465,17 +458,13 @@ export default function ItemDetail() {
                 <div style={{ marginTop: 18, textAlign: "left" }}>
                   <div style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline" }}>
                     <div style={{ fontWeight: 800, color: "var(--text)" }}>Waves</div>
-                    <div style={{ fontSize: 12, color: "var(--muted)" }}>
-                      Public, anonymous
-                    </div>
+                    <div style={{ fontSize: 12, color: "var(--muted)" }}>Public, anonymous</div>
                   </div>
 
                   {wavesLoading ? (
                     <p style={{ color: "var(--muted)", marginTop: 10 }}>Loading waves…</p>
                   ) : waves.length === 0 ? (
-                    <p style={{ color: "var(--muted)", marginTop: 10 }}>
-                      No waves yet. Be the first to share a tag.
-                    </p>
+                    <p style={{ color: "var(--muted)", marginTop: 10 }}>No waves yet. Be the first to share a tag.</p>
                   ) : (
                     <div style={{ marginTop: 10, display: "grid", gap: 10 }}>
                       {waves.slice(0, 8).map((w) => (
@@ -490,9 +479,7 @@ export default function ItemDetail() {
                             background: "rgba(0,0,0,0.02)",
                           }}
                         >
-                          <div style={{ fontWeight: 800, color: "var(--primary)" }}>
-                            {w.usage_tag}
-                          </div>
+                          <div style={{ fontWeight: 800, color: "var(--primary)" }}>{w.usage_tag}</div>
                           <div style={{ color: "var(--muted)", fontSize: 13 }}>
                             {w.uses} wave{w.uses === 1 ? "" : "s"}
                           </div>
@@ -502,11 +489,7 @@ export default function ItemDetail() {
                   )}
 
                   <div style={{ marginTop: 12 }}>
-                    <button
-                      type="button"
-                      className="btn btn-ghost"
-                      onClick={() => navigate("/waves")}
-                    >
+                    <button type="button" className="btn btn-ghost" onClick={() => navigate("/waves")}>
                       View all Waves →
                     </button>
                   </div>
@@ -519,6 +502,7 @@ export default function ItemDetail() {
     </div>
   );
 }
+
 
 
 

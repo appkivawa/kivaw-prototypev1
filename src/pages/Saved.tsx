@@ -6,24 +6,35 @@ import { fetchSavedIds, unsaveItem, getUserId } from "../data/savesApi";
 import type { ContentItem } from "../data/contentApi";
 
 function kindEmoji(kind: string) {
-  switch (kind) {
-    case "Album":
-    case "Playlist":
+  const k = (kind || "").toLowerCase();
+  switch (k) {
+    case "album":
+    case "playlist":
       return "🎧";
-    case "Concert":
+    case "concert":
+    case "event":
       return "🎟️";
-    case "Film":
+    case "film":
+    case "movie":
       return "🎬";
-    case "Book":
+    case "book":
       return "📖";
-    case "Practice":
+    case "practice":
       return "🕯️";
     default:
       return "✦";
   }
 }
 
-function MediaCover({ id, kind, image }: { id: string; kind: string; image?: string | null }) {
+function MediaCover({
+  id,
+  kind,
+  image,
+}: {
+  id: string;
+  kind: string;
+  image?: string | null;
+}) {
   const [broken, setBroken] = useState(false);
   const src = (image || "").trim();
   const showImg = src.length > 0 && !broken;
@@ -175,11 +186,17 @@ export default function Saved() {
                       onKeyDown={(e) => onCardKeyDown(e, r.id)}
                       aria-label={`Open ${r.title}`}
                     >
-                      <MediaCover id={r.id} kind={r.kind} image={r.image_url} />
+                      {/* ✅ FIX: ensure kind is a string */}
+                      <MediaCover
+                        id={r.id}
+                        kind={r.kind || "Other"}
+                        image={r.image_url ?? null}
+                      />
 
                       <div className="kivaw-rec-info">
                         <div className="kivaw-rec-meta">
-                          {r.kind} <span className="dot">•</span> {r.meta || "—"}
+                          {r.kind || "Other"} <span className="dot">•</span>{" "}
+                          {r.meta || "—"}
                         </div>
                         <div className="kivaw-rec-name">{r.title}</div>
                         <div className="kivaw-rec-by">{r.byline || ""}</div>
@@ -219,6 +236,7 @@ export default function Saved() {
     </div>
   );
 }
+
 
 
 
