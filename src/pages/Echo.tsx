@@ -21,7 +21,8 @@ function cls(...parts: Array<string | false | null | undefined>) {
 const DEFAULT_TAGS = ["focus", "unwind", "study", "heal", "reset", "laugh"] as const;
 
 type DraftEcho = {
-  contentId: string | null; // optional linked item
+  // We ALWAYS send a contentId to Supabase (even for “No linked item”)
+  contentId: string;
   usageTag: string;
   note?: string;
   shareToWaves?: boolean;
@@ -31,6 +32,7 @@ type DraftEcho = {
  * Persist the echo draft across magic-link redirect AND across tabs/windows.
  */
 const PENDING_ECHO_KEY = "kivaw_pending_echo_v1";
+const POST_AUTH_PATH_KEY = "kivaw_post_auth_path";
 
 function setPendingEcho(draft: DraftEcho) {
   localStorage.setItem(PENDING_ECHO_KEY, JSON.stringify(draft));
@@ -52,17 +54,30 @@ function clearPendingEcho() {
 }
 
 /**
+ * ✅ Return-path builder that works for BOTH:
+ * - HashRouter URLs:   /#/echo
+ * - BrowserRouter URLs: /echo
+ */
+function getCurrentAppPath() {
+  const hash = window.location.hash || "";
+  if (hash.startsWith("#/")) return hash.slice(1); // "/echo"
+  return window.location.pathname + window.location.search; // "/echo?x=y"
+}
+
+/**
  * ✅ Stable auth redirect builder
  * - Prefer explicit deployed URL (set in Vercel as VITE_PUBLIC_SITE_URL="https://www.kivaw.com")
  * - Fall back to current origin for local dev
  */
 function getAuthRedirectTo() {
-  // Vite exposes env vars as strings or undefined
   const site =
     (import.meta as any).env?.VITE_PUBLIC_SITE_URL?.trim?.() || window.location.origin;
 
-  // Ensure we always end up with: https://whatever.com/auth/callback
-  return new URL("/auth/callback", site).toString();
+  const usesHashRouter =
+    (window.location.hash && window.location.hash.startsWith("#/")) ||
+    window.location.href.includes("/#/");
+
+  return usesHashRouter ? `${site}/#/auth/callback` : `${site}/auth/callback`;
 }
 
 function kindIcon(kind?: string | null) {
@@ -79,7 +94,7 @@ function kindIcon(kind?: string | null) {
   if (k.includes("concert")) return "🎫";
   if (k.includes("book")) return "📚";
   if (k.includes("aesthetic")) return "✨";
-  return "🔖";
+  return "🔖"; // unknown
 }
 
 /* ---------------- Save gate (guest → magic link) ---------------- */
@@ -116,13 +131,12 @@ function SaveGateModal({
     setErr(null);
 
     try {
+      localStorage.setItem(POST_AUTH_PATH_KEY, getCurrentAppPath());
       const redirectTo = getAuthRedirectTo();
 
       const { error } = await supabase.auth.signInWithOtp({
         email: email.trim(),
-        options: {
-          emailRedirectTo: redirectTo,
-        },
+        options: { emailRedirectTo: redirectTo },
       });
 
       if (error) throw error;
@@ -227,12 +241,14 @@ function LinkItemModal({
   open,
   onClose,
   onPick,
-  onClear,
+  onPickUnlinked,
+  standaloneId,
 }: {
   open: boolean;
   onClose: () => void;
   onPick: (item: ContentItemLite) => void;
-  onClear: () => void;
+  onPickUnlinked: () => void;
+  standaloneId: string | null;
 }) {
   const [q, setQ] = useState("");
   const [items, setItems] = useState<ContentItemLite[]>([]);
@@ -252,7 +268,15 @@ function LinkItemModal({
     listContentItemsLite({ q, limit: 60 })
       .then((rows) => {
         if (!alive) return;
-        setItems(rows || []);
+
+        // Hide the DB “Unlinked Echo” item from the picker so it doesn’t look redundant
+        const filtered = (rows || []).filter((it) => {
+          if (standaloneId && it.id === standaloneId) return false;
+          if ((it.title || "").trim().toLowerCase() === "unlinked echo") return false;
+          return true;
+        });
+
+        setItems(filtered);
       })
       .finally(() => {
         if (!alive) return;
@@ -262,7 +286,7 @@ function LinkItemModal({
     return () => {
       alive = false;
     };
-  }, [open, q]);
+  }, [open, q, standaloneId]);
 
   if (!open) return null;
 
@@ -271,8 +295,8 @@ function LinkItemModal({
       <Card className="echo-modal echo-modal--wide">
         <div className="echo-modal-head">
           <div>
-            <div className="echo-modal-title">Link an item (optional)</div>
-            <div className="echo-modal-sub">Pick one… or keep this moment unlinked.</div>
+            <div className="echo-modal-title">Change linked item</div>
+            <div className="echo-modal-sub">Search and pick a new one.</div>
           </div>
           <button className="btn-ghost" onClick={onClose} type="button">
             ✕
@@ -288,23 +312,23 @@ function LinkItemModal({
           />
           <div style={{ height: 12 }} />
 
-          {/* clear/unlinked option */}
+          {/* ✅ The ONLY unlinked option the user sees */}
           <button
             type="button"
             className="echo-result"
             onClick={() => {
-              onClear();
+              onPickUnlinked();
               onClose();
             }}
             style={{ marginBottom: 10 }}
           >
             <div className="echo-kindicon" aria-hidden="true">
-              🫧
+              ⊥
             </div>
-            <div className="echo-resultthumb echo-thumb--empty" />
+
             <div className="echo-resulttext">
-              <div className="echo-resulttitle">Unlinked moment</div>
-              <div className="echo-resultmeta">Save without linking an item</div>
+              <div className="echo-resulttitle">No linked item</div>
+              <div className="echo-resultmeta">Optional — save a standalone Echo.</div>
             </div>
           </button>
 
@@ -314,37 +338,40 @@ function LinkItemModal({
             <div className="echo-muted">No results.</div>
           ) : (
             <div className="echo-results">
-              {items.map((it) => (
-                <button
-                  key={it.id}
-                  type="button"
-                  className="echo-result"
-                  onClick={() => {
-                    onPick(it);
-                    onClose();
-                  }}
-                >
-                  <div className="echo-kindicon" aria-hidden="true">
-                    {kindIcon(it.kind)}
-                  </div>
+              {items.map((it) => {
+                const icon = kindIcon(it.kind);
+                const showThumb = icon === "🔖" && !!it.image_url; // image only as last resort
 
-                  {it.image_url ? (
-                    <img
-                      className="echo-resultthumb"
-                      src={it.image_url}
-                      alt=""
-                      onError={(e) => (e.currentTarget.style.display = "none")}
-                    />
-                  ) : (
-                    <div className="echo-resultthumb echo-thumb--empty" />
-                  )}
+                return (
+                  <button
+                    key={it.id}
+                    type="button"
+                    className="echo-result"
+                    onClick={() => {
+                      onPick(it);
+                      onClose();
+                    }}
+                  >
+                    <div className="echo-kindicon" aria-hidden="true">
+                      {icon}
+                    </div>
 
-                  <div className="echo-resulttext">
-                    <div className="echo-resulttitle">{it.title}</div>
-                    <div className="echo-resultmeta">{it.kind || "Item"}</div>
-                  </div>
-                </button>
-              ))}
+                    {showThumb ? (
+                      <img
+                        className="echo-resultthumb has-thumb"
+                        src={it.image_url!}
+                        alt=""
+                        onError={(e) => (e.currentTarget.style.display = "none")}
+                      />
+                    ) : null}
+
+                    <div className="echo-resulttext">
+                      <div className="echo-resulttitle">{it.title}</div>
+                      <div className="echo-resultmeta">{it.kind || "Item"}</div>
+                    </div>
+                  </button>
+                );
+              })}
             </div>
           )}
         </div>
@@ -357,6 +384,7 @@ function LinkItemModal({
 
 export default function Echo() {
   const [linked, setLinked] = useState<ContentItemLite | null>(null);
+  const [standaloneId, setStandaloneId] = useState<string | null>(null);
 
   const [note, setNote] = useState("");
   const [usageTag, setUsageTag] = useState<string>("");
@@ -379,6 +407,8 @@ export default function Echo() {
     return chip || typed;
   }, [usageTag, customTag]);
 
+  const linkedIsStandalone = !!linked && !!standaloneId && linked.id === standaloneId;
+
   async function refreshSaved() {
     setLoadingSaved(true);
     try {
@@ -394,12 +424,33 @@ export default function Echo() {
     }
   }
 
+  // Find the DB “Unlinked Echo” item id once (used as the fallback content_id)
+  useEffect(() => {
+    let alive = true;
+    (async () => {
+      try {
+        const rows = await listContentItemsLite({ q: "Unlinked Echo", limit: 10 });
+        const hit =
+          rows.find((r) => (r.title || "").trim().toLowerCase() === "unlinked echo") ||
+          null;
+
+        if (!alive) return;
+        setStandaloneId(hit?.id ?? null);
+      } catch {
+        // ignore
+      }
+    })();
+    return () => {
+      alive = false;
+    };
+  }, []);
+
   async function saveDraft(draft: DraftEcho) {
     setSaving(true);
     setErr(null);
     try {
       await createEcho({
-        contentId: draft.contentId, // can be null
+        contentId: draft.contentId,
         usageTag: draft.usageTag,
         note: draft.note,
         shareToWaves: draft.shareToWaves,
@@ -413,6 +464,7 @@ export default function Echo() {
       await refreshSaved();
     } catch (e: any) {
       setErr(e?.message || "Failed to save echo.");
+      throw e;
     } finally {
       setSaving(false);
     }
@@ -432,7 +484,7 @@ export default function Echo() {
         if (!alive) return;
         if (it) setLinked(it);
       } catch {
-        // fail silently
+        // silent
       }
     })();
 
@@ -446,23 +498,40 @@ export default function Echo() {
   }, []);
 
   /**
-   * Auto-save after login if a pending draft exists in localStorage.
+   * ✅ Auto-save after login if a pending draft exists in localStorage.
+   * - waits for session to exist
+   * - only clears pending after successful save
    */
   useEffect(() => {
     let alive = true;
 
-    async function tryAutoSave() {
-      const { data } = await supabase.auth.getSession();
-      if (!alive) return;
+    async function waitForSession(maxMs = 2000) {
+      const start = Date.now();
+      while (Date.now() - start < maxMs) {
+        const { data } = await supabase.auth.getSession();
+        if (!alive) return null;
+        if (data.session) return data.session;
+        await new Promise((r) => setTimeout(r, 200));
+      }
+      return null;
+    }
 
-      if (data.session) {
-        const draft = getPendingEcho();
-        if (draft) {
-          clearPendingEcho();
-          await saveDraft(draft);
-          setPendingDraft(null);
-          setSaveGateOpen(false);
-        }
+    async function tryAutoSave() {
+      const session = await waitForSession(2000);
+      if (!alive) return;
+      if (!session) return;
+
+      const draft = getPendingEcho();
+      if (!draft) return;
+
+      try {
+        await saveDraft(draft);
+        clearPendingEcho();
+        if (!alive) return;
+        setPendingDraft(null);
+        setSaveGateOpen(false);
+      } catch {
+        // keep pending
       }
     }
 
@@ -487,16 +556,26 @@ export default function Echo() {
       return;
     }
 
+    if (!standaloneId) {
+      setErr("Missing the 'Unlinked Echo' item in your content_items. (Needed for standalone saves.)");
+      return;
+    }
+
+    // If user picked “No linked item”, we still save using the DB “Unlinked Echo” content id
+    const contentId = !linked || linkedIsStandalone ? standaloneId : linked.id;
+
     const draft: DraftEcho = {
-      contentId: linked?.id ?? null, // optional
+      contentId,
       usageTag: effectiveTag,
-      note: note.trim(),
+      note: note.trim() || undefined,
+      shareToWaves: false,
     };
 
+    // Gate saving for guests
     const { data } = await supabase.auth.getSession();
     if (!data.session) {
-      setPendingEcho(draft);
       setPendingDraft(draft);
+      setPendingEcho(draft);
       setSaveGateOpen(true);
       return;
     }
@@ -504,44 +583,35 @@ export default function Echo() {
     await saveDraft(draft);
   }
 
-  async function onDeleteEcho(echoId: string) {
-    const ok = confirm("Delete this echo?");
-    if (!ok) return;
-
+  async function onDelete(echoId: string) {
     try {
       await deleteEcho(echoId);
       await refreshSaved();
     } catch (e: any) {
-      alert(e?.message || "Could not delete.");
+      setErr(e?.message || "Could not delete.");
     }
   }
 
-  function clickTag(t: string) {
-    setUsageTag(t);
-    setCustomTag("");
-    setErr(null);
-  }
-
-  const linkedTitle = linked ? linked.title : "Unlinked moment";
-  const linkedMeta = linked ? linked.kind || "Item" : "Linking is optional.";
-  const linkButtonLabel = linked ? "Change" : "Link an item";
+  // UI text: show “No linked item” if the selected item is the standalone DB item
+  const linkedTitle = linked && !linkedIsStandalone ? linked.title : "No linked item";
+  const linkedMeta = linked && !linkedIsStandalone ? linked.kind || "Item" : "Optional — you can save a standalone Echo.";
 
   return (
     <div className="page echo-page">
       <div className="center-wrap echo-center">
         <div className="echo-hero">
-          <h1 className="echo-h1">Echo</h1>
+          <div className="echo-h1">Echo</div>
         </div>
 
         <Card className="echo-maincard">
           <div className="echo-linkedrow">
             <div className="echo-linkedleft">
-              <div className="echo-kindicon echo-kindicon--selected" aria-hidden="true">
-                {linked ? kindIcon(linked.kind) : "🫧"}
+              <div className={cls("echo-kindicon", "echo-kindicon--selected")} aria-hidden="true">
+                {linked && !linkedIsStandalone ? kindIcon(linked.kind) : "⊥"}
               </div>
 
               <div className="echo-linkedtext">
-                <div className="echo-kicker">LINKED ITEM (OPTIONAL)</div>
+                <div className="echo-kicker">LINKED ITEM</div>
                 <div className="echo-linkedtitle">{linkedTitle}</div>
                 <div className="echo-linkedmeta">{linkedMeta}</div>
               </div>
@@ -549,7 +619,7 @@ export default function Echo() {
 
             <div className="echo-linkedactions">
               <button className="echo-pillbtn" type="button" onClick={() => setLinkOpen(true)}>
-                {linkButtonLabel}
+                Change
               </button>
             </div>
           </div>
@@ -564,10 +634,10 @@ export default function Echo() {
           <div className="echo-chips">
             {DEFAULT_TAGS.map((t) => (
               <button
-                key={t}
                 type="button"
+                key={t}
                 className={cls("echo-chip", usageTag === t && "is-active")}
-                onClick={() => clickTag(t)}
+                onClick={() => setUsageTag((cur) => (cur === t ? "" : t))}
               >
                 #{t}
               </button>
@@ -576,13 +646,9 @@ export default function Echo() {
 
           <input
             className="input"
-            placeholder="Or your own tag…"
+            placeholder="Or your own tag..."
             value={customTag}
-            onChange={(e) => {
-              setCustomTag(e.target.value);
-              if (e.target.value.trim()) setUsageTag("");
-              setErr(null);
-            }}
+            onChange={(e) => setCustomTag(e.target.value)}
           />
 
           {err ? <div className="echo-alert">{err}</div> : null}
@@ -603,16 +669,17 @@ export default function Echo() {
         ) : (
           <div className="echo-day">
             {saved.map((e) => {
-              const it = e.content_items;
+              const title = e.content_items?.title || "No linked item";
+              const kind = e.content_items?.kind || "Standalone";
               return (
-                <Card key={e.id} className="echo-savedcard">
+                <Card className="echo-savedcard" key={e.id}>
                   <div className="echo-entrytop">
                     <div className="echo-entryleft">
-                      <span className="echo-tagpill">{e.usage_tag ? `#${e.usage_tag}` : "—"}</span>
-                      <div className="echo-entrytitle">{it?.title || "Unlinked moment"}</div>
+                      <div className="echo-tagpill">#{e.usage_tag}</div>
+                      <div className="echo-entrytitle">{title}</div>
                     </div>
 
-                    <button className="btn-ghost" type="button" onClick={() => onDeleteEcho(e.id)}>
+                    <button className="btn-ghost" type="button" onClick={() => onDelete(e.id)}>
                       Delete
                     </button>
                   </div>
@@ -620,31 +687,44 @@ export default function Echo() {
                   {e.note ? <div className="echo-entrynote">{e.note}</div> : null}
 
                   <div className="echo-entrymeta">
-                    {it?.kind ? `${it.kind} • ` : ""}
-                    {e.shared_to_waves ? "shared" : "private"}
+                    {kind} • {e.shared_to_waves ? "shared" : "private"}
                   </div>
                 </Card>
               );
             })}
           </div>
         )}
-
-        <LinkItemModal
-          open={linkOpen}
-          onClose={() => setLinkOpen(false)}
-          onPick={setLinked}
-          onClear={() => setLinked(null)}
-        />
-
-        <SaveGateModal
-          open={saveGateOpen}
-          draft={pendingDraft}
-          onClose={() => setSaveGateOpen(false)}
-        />
       </div>
+
+      <LinkItemModal
+        open={linkOpen}
+        onClose={() => setLinkOpen(false)}
+        standaloneId={standaloneId}
+        onPick={(it) => setLinked(it)}
+        onPickUnlinked={() => {
+          // Set linked to the standalone DB item (so it consistently saves),
+          // but UI will still display “No linked item”
+          if (standaloneId) {
+            setLinked({ id: standaloneId, title: "Unlinked Echo", kind: "Prompt", image_url: null });
+          } else {
+            setLinked(null);
+          }
+        }}
+      />
+
+      <SaveGateModal
+        open={saveGateOpen}
+        draft={pendingDraft}
+        onClose={() => setSaveGateOpen(false)}
+      />
     </div>
   );
 }
+
+
+
+
+
 
 
 

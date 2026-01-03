@@ -144,6 +144,11 @@
   cursor: pointer;
 }
 
+.echo-primary:disabled {
+  opacity: 0.65;
+  cursor: not-allowed;
+}
+
 /* ---------------- Alerts ---------------- */
 
 .echo-alert {
@@ -244,7 +249,6 @@
   padding: 16px;
   border-radius: 22px;
 
-  /* 🔑 scrolling fix */
   max-height: min(78vh, 720px);
   display: flex;
   flex-direction: column;
@@ -274,7 +278,6 @@
 .echo-modal-body {
   margin-top: 12px;
 
-  /* 🔑 scrolling fix */
   flex: 1 1 auto;
   overflow-y: auto;
   -webkit-overflow-scrolling: touch;
@@ -298,30 +301,34 @@
   border: 1px solid transparent;
   background: transparent;
   cursor: pointer;
+  text-align: left;
 }
 
 .echo-result:hover {
   background: var(--surface-soft);
 }
 
+/* Icon-led list: thumbnails hidden by default */
 .echo-resultthumb {
+  display: none;
+}
+
+.echo-resultthumb.has-thumb {
+  display: block;
   width: 44px;
   height: 44px;
   border-radius: 10px;
   object-fit: cover;
 }
 
-.echo-thumb--empty {
-  background: var(--surface-soft);
-}
-
 .echo-resulttext {
   display: flex;
   flex-direction: column;
+  min-width: 0;
 }
 
 .echo-resulttitle {
-  font-weight: 500;
+  font-weight: 600;
 }
 
 .echo-resultmeta {
@@ -329,13 +336,16 @@
   color: var(--muted);
 }
 
-/* ---------------- Modal actions ---------------- */
-
-.echo-modal-actions {
-  display: flex;
-  gap: 10px;
-  margin-top: 14px;
+/* Optional: tighten on small screens */
+@media (max-width: 520px) {
+  .echo-h1 {
+    font-size: 34px;
+  }
+  .echo-maincard {
+    padding: 16px;
+  }
 }
+
 
 
 
