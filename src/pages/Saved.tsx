@@ -5,75 +5,15 @@ import { supabase } from "../lib/supabaseClient";
 import { fetchSavedIds, unsaveItem, getUserId } from "../data/savesApi";
 import type { ContentItem } from "../data/contentApi";
 
-function kindEmoji(kind: string) {
+function kindEmoji(kind?: string) {
   const k = (kind || "").toLowerCase();
-  switch (k) {
-    case "album":
-    case "playlist":
-      return "🎧";
-    case "concert":
-    case "event":
-      return "🎟️";
-    case "film":
-    case "movie":
-      return "🎬";
-    case "book":
-      return "📖";
-    case "practice":
-      return "🕯️";
-    default:
-      return "✦";
-  }
-}
-
-function MediaCover({
-  id,
-  kind,
-  image,
-}: {
-  id: string;
-  kind: string;
-  image?: string | null;
-}) {
-  const [broken, setBroken] = useState(false);
-  const src = (image || "").trim();
-  const showImg = src.length > 0 && !broken;
-
-  return (
-    <div className="kivaw-cover">
-      {showImg ? (
-        <img
-          key={id}
-          src={src}
-          alt=""
-          loading="lazy"
-          referrerPolicy="no-referrer"
-          onError={() => setBroken(true)}
-          className="kivaw-cover__img"
-        />
-      ) : (
-        <div className="kivaw-cover__emoji">{kindEmoji(kind)}</div>
-      )}
-    </div>
-  );
-}
-
-function HeartIcon({ filled }: { filled: boolean }) {
-  // simple inline heart (no dependency)
-  return (
-    <svg
-      width="18"
-      height="18"
-      viewBox="0 0 24 24"
-      aria-hidden="true"
-      style={{ display: "block" }}
-      fill={filled ? "currentColor" : "none"}
-      stroke="currentColor"
-      strokeWidth="2"
-    >
-      <path d="M20.8 4.6c-1.6-1.6-4.1-1.6-5.7 0L12 7.7 8.9 4.6c-1.6-1.6-4.1-1.6-5.7 0s-1.6 4.1 0 5.7L12 21.1l8.8-10.8c1.6-1.6 1.6-4.1 0-5.7z" />
-    </svg>
-  );
+  if (k.includes("playlist") || k.includes("album") || k.includes("song")) return "🎧";
+  if (k.includes("reflection") || k.includes("prompt")) return "📝";
+  if (k.includes("visual") || k.includes("art")) return "🎨";
+  if (k.includes("movement") || k.includes("exercise")) return "🧘";
+  if (k.includes("creative")) return "🌸";
+  if (k.includes("expansive")) return "🌱";
+  return "✦";
 }
 
 export default function Saved() {
@@ -86,95 +26,99 @@ export default function Saved() {
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
   const [busyId, setBusyId] = useState<string | null>(null);
 
+  async function loadSaved() {
+    setLoading(true);
+    setErrorMsg(null);
+
+    try {
+      const uid = await getUserId();
+      const authed = !!uid;
+      setIsAuthed(authed);
+
+      if (!uid) {
+        setIds([]);
+        setItems([]);
+        return;
+      }
+
+      const saved = await fetchSavedIds(); // already ordered newest-first
+      setIds(saved);
+
+      if (saved.length === 0) {
+        setItems([]);
+        return;
+      }
+
+      const { data, error } = await supabase
+        .from("content_items")
+        .select(
+          "id,external_id,kind,title,byline,meta,image_url,url,state_tags,focus_tags,usage_tags,source,created_at"
+        )
+        .in("id", saved);
+
+      if (error) throw error;
+
+      // reorder to match saved ids order
+      const index = new Map<string, number>();
+      saved.forEach((x, i) => index.set(x, i));
+
+      const sorted = (data || []).sort((a: any, b: any) => {
+        return (index.get(a.id) ?? 9999) - (index.get(b.id) ?? 9999);
+      });
+
+      setItems(sorted as ContentItem[]);
+    } catch (e) {
+      console.error(e);
+      setErrorMsg("Couldn’t load saved items right now.");
+    } finally {
+      setLoading(false);
+    }
+  }
+
   useEffect(() => {
     let cancelled = false;
 
     (async () => {
-      try {
-        setLoading(true);
-        setErrorMsg(null);
-
-        const uid = await getUserId();
-        if (cancelled) return;
-        setIsAuthed(!!uid);
-
-        if (!uid) {
-          setIds([]);
-          setItems([]);
-          return;
-        }
-
-        const saved = await fetchSavedIds();
-        if (cancelled) return;
-        setIds(saved);
-
-        if (saved.length === 0) {
-          setItems([]);
-          return;
-        }
-
-        const { data, error } = await supabase
-          .from("content_items")
-          .select(
-            "id,external_id,kind,title,byline,meta,image_url,url,state_tags,focus_tags,usage_tags,source,created_at"
-          )
-          .in("id", saved);
-
-        if (error) throw error;
-
-        const index = new Map<string, number>();
-        saved.forEach((x, i) => index.set(x, i));
-
-        const sorted = (data || []).sort((a: any, b: any) => {
-          return (index.get(a.id) ?? 9999) - (index.get(b.id) ?? 9999);
-        });
-
-        if (!cancelled) setItems(sorted as ContentItem[]);
-      } catch (e) {
-        console.error(e);
-        if (!cancelled) setErrorMsg("Couldn’t load saved items right now.");
-      } finally {
-        if (!cancelled) setLoading(false);
-      }
+      await loadSaved();
+      if (cancelled) return;
     })();
 
     return () => {
       cancelled = true;
     };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   async function removeSaved(contentId: string) {
-    if (!isAuthed) return;
-    if (busyId) return;
+    const uid = await getUserId();
+    if (!uid) {
+      navigate(`/auth?returnTo=${encodeURIComponent("/saved")}`);
+      return;
+    }
 
+    if (busyId) return;
     setBusyId(contentId);
+
+    // optimistic UI
+    setIds((prev) => prev.filter((x) => x !== contentId));
+    setItems((prev) => prev.filter((x) => x.id !== contentId));
+
     try {
       await unsaveItem(contentId);
-      setIds((prev) => prev.filter((x) => x !== contentId));
-      setItems((prev) => prev.filter((x) => x.id !== contentId));
     } catch (e) {
       console.error(e);
+      // reload to repair UI if something went wrong
+      await loadSaved();
       alert("Couldn’t update saved right now.");
     } finally {
       setBusyId(null);
     }
   }
 
-  function openItem(id: string) {
-    navigate(`/item/${id}`);
-  }
-
-  function onCardKeyDown(e: React.KeyboardEvent<HTMLDivElement>, id: string) {
-    if (e.key === "Enter" || e.key === " ") {
-      e.preventDefault();
-      openItem(id);
-    }
-  }
-
   return (
     <div className="page">
       <div className="center-wrap">
-        <Card className="center">
+        <Card className="center card-pad">
           <h1 className="h1">Saved</h1>
           <p className="kivaw-sub">Your saved items live here.</p>
 
@@ -182,24 +126,33 @@ export default function Saved() {
             {loading ? (
               <p className="muted">Loading…</p>
             ) : errorMsg ? (
-              <p className="muted">{errorMsg}</p>
+              <div style={{ display: "grid", gap: 10 }}>
+                <p className="muted">{errorMsg}</p>
+                <button className="btn btn-ghost" type="button" onClick={() => navigate("/explore")}>
+                  Explore →
+                </button>
+              </div>
             ) : !isAuthed ? (
               <div style={{ display: "grid", gap: 10 }}>
                 <p className="muted">Sign in to view (and save) your items.</p>
                 <button
                   type="button"
                   className="btn"
-                  onClick={() => navigate("/auth")}
+                  onClick={() => navigate(`/auth?returnTo=${encodeURIComponent("/saved")}`)}
                 >
                   Sign in
                 </button>
+                <button className="btn btn-ghost" type="button" onClick={() => navigate("/explore")}>
+                  Browse as guest →
+                </button>
               </div>
             ) : ids.length === 0 ? (
-              <p className="muted">Nothing saved yet. Go heart a few items.</p>
-            ) : items.length === 0 ? (
-              <p className="muted">
-                Saved items exist, but nothing matched in the database.
-              </p>
+              <div style={{ display: "grid", gap: 10 }}>
+                <p className="muted">Nothing saved yet. Go heart a few items.</p>
+                <button className="btn" type="button" onClick={() => navigate("/explore")}>
+                  Explore →
+                </button>
+              </div>
             ) : (
               <div className="kivaw-rec-grid" style={{ marginTop: 10 }}>
                 {items.map((r) => {
@@ -207,60 +160,60 @@ export default function Saved() {
 
                   return (
                     <div
-                      className="kivaw-rec-card kivaw-rec-row"
                       key={r.id}
+                      className="kivaw-rec-card kivaw-rec-row"
                       role="button"
                       tabIndex={0}
-                      onClick={() => openItem(r.id)}
-                      onKeyDown={(e) => onCardKeyDown(e, r.id)}
-                      aria-label={`Open ${r.title}`}
+                      onClick={() => navigate(`/item/${r.id}`)}
+                      onKeyDown={(e) => {
+                        if (e.key === "Enter" || e.key === " ") {
+                          e.preventDefault();
+                          navigate(`/item/${r.id}`);
+                        }
+                      }}
                     >
-                      <MediaCover
-                        id={r.id}
-                        kind={r.kind || "Other"}
-                        image={r.image_url ?? null}
-                      />
+                      {/* Use your existing icon tile styling */}
+                      <div className="kivaw-rec-icon" aria-hidden="true">
+                        {kindEmoji(r.kind)}
+                      </div>
 
-                      <div className="kivaw-rec-info">
-                        <div className="kivaw-rec-meta">
-                          {r.kind || "Other"} <span className="dot">•</span>{" "}
-                          {r.meta || "—"}
+                      <div className="kivaw-rec-content">
+                        <div className="kivaw-rec-card__meta">
+                          {(r.kind || "Item") + (r.meta ? ` • ${r.meta}` : "")}
                         </div>
-                        <div className="kivaw-rec-name">{r.title}</div>
-                        <div className="kivaw-rec-by">{r.byline || ""}</div>
+                        <div className="kivaw-rec-card__title">{r.title}</div>
+                        {r.byline ? <div className="kivaw-rec-card__by">{r.byline}</div> : null}
 
-                        {r.url && (
+                        {r.url ? (
                           <a
                             href={r.url}
                             target="_blank"
                             rel="noreferrer"
-                            onClick={(e) => e.stopPropagation()}
                             className="kivaw-openlink"
+                            onClick={(e) => e.stopPropagation()}
                           >
                             Open →
                           </a>
-                        )}
+                        ) : null}
                       </div>
 
-                      {/* Heart button = unsave */}
                       <button
+                        className="kivaw-heart kivaw-remove"
                         type="button"
-                        className="btn btn-small btn-ghost kivaw-rec-action"
                         aria-label="Unsave"
                         disabled={isBusy}
                         onClick={(e) => {
+                          e.preventDefault();
                           e.stopPropagation();
                           removeSaved(r.id);
                         }}
-                        style={{
-                          display: "inline-flex",
-                          alignItems: "center",
-                          justifyContent: "center",
-                          gap: 8,
-                          minWidth: 44,
+                        onKeyDown={(e) => {
+                          e.stopPropagation();
+                          if (e.key === " " || e.key === "Enter") e.preventDefault();
                         }}
+                        title="Remove from saved"
                       >
-                        {isBusy ? "…" : <HeartIcon filled={true} />}
+                        {isBusy ? "…" : "♥"}
                       </button>
                     </div>
                   );
@@ -273,6 +226,7 @@ export default function Saved() {
     </div>
   );
 }
+
 
 
 

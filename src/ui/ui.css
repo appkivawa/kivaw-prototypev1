@@ -1503,4 +1503,41 @@ textarea {
   }
 }
 
+/* =========================
+   Saved page layout override
+   ========================= */
+
+/* Saved should feel curated, not spread out */
+.page .kivaw-rec-grid {
+  grid-template-columns: repeat(auto-fit, minmax(360px, 1fr));
+  gap: 14px;
+}
+
+/* Tighten row cards specifically */
+.page .kivaw-rec-card.kivaw-rec-row {
+  padding: 12px 14px;
+  border-radius: 16px;
+}
+
+/* Prevent awkward wrapping */
+.page .kivaw-rec-content {
+  min-width: 0;
+}
+
+.page .kivaw-rec-card__meta,
+.page .kivaw-rec-card__title,
+.page .kivaw-rec-card__by {
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+/* Make the heart feel intentional, not floaty */
+.page .kivaw-heart {
+  width: 34px;
+  height: 34px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
 
