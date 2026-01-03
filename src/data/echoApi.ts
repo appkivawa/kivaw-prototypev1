@@ -10,7 +10,7 @@ export type ContentItemLite = {
 export type EchoRow = {
   id: string;
   user_id: string;
-  content_id: string | null; // ✅ optional now
+  content_id: string | null; // ✅ allow null
   usage_tag: string;
   note: string | null;
   shared_to_waves: boolean;
@@ -21,7 +21,6 @@ export type EchoWithContent = EchoRow & {
   content_items: ContentItemLite | null;
 };
 
-/** ✅ Exported so other pages (ItemDetail, Saved, etc.) can reuse it safely */
 export async function getUserId(): Promise<string | null> {
   const { data } = await supabase.auth.getSession();
   return data.session?.user?.id ?? null;
@@ -58,7 +57,7 @@ export async function getContentItemLiteById(contentId: string) {
 }
 
 export async function createEcho(input: {
-  contentId: string | null; // ✅ optional now
+  contentId: string | null; // ✅ allow null
   usageTag: string;
   note?: string;
   shareToWaves?: boolean;
@@ -68,7 +67,7 @@ export async function createEcho(input: {
 
   const payload = {
     user_id: uid,
-    content_id: input.contentId ?? null,
+    content_id: input.contentId ?? null, // ✅
     usage_tag: input.usageTag,
     note: input.note || null,
     shared_to_waves: !!input.shareToWaves,
@@ -76,32 +75,6 @@ export async function createEcho(input: {
 
   const { error } = await supabase.from("echoes").insert(payload);
   if (error) throw error;
-}
-
-type RawEchoRow = {
-  id: any;
-  user_id: any;
-  content_id: any;
-  usage_tag: any;
-  note: any;
-  shared_to_waves: any;
-  created_at: any;
-  // Supabase can return a single object OR an array depending on relationship config
-  content_items: any;
-};
-
-function normalizeContentItem(x: any): ContentItemLite | null {
-  if (!x) return null;
-  // If it’s an array, take first
-  const it = Array.isArray(x) ? x[0] : x;
-  if (!it) return null;
-
-  return {
-    id: String(it.id),
-    kind: it.kind ?? null,
-    title: String(it.title ?? ""),
-    image_url: it.image_url ?? null,
-  };
 }
 
 export async function listMyEchoes(limit = 100) {
@@ -119,34 +92,28 @@ export async function listMyEchoes(limit = 100) {
 
   if (error) throw error;
 
-  const rows = (data || []) as RawEchoRow[];
-
-  const normalized: EchoWithContent[] = rows.map((r) => ({
-    id: r.id,
-    user_id: r.user_id,
-    content_id: r.content_id ?? null,
-    usage_tag: r.usage_tag,
-    note: r.note ?? null,
-    shared_to_waves: !!r.shared_to_waves,
-    created_at: r.created_at,
-    content_items: normalizeContentItem(r.content_items),
+  // Supabase can return content_items as an array depending on relationship shape.
+  // Normalize it to the type we want.
+  const rows = (data || []).map((r: any) => ({
+    ...r,
+    content_items: Array.isArray(r.content_items) ? r.content_items[0] ?? null : r.content_items ?? null,
   }));
 
-  return normalized;
+  return rows as EchoWithContent[];
 }
 
 export async function deleteEcho(echoId: string) {
   const uid = await getUserId();
   if (!uid) throw new Error("Auth session missing!");
 
-  const { error } = await supabase
-    .from("echoes")
-    .delete()
-    .eq("id", echoId)
-    .eq("user_id", uid);
+  const { error } = await supabase.from("echoes").delete().eq("id", echoId).eq("user_id", uid);
 
   if (error) throw error;
 }
+
+
+
+
 
 
 

@@ -58,6 +58,14 @@
   color: #fff;
 }
 
+.echo-linkedthumb {
+  width: 42px;
+  height: 42px;
+  border-radius: 12px;
+  object-fit: cover;
+  background: var(--surface-soft);
+}
+
 .echo-linkedtext {
   display: flex;
   flex-direction: column;
@@ -277,14 +285,25 @@
 
 .echo-modal-body {
   margin-top: 12px;
-
   flex: 1 1 auto;
+  overflow: hidden; /* ✅ prevent body from fighting the list scroll */
+}
+
+/* ---------------- Modal results ---------------- */
+
+.echo-leftslot {
+  width: 48px;
+  display: flex;
+  justify-content: center;
+  flex: 0 0 auto;
+}
+
+.echo-results-scroll {
+  max-height: 52vh; /* ✅ this is the key: list scroll */
   overflow-y: auto;
   -webkit-overflow-scrolling: touch;
   padding-right: 6px;
 }
-
-/* ---------------- Modal results ---------------- */
 
 .echo-results {
   display: flex;
@@ -308,17 +327,12 @@
   background: var(--surface-soft);
 }
 
-/* Icon-led list: thumbnails hidden by default */
 .echo-resultthumb {
-  display: none;
-}
-
-.echo-resultthumb.has-thumb {
-  display: block;
   width: 44px;
   height: 44px;
   border-radius: 10px;
   object-fit: cover;
+  background: var(--surface-soft);
 }
 
 .echo-resulttext {
@@ -344,7 +358,11 @@
   .echo-maincard {
     padding: 16px;
   }
+  .echo-results-scroll {
+    max-height: 58vh;
+  }
 }
+
 
 
 

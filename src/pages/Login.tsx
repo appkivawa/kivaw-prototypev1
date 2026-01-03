@@ -5,6 +5,16 @@ import { supabase } from "../lib/supabaseClient";
 
 type LocState = { from?: string };
 
+function buildAuthRedirect() {
+  const site =
+    (import.meta as any).env?.VITE_PUBLIC_SITE_URL?.trim?.() || window.location.origin;
+
+  const usesHashRouter =
+    window.location.href.includes("/#/") || window.location.hash.startsWith("#/");
+
+  return usesHashRouter ? `${site}/#/auth/callback` : `${site}/auth/callback`;
+}
+
 export default function Login() {
   const navigate = useNavigate();
   const location = useLocation();
@@ -18,7 +28,6 @@ export default function Login() {
   const [err, setErr] = useState("");
 
   useEffect(() => {
-    // If they already have a session, bounce them back where they came from
     supabase.auth.getSession().then(({ data }) => {
       if (data.session) navigate(from, { replace: true });
     });
@@ -37,8 +46,11 @@ export default function Login() {
 
     setBusy(true);
     try {
-      // Redirect back to /login so this page can detect the new session and route you back.
-      const redirectTo = `${window.location.origin}/login`;
+      // ✅ Remember where they were trying to go
+      localStorage.setItem("kivaw_post_auth_path", from);
+
+      // ✅ Redirect to the correct callback route (hash-safe)
+      const redirectTo = buildAuthRedirect();
 
       const { error } = await supabase.auth.signInWithOtp({
         email: clean,
@@ -91,7 +103,12 @@ export default function Login() {
 
                 <div style={{ height: 12 }} />
 
-                <button className="btn btn-primary btn-wide" type="button" onClick={sendLink} disabled={busy}>
+                <button
+                  className="btn btn-primary btn-wide"
+                  type="button"
+                  onClick={sendLink}
+                  disabled={busy}
+                >
                   {busy ? "Sending…" : "Send magic link →"}
                 </button>
 
@@ -121,3 +138,4 @@ export default function Login() {
     </div>
   );
 }
+

@@ -9,31 +9,43 @@ export default function AuthCallback() {
   useEffect(() => {
     let alive = true;
 
+    async function waitForSession(maxMs = 2500) {
+      const start = Date.now();
+      while (Date.now() - start < maxMs) {
+        const { data } = await supabase.auth.getSession();
+        if (data.session) return data.session;
+        await new Promise((r) => setTimeout(r, 200));
+      }
+      return null;
+    }
+
     (async () => {
       try {
         const url = new URL(window.location.href);
         const code = url.searchParams.get("code");
 
-        // 1️⃣ Handle PKCE code flow (if present)
+        // PKCE: exchange ?code= for session
         if (code) {
           const { error } = await supabase.auth.exchangeCodeForSession(code);
           if (error) throw error;
 
-          // Clean URL
           url.searchParams.delete("code");
-          window.history.replaceState({}, document.title, url.pathname);
+          window.history.replaceState({}, document.title, url.pathname + url.search + url.hash);
         }
 
-        // 2️⃣ IMPORTANT: wait for session to actually exist
-        const { data } = await supabase.auth.getSession();
+        // Give auth a moment to settle (hash flow + storage timing)
+        await new Promise((r) => setTimeout(r, 400));
+
+        const session = await waitForSession(2500);
+        if (!session) {
+          throw new Error("Sign-in didn’t finish. Please try again.");
+        }
+
+        const backTo = localStorage.getItem("kivaw_post_auth_path") || "/echo";
+        localStorage.removeItem("kivaw_post_auth_path");
+
         if (!alive) return;
-
-        if (!data.session) {
-          throw new Error("Sign-in did not complete. Please try again.");
-        }
-
-        // 3️⃣ Redirect only AFTER session is confirmed
-        nav("/echo", { replace: true });
+        nav(backTo, { replace: true });
       } catch (e: any) {
         console.error("Auth callback error:", e);
         if (!alive) return;
@@ -54,4 +66,6 @@ export default function AuthCallback() {
     </div>
   );
 }
+
+
 
