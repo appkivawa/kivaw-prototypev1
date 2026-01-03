@@ -21,7 +21,7 @@ function cls(...parts: Array<string | false | null | undefined>) {
 const DEFAULT_TAGS = ["focus", "unwind", "study", "heal", "reset", "laugh"] as const;
 
 type DraftEcho = {
-  contentId: string;
+  contentId: string | null; // ✅ optional linked item
   usageTag: string;
   note?: string;
   shareToWaves?: boolean;
@@ -29,7 +29,6 @@ type DraftEcho = {
 
 /**
  * ✅ Persist the echo draft across magic-link redirect AND across tabs/windows.
- * sessionStorage dies when the link opens in a new tab; localStorage survives.
  */
 const PENDING_ECHO_KEY = "kivaw_pending_echo_v1";
 
@@ -104,7 +103,6 @@ function SaveGateModal({
     try {
       const { error } = await supabase.auth.signInWithOtp({
         email,
-        // ✅ IMPORTANT: callback route exchanges PKCE code so app doesn’t “break”
         options: { emailRedirectTo: window.location.origin + "/auth/callback" },
       });
 
@@ -209,10 +207,12 @@ function LinkItemModal({
   open,
   onClose,
   onPick,
+  onClear,
 }: {
   open: boolean;
   onClose: () => void;
   onPick: (item: ContentItemLite) => void;
+  onClear: () => void;
 }) {
   const [q, setQ] = useState("");
   const [items, setItems] = useState<ContentItemLite[]>([]);
@@ -229,7 +229,7 @@ function LinkItemModal({
     let alive = true;
 
     setBusy(true);
-    listContentItemsLite({ q, limit: 40 })
+    listContentItemsLite({ q, limit: 60 })
       .then((rows) => {
         if (!alive) return;
         setItems(rows || []);
@@ -251,8 +251,8 @@ function LinkItemModal({
       <Card className="echo-modal echo-modal--wide">
         <div className="echo-modal-head">
           <div>
-            <div className="echo-modal-title">Change linked item</div>
-            <div className="echo-modal-sub">Search and pick a new one.</div>
+            <div className="echo-modal-title">Link an item (optional)</div>
+            <div className="echo-modal-sub">Pick one… or keep this moment unlinked.</div>
           </div>
           <button className="btn-ghost" onClick={onClose} type="button">
             ✕
@@ -267,6 +267,26 @@ function LinkItemModal({
             onChange={(e) => setQ(e.target.value)}
           />
           <div style={{ height: 12 }} />
+
+          {/* ✅ clear option */}
+          <button
+            type="button"
+            className="echo-result"
+            onClick={() => {
+              onClear();
+              onClose();
+            }}
+            style={{ marginBottom: 10 }}
+          >
+            <div className="echo-kindicon" aria-hidden="true">
+              🫧
+            </div>
+            <div className="echo-resultthumb echo-thumb--empty" />
+            <div className="echo-resulttext">
+              <div className="echo-resulttitle">Unlinked moment</div>
+              <div className="echo-resultmeta">Save without linking an item</div>
+            </div>
+          </button>
 
           {busy ? (
             <div className="echo-muted">Loading…</div>
@@ -359,7 +379,7 @@ export default function Echo() {
     setErr(null);
     try {
       await createEcho({
-        contentId: draft.contentId,
+        contentId: draft.contentId, // ✅ can be null
         usageTag: draft.usageTag,
         note: draft.note,
         shareToWaves: draft.shareToWaves,
@@ -407,7 +427,6 @@ export default function Echo() {
 
   /**
    * ✅ Auto-save after login if a pending draft exists in localStorage.
-   * Also listens for auth state changes to avoid timing issues.
    */
   useEffect(() => {
     let alive = true;
@@ -427,10 +446,8 @@ export default function Echo() {
       }
     }
 
-    // run once
     tryAutoSave();
 
-    // run again when auth changes (covers slow session restore)
     const { data: sub } = supabase.auth.onAuthStateChange(() => {
       tryAutoSave();
     });
@@ -445,24 +462,19 @@ export default function Echo() {
   async function onSave() {
     setErr(null);
 
-    if (!linked?.id) {
-      setErr("Link an item first.");
-      return;
-    }
     if (!effectiveTag) {
       setErr("Pick a tag.");
       return;
     }
 
     const draft: DraftEcho = {
-      contentId: linked.id,
+      contentId: linked?.id ?? null, // ✅ optional
       usageTag: effectiveTag,
       note: note.trim(),
     };
 
     const { data } = await supabase.auth.getSession();
     if (!data.session) {
-      // ✅ Persist across redirect + across tabs
       setPendingEcho(draft);
       setPendingDraft(draft);
       setSaveGateOpen(true);
@@ -490,6 +502,10 @@ export default function Echo() {
     setErr(null);
   }
 
+  const linkedTitle = linked ? linked.title : "Unlinked moment";
+  const linkedMeta = linked ? linked.kind || "Item" : "Linking is optional.";
+  const linkButtonLabel = linked ? "Change" : "Link an item";
+
   return (
     <div className="page echo-page">
       <div className="center-wrap echo-center">
@@ -501,21 +517,19 @@ export default function Echo() {
           <div className="echo-linkedrow">
             <div className="echo-linkedleft">
               <div className="echo-kindicon echo-kindicon--selected" aria-hidden="true">
-                {kindIcon(linked?.kind)}
+                {linked ? kindIcon(linked.kind) : "🫧"}
               </div>
 
               <div className="echo-linkedtext">
-                <div className="echo-kicker">LINKED ITEM</div>
-                <div className="echo-linkedtitle">{linked ? linked.title : "Pick an item to link"}</div>
-                <div className="echo-linkedmeta">
-                  {linked ? linked.kind || "Item" : "Click Change to choose."}
-                </div>
+                <div className="echo-kicker">LINKED ITEM (OPTIONAL)</div>
+                <div className="echo-linkedtitle">{linkedTitle}</div>
+                <div className="echo-linkedmeta">{linkedMeta}</div>
               </div>
             </div>
 
             <div className="echo-linkedactions">
               <button className="echo-pillbtn" type="button" onClick={() => setLinkOpen(true)}>
-                Change
+                {linkButtonLabel}
               </button>
             </div>
           </div>
@@ -575,7 +589,7 @@ export default function Echo() {
                   <div className="echo-entrytop">
                     <div className="echo-entryleft">
                       <span className="echo-tagpill">{e.usage_tag ? `#${e.usage_tag}` : "—"}</span>
-                      <div className="echo-entrytitle">{it?.title || "Linked item"}</div>
+                      <div className="echo-entrytitle">{it?.title || "Unlinked moment"}</div>
                     </div>
 
                     <button className="btn-ghost" type="button" onClick={() => onDeleteEcho(e.id)}>
@@ -595,13 +609,17 @@ export default function Echo() {
           </div>
         )}
 
-        <LinkItemModal open={linkOpen} onClose={() => setLinkOpen(false)} onPick={setLinked} />
+        <LinkItemModal
+          open={linkOpen}
+          onClose={() => setLinkOpen(false)}
+          onPick={setLinked}
+          onClear={() => setLinked(null)}
+        />
         <SaveGateModal open={saveGateOpen} draft={pendingDraft} onClose={() => setSaveGateOpen(false)} />
       </div>
     </div>
   );
 }
-
 
 
 

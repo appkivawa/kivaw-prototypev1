@@ -10,7 +10,7 @@ export type ContentItemLite = {
 export type EchoRow = {
   id: string;
   user_id: string;
-  content_id: string;
+  content_id: string | null; // ✅ optional now
   usage_tag: string;
   note: string | null;
   shared_to_waves: boolean;
@@ -58,7 +58,7 @@ export async function getContentItemLiteById(contentId: string) {
 }
 
 export async function createEcho(input: {
-  contentId: string;
+  contentId: string | null; // ✅ optional now
   usageTag: string;
   note?: string;
   shareToWaves?: boolean;
@@ -68,7 +68,7 @@ export async function createEcho(input: {
 
   const payload = {
     user_id: uid,
-    content_id: input.contentId,
+    content_id: input.contentId ?? null, // ✅ allow null insert
     usage_tag: input.usageTag,
     note: input.note || null,
     shared_to_waves: !!input.shareToWaves,
