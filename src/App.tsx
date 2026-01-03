@@ -1,4 +1,5 @@
-import { Navigate, Route, Routes } from "react-router-dom";
+import { useEffect } from "react";
+import { Navigate, Route, Routes, useNavigate } from "react-router-dom";
 import AppShell from "./layout/AppShell";
 
 import Home from "./pages/Home";
@@ -16,6 +17,26 @@ import Login from "./pages/Login";
 import AuthCallback from "./auth/AuthCallback";
 import FAQPage from "./pages/FAQ";
 
+/**
+ * ✅ Supabase magic links sometimes return tokens in the URL hash:
+ *   /#access_token=...
+ * With BrowserRouter, that loads "/" (Home) unless we forward it.
+ * This forwards hash-auth to /auth/callback so AuthCallback can finish sign-in,
+ * then it returns the user to the saved "kivaw_post_auth_path".
+ */
+function HashAuthRedirect() {
+  const nav = useNavigate();
+
+  useEffect(() => {
+    const h = window.location.hash || "";
+    if (h.includes("access_token=") || h.includes("refresh_token=") || h.includes("type=recovery")) {
+      nav("/auth/callback" + h, { replace: true });
+    }
+  }, [nav]);
+
+  return null;
+}
+
 export default function App() {
   return (
     <Routes>
@@ -24,7 +45,15 @@ export default function App() {
       <Route path="/auth/callback" element={<AuthCallback />} />
 
       {/* --------- APP WITH SHELL --------- */}
-      <Route path="/" element={<AppShell />}>
+      <Route
+        path="/"
+        element={
+          <>
+            <HashAuthRedirect />
+            <AppShell />
+          </>
+        }
+      >
         {/* Home */}
         <Route index element={<Home />} />
 
@@ -54,6 +83,7 @@ export default function App() {
     </Routes>
   );
 }
+
 
 
 
