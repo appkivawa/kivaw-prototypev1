@@ -108,24 +108,39 @@ export default function TopNav() {
   }, []);
 
   function goLogin() {
+    // ✅ preserve the exact page (including admin)
     navigate("/login", { state: { from: location.pathname } });
   }
 
-  async function onSignOut() {
+  async function onSignOut(e?: React.MouseEvent) {
+    e?.preventDefault();
+    e?.stopPropagation();
+
     if (authBusy) return;
     setAuthBusy(true);
+
     try {
-      await supabase.auth.signOut();
-      // Drop them somewhere stable so it doesn't feel like the app "broke"
-      navigate("/", { replace: true });
+      const { error } = await supabase.auth.signOut();
+      if (error) console.error("Sign out error:", error);
     } finally {
-      setAuthBusy(false);
+      // ✅ wipe cached auth + force clean UI
+      try {
+        localStorage.removeItem("supabase.auth.token");
+        sessionStorage.clear();
+      } catch {}
+
+      // Hard redirect ensures NO stale authed UI
+      window.location.href = "/";
     }
   }
 
-  function onAccountTap() {
-    if (isAuthed) onSignOut();
-    else goLogin();
+  function onAccountTap(e: React.MouseEvent) {
+    if (isAuthed) onSignOut(e);
+    else {
+      e.preventDefault();
+      e.stopPropagation();
+      goLogin();
+    }
   }
 
   return (
@@ -161,7 +176,7 @@ export default function TopNav() {
                   Continue
                 </button>
               ) : (
-                <button type="button" className="nav-ghost" onClick={onSignOut} disabled={authBusy}>
+                <button type="button" className="nav-ghost" onClick={(e) => onSignOut(e)} disabled={authBusy}>
                   {authBusy ? "Signing out…" : "Sign out"}
                 </button>
               )}
@@ -207,7 +222,6 @@ export default function TopNav() {
           <span className="tabbar__label">Saved</span>
         </NavLink>
 
-        {/* New: Account action on mobile */}
         <button className="tabbar__item tabbar__btn" onClick={onAccountTap} type="button" disabled={authBusy}>
           <IconUser className="tabbar__icon" />
           <span className="tabbar__label">{isAuthed ? "Sign out" : "Continue"}</span>
@@ -221,6 +235,7 @@ export default function TopNav() {
     </>
   );
 }
+
 
 
 

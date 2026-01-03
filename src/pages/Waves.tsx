@@ -1,42 +1,54 @@
 import { useEffect, useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import Card from "../ui/Card";
-import { fetchSavedIds, saveItem, unsaveItem, getUserId } from "../data/savesApi";
+
 import { listWavesFeed } from "../data/wavesApi";
 import type { WavesFeedItem } from "../data/wavesApi";
+
+import { fetchSavedIds, saveItem, unsaveItem, getUserId } from "../data/savesApi";
 import { requireAuth } from "../auth/requireAuth";
 
 function timeAgo(iso: string) {
   const t = new Date(iso).getTime();
   if (!t) return "";
   const diff = Date.now() - t;
-
   const sec = Math.floor(diff / 1000);
-  if (sec < 60) return `${sec}s ago`;
-
+  if (sec < 60) return `${sec}s`;
   const min = Math.floor(sec / 60);
-  if (min < 60) return `${min}m ago`;
-
+  if (min < 60) return `${min}m`;
   const hr = Math.floor(min / 60);
-  if (hr < 24) return `${hr}h ago`;
-
+  if (hr < 24) return `${hr}h`;
   const day = Math.floor(hr / 24);
-  return `${day}d ago`;
+  return `${day}d`;
 }
 
 function kindEmoji(kind?: string) {
   const k = (kind || "").toLowerCase();
-  if (k.includes("playlist") || k.includes("album") || k.includes("song")) return "🎧";
-  if (k.includes("reflection") || k.includes("prompt")) return "📝";
-  if (k.includes("visual") || k.includes("art")) return "🎨";
-  if (k.includes("movement") || k.includes("exercise")) return "🧘";
-  if (k.includes("creative")) return "🌸";
-  if (k.includes("expansive")) return "🌱";
+  if (k.includes("movement") || k.includes("walk") || k.includes("exercise")) return "🚶";
+  if (k.includes("music") || k.includes("sound") || k.includes("playlist")) return "🎵";
+  if (k.includes("logic")) return "🧠";
+  if (k.includes("visual") || k.includes("aesthetic") || k.includes("art")) return "🎨";
+  if (k.includes("prompt") || k.includes("reflection")) return "📝";
+  if (k.includes("faith")) return "🙏";
   return "🌊";
+}
+
+// Hide internal/system-only content from Waves feed (ex: Unlinked Echo)
+function isInternalDiscoverableItem(item: { title?: string; meta?: string; kind?: string }) {
+  const title = (item.title || "").toLowerCase().trim();
+  const meta = (item.meta || "").toLowerCase().trim();
+  const kind = (item.kind || "").toLowerCase().trim();
+
+  if (title === "unlinked echo") return true;
+  if (meta.includes("used when an echo is saved")) return true;
+  if (kind.includes("system")) return true;
+
+  return false;
 }
 
 export default function Waves() {
   const navigate = useNavigate();
+
   const [feed, setFeed] = useState<WavesFeedItem[]>([]);
   const [savedIds, setSavedIds] = useState<string[]>([]);
   const [isAuthed, setIsAuthed] = useState(false);
@@ -55,7 +67,9 @@ export default function Waves() {
 
         const rows = await listWavesFeed(60);
         if (cancelled) return;
-        setFeed(rows || []);
+
+        const filtered = (rows || []).filter((r) => !isInternalDiscoverableItem(r.content));
+        setFeed(filtered);
 
         const uid = await getUserId();
         if (cancelled) return;
@@ -88,7 +102,7 @@ export default function Waves() {
     if (busyId) return;
     setBusyId(contentId);
 
-    // optimistic update
+    // optimistic UI
     setSavedIds((prev) => {
       const set = new Set(prev);
       if (isSaved) set.delete(contentId);
@@ -100,10 +114,10 @@ export default function Waves() {
       if (isSaved) await unsaveItem(contentId);
       else await saveItem(contentId);
 
+      // re-sync from server
       const updated = await fetchSavedIds();
       setSavedIds(updated || []);
     } catch {
-      // rollback via re-fetch
       try {
         const updated = await fetchSavedIds();
         setSavedIds(updated || []);
@@ -149,11 +163,7 @@ export default function Waves() {
                   <p className="muted" style={{ marginBottom: 8 }}>
                     Want to save items? Sign in to heart them.
                   </p>
-                  <button
-                    className="btn btn-ghost"
-                    onClick={() => navigate("/auth?returnTo=/waves")}
-                    type="button"
-                  >
+                  <button className="btn btn-ghost" onClick={() => navigate("/auth?returnTo=/waves")} type="button">
                     Sign in →
                   </button>
                 </div>
@@ -163,6 +173,9 @@ export default function Waves() {
                 const item = row.content;
                 const isSaved = savedIds.includes(item.id);
                 const isBusy = busyId === item.id;
+
+                const emoji = kindEmoji(item.kind);
+                const img = item.image_url || "";
 
                 return (
                   <div
@@ -175,53 +188,62 @@ export default function Waves() {
                       if (e.key === "Enter" || e.key === " ") navigate(`/item/${item.id}`);
                     }}
                   >
-                    <div className="kivaw-rec-card__body">
-                      <div className="kivaw-rec-card__top">
-                        <div className="kivaw-rec-card__meta">
-                          <span aria-hidden="true" style={{ marginRight: 8 }}>
-                            {kindEmoji(item.kind)}
-                          </span>
-                          <span>{item.kind || "Item"}</span>
-                          <span style={{ margin: "0 8px", opacity: 0.5 }}>•</span>
-                          <span>{row.uses} uses</span>
-                          <span style={{ margin: "0 8px", opacity: 0.5 }}>•</span>
-                          <span>{timeAgo(row.last_used_at)}</span>
-                        </div>
-
-                        <button
-                          className="kivaw-heart"
-                          type="button"
-                          aria-label={isSaved ? "Unsave" : "Save"}
-                          disabled={isBusy}
-                          title={!isAuthed ? "Sign in to save" : isSaved ? "Unsave" : "Save"}
-                          onClick={(e) => {
-                            e.preventDefault();
-                            e.stopPropagation();
-                            toggleSave(item.id, isSaved);
-                          }}
-                          onKeyDown={(e) => {
-                            // prevent Space/Enter bubbling to the card
-                            e.stopPropagation();
-                            if (e.key === " " || e.key === "Enter") e.preventDefault();
-                          }}
-                        >
-                          {isBusy ? "…" : isSaved ? "♥" : "♡"}
-                        </button>
+                    <div className="kivaw-rowCard">
+                      <div className="kivaw-thumb" aria-hidden="true">
+                        <div className="kivaw-thumb__emoji">{emoji}</div>
+                        {img ? (
+                          <img
+                            className="kivaw-thumb__img"
+                            src={img}
+                            alt=""
+                            loading="lazy"
+                            onError={(e) => {
+                              (e.currentTarget as HTMLImageElement).style.display = "none";
+                            }}
+                          />
+                        ) : null}
                       </div>
 
-                      <div className="kivaw-rec-card__title">{item.title}</div>
+                      <div className="kivaw-rowCard__content">
+                        <div className="kivaw-rowCard__top">
+                          <div className="kivaw-rowCard__meta">
+                            <span className="kivaw-meta-pill">{item.kind || "Item"}</span>
+                            <span className="kivaw-meta-dot">•</span>
 
-                      {item.byline ? (
-                        <div className="muted" style={{ marginTop: 8, fontSize: 12 }}>
-                          {item.byline}
-                        </div>
-                      ) : null}
+                            <span className="kivaw-meta-strong">{row.uses}</span>
+                            <span className="kivaw-meta-soft">uses</span>
 
-                      {row.usage_tag ? (
-                        <div style={{ marginTop: 10 }}>
-                          <span className="tag">{row.usage_tag}</span>
+                            <span className="kivaw-meta-dot">•</span>
+                            <span className="kivaw-meta-soft">last used {timeAgo(row.last_used_at)} ago</span>
+                          </div>
+
+                          <button
+                            className="kivaw-heart"
+                            type="button"
+                            aria-label={isSaved ? "Unsave" : "Save"}
+                            disabled={isBusy}
+                            onClick={(e) => {
+                              e.preventDefault();
+                              e.stopPropagation();
+                              toggleSave(item.id, isSaved);
+                            }}
+                            onKeyDown={(e) => {
+                              e.stopPropagation();
+                              if (e.key === " " || e.key === "Enter") e.preventDefault();
+                            }}
+                          >
+                            {isBusy ? "…" : isSaved ? "♥" : "♡"}
+                          </button>
                         </div>
-                      ) : null}
+
+                        <div className="kivaw-rowCard__title">{item.title}</div>
+
+                        {row.usage_tag ? (
+                          <div style={{ marginTop: 10 }}>
+                            <span className="tag">{row.usage_tag}</span>
+                          </div>
+                        ) : null}
+                      </div>
                     </div>
                   </div>
                 );
@@ -233,6 +255,13 @@ export default function Waves() {
     </div>
   );
 }
+
+
+
+
+
+
+
 
 
 

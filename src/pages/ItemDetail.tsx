@@ -31,7 +31,22 @@ function isUuid(v: string) {
   return /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(v);
 }
 
+// ✅ robust-ish “Unlinked Echo” detector (works even if kind/meta change)
+function isUnlinkedEchoItem(item: ContentItem | null) {
+  if (!item) return false;
+  const ext = (item.external_id || "").toLowerCase();
+  const title = (item.title || "").toLowerCase();
+  const meta = (item.meta || "").toLowerCase();
+  return (
+    ext.includes("unlinked") ||
+    title.includes("unlinked echo") ||
+    meta.includes("unlinked echo") ||
+    meta.includes("saved without linking")
+  );
+}
+
 function HeartIcon({ filled }: { filled: boolean }) {
+  // Your SVG path looked off before; keeping your existing approach but using a known-good heart.
   return (
     <svg
       width="18"
@@ -43,7 +58,7 @@ function HeartIcon({ filled }: { filled: boolean }) {
       stroke="currentColor"
       strokeWidth="2"
     >
-      <path d="M20.8 4.6c-1.6-1.6-4.1-1.6-5.7 0L12 7.7 8.9 4.6c-1.6-1.6-1.6-4.1 0-5.7z" />
+      <path d="M12 21s-7-4.4-9.5-8.5C.6 9.4 2 6.6 4.6 5.5c1.8-.8 3.9-.3 5.2 1l2.2 2.2 2.2-2.2c1.3-1.3 3.4-1.8 5.2-1 2.6 1.1 4 3.9 2.1 7C19 16.6 12 21 12 21z" />
     </svg>
   );
 }
@@ -64,6 +79,25 @@ export default function ItemDetail() {
 
   const [waves, setWaves] = useState<WaveSummaryRow[]>([]);
   const [wavesLoading, setWavesLoading] = useState(true);
+
+  // ✅ Wave composer
+  const [waveTag, setWaveTag] = useState("");
+  const [waveBusy, setWaveBusy] = useState(false);
+  const [waveErr, setWaveErr] = useState("");
+
+  const isUnlinked = useMemo(() => isUnlinkedEchoItem(item), [item]);
+
+  async function loadWaves(contentId: string) {
+    setWavesLoading(true);
+    try {
+      const waveRows = await listWavesForItem(contentId, 25);
+      setWaves(waveRows);
+    } catch (e) {
+      console.error(e);
+    } finally {
+      setWavesLoading(false);
+    }
+  }
 
   useEffect(() => {
     let cancelled = false;
@@ -138,8 +172,6 @@ export default function ItemDetail() {
       if (!item?.id) return;
 
       try {
-        setWavesLoading(true);
-
         const uid = await getUserId();
         if (cancelled) return;
 
@@ -153,12 +185,9 @@ export default function ItemDetail() {
           setIsSaved(false);
         }
 
-        const waveRows = await listWavesForItem(item.id, 25);
-        if (!cancelled) setWaves(waveRows);
+        if (!cancelled) await loadWaves(item.id);
       } catch (e) {
         console.error(e);
-      } finally {
-        if (!cancelled) setWavesLoading(false);
       }
     })();
 
@@ -193,6 +222,39 @@ export default function ItemDetail() {
       alert("Couldn’t update saved right now.");
     } finally {
       setSaveBusy(false);
+    }
+  }
+
+  async function postWave() {
+    if (!item?.id) return;
+    if (isUnlinked) return; // hard block
+    const raw = waveTag.trim();
+    if (!raw) {
+      setWaveErr("Add a tag first (example: reset, comfort, clarity).");
+      return;
+    }
+
+    // simple normalization
+    const tag = raw.replace(/\s+/g, " ").slice(0, 40);
+
+    setWaveErr("");
+    setWaveBusy(true);
+
+    try {
+      // ✅ assumes your table is waves_events(content_item_id, usage_tag, created_at)
+      const { error } = await supabase.from("waves_events").insert([
+        { content_item_id: item.id, usage_tag: tag },
+      ]);
+
+      if (error) throw error;
+
+      setWaveTag("");
+      await loadWaves(item.id);
+    } catch (e: any) {
+      console.error(e);
+      setWaveErr(e?.message || "Couldn’t post a wave right now.");
+    } finally {
+      setWaveBusy(false);
     }
   }
 
@@ -337,6 +399,7 @@ export default function ItemDetail() {
                   </div>
                 )}
 
+                {/* Echo */}
                 <div
                   style={{
                     marginTop: 24,
@@ -362,11 +425,46 @@ export default function ItemDetail() {
                   </button>
                 </div>
 
+                {/* Waves */}
                 <div style={{ marginTop: 18, textAlign: "left" }}>
                   <div style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline" }}>
                     <div style={{ fontWeight: 800, color: "var(--text)" }}>Waves</div>
                     <div style={{ fontSize: 12, color: "var(--muted)" }}>Public, anonymous</div>
                   </div>
+
+                  {/* ✅ Post to Waves composer (hidden for Unlinked Echo) */}
+                  {isUnlinked ? (
+                    <p style={{ color: "var(--muted)", marginTop: 10 }}>
+                      This is a private “Unlinked Echo” placeholder — it can’t be posted to Waves.
+                    </p>
+                  ) : (
+                    <div
+                      style={{
+                        marginTop: 10,
+                        display: "grid",
+                        gridTemplateColumns: "1fr auto",
+                        gap: 10,
+                        alignItems: "center",
+                      }}
+                    >
+                      <input
+                        className="input"
+                        value={waveTag}
+                        onChange={(e) => setWaveTag(e.target.value)}
+                        placeholder="Add a wave tag (e.g., reset, comfort, clarity)"
+                        disabled={waveBusy}
+                      />
+                      <button className="btn btn-ghost" type="button" onClick={postWave} disabled={waveBusy}>
+                        {waveBusy ? "Posting…" : "Post"}
+                      </button>
+
+                      {waveErr ? (
+                        <div className="echo-alert" style={{ gridColumn: "1 / -1" }}>
+                          {waveErr}
+                        </div>
+                      ) : null}
+                    </div>
+                  )}
 
                   {wavesLoading ? (
                     <p style={{ color: "var(--muted)", marginTop: 10 }}>Loading waves…</p>
@@ -409,6 +507,7 @@ export default function ItemDetail() {
     </div>
   );
 }
+
 
 
 

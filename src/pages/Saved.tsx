@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import Card from "../ui/Card";
 import { supabase } from "../lib/supabaseClient";
@@ -16,6 +16,23 @@ function kindEmoji(kind?: string) {
   return "✦";
 }
 
+// Heuristic: hide system-ish items from the Saved feed
+function isInternalSavedItem(item: ContentItem) {
+  const title = (item.title || "").toLowerCase().trim();
+  const meta = (item.meta || "").toLowerCase().trim();
+  const kind = (item.kind || "").toLowerCase().trim();
+
+  if (title === "unlinked echo") return true;
+
+  // The exact string you showed in UI (treat as internal)
+  if (meta.includes("used when an echo is saved")) return true;
+
+  // If you’ve got any “note/system” kinds in your db, catch them too
+  if (kind.includes("note") && title.includes("echo")) return true;
+
+  return false;
+}
+
 export default function Saved() {
   const navigate = useNavigate();
 
@@ -25,6 +42,9 @@ export default function Saved() {
   const [loading, setLoading] = useState(true);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
   const [busyId, setBusyId] = useState<string | null>(null);
+
+  // UX: keep internal stuff accessible, but not the default vibe
+  const [showNotes, setShowNotes] = useState(false);
 
   async function loadSaved() {
     setLoading(true);
@@ -77,12 +97,10 @@ export default function Saved() {
 
   useEffect(() => {
     let cancelled = false;
-
     (async () => {
       await loadSaved();
       if (cancelled) return;
     })();
-
     return () => {
       cancelled = true;
     };
@@ -107,13 +125,27 @@ export default function Saved() {
       await unsaveItem(contentId);
     } catch (e) {
       console.error(e);
-      // reload to repair UI if something went wrong
       await loadSaved();
       alert("Couldn’t update saved right now.");
     } finally {
       setBusyId(null);
     }
   }
+
+  const { visibleItems, internalItems } = useMemo(() => {
+    const internal: ContentItem[] = [];
+    const normal: ContentItem[] = [];
+
+    for (const it of items) {
+      if (isInternalSavedItem(it)) internal.push(it);
+      else normal.push(it);
+    }
+
+    return {
+      visibleItems: showNotes ? [...normal, ...internal] : normal,
+      internalItems: internal,
+    };
+  }, [items, showNotes]);
 
   return (
     <div className="page">
@@ -122,7 +154,7 @@ export default function Saved() {
           <h1 className="h1">Saved</h1>
           <p className="kivaw-sub">Your saved items live here.</p>
 
-          <div style={{ marginTop: 16, width: "100%" }}>
+          <div style={{ marginTop: 14, width: "100%" }}>
             {loading ? (
               <p className="muted">Loading…</p>
             ) : errorMsg ? (
@@ -154,71 +186,90 @@ export default function Saved() {
                 </button>
               </div>
             ) : (
-              <div className="kivaw-rec-grid" style={{ marginTop: 10 }}>
-                {items.map((r) => {
-                  const isBusy = busyId === r.id;
+              <>
+                {/* Notes toggle row */}
+                {internalItems.length > 0 ? (
+                  <div style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline" }}>
+                    <p className="kivaw-muted" style={{ marginTop: 0 }}>
+                      {visibleItems.length} item{visibleItems.length === 1 ? "" : "s"}
+                    </p>
 
-                  return (
-                    <div
-                      key={r.id}
-                      className="kivaw-rec-card kivaw-rec-row"
-                      role="button"
-                      tabIndex={0}
-                      onClick={() => navigate(`/item/${r.id}`)}
-                      onKeyDown={(e) => {
-                        if (e.key === "Enter" || e.key === " ") {
-                          e.preventDefault();
-                          navigate(`/item/${r.id}`);
-                        }
-                      }}
+                    <button
+                      className="btn-ghost"
+                      type="button"
+                      onClick={() => setShowNotes((v) => !v)}
+                      title="Show/hide internal notes"
                     >
-                      {/* Use your existing icon tile styling */}
-                      <div className="kivaw-rec-icon" aria-hidden="true">
-                        {kindEmoji(r.kind)}
-                      </div>
+                      {showNotes ? "Hide notes" : `Show notes (${internalItems.length})`}
+                    </button>
+                  </div>
+                ) : null}
 
-                      <div className="kivaw-rec-content">
-                        <div className="kivaw-rec-card__meta">
-                          {(r.kind || "Item") + (r.meta ? ` • ${r.meta}` : "")}
-                        </div>
-                        <div className="kivaw-rec-card__title">{r.title}</div>
-                        {r.byline ? <div className="kivaw-rec-card__by">{r.byline}</div> : null}
+                <div className="kivaw-rec-grid" style={{ marginTop: 10 }}>
+                  {visibleItems.map((r) => {
+                    const isBusy = busyId === r.id;
 
-                        {r.url ? (
-                          <a
-                            href={r.url}
-                            target="_blank"
-                            rel="noreferrer"
-                            className="kivaw-openlink"
-                            onClick={(e) => e.stopPropagation()}
-                          >
-                            Open →
-                          </a>
-                        ) : null}
-                      </div>
-
-                      <button
-                        className="kivaw-heart kivaw-remove"
-                        type="button"
-                        aria-label="Unsave"
-                        disabled={isBusy}
-                        onClick={(e) => {
-                          e.preventDefault();
-                          e.stopPropagation();
-                          removeSaved(r.id);
-                        }}
+                    return (
+                      <div
+                        key={r.id}
+                        className="kivaw-rec-card kivaw-rec-row"
+                        role="button"
+                        tabIndex={0}
+                        onClick={() => navigate(`/item/${r.id}`)}
                         onKeyDown={(e) => {
-                          e.stopPropagation();
-                          if (e.key === " " || e.key === "Enter") e.preventDefault();
+                          if (e.key === "Enter" || e.key === " ") {
+                            e.preventDefault();
+                            navigate(`/item/${r.id}`);
+                          }
                         }}
-                        title="Remove from saved"
                       >
-                        {isBusy ? "…" : "♥"}
-                      </button>
-                    </div>
-                  );
-                })}
-              </div>
+                        <div className="kivaw-rec-icon" aria-hidden="true">
+                          {kindEmoji(r.kind)}
+                        </div>
+
+                        <div className="kivaw-rec-content">
+                          <div className="kivaw-rec-card__meta">
+                            {(r.kind || "Item") + (r.meta ? ` • ${r.meta}` : "")}
+                          </div>
+                          <div className="kivaw-rec-card__title">{r.title}</div>
+                          {r.byline ? <div className="kivaw-rec-card__by">{r.byline}</div> : null}
+
+                          {r.url ? (
+                            <a
+                              href={r.url}
+                              target="_blank"
+                              rel="noreferrer"
+                              className="kivaw-openlink"
+                              onClick={(e) => e.stopPropagation()}
+                            >
+                              Open →
+                            </a>
+                          ) : null}
+                        </div>
+
+                        <button
+                          className="kivaw-heart kivaw-remove"
+                          type="button"
+                          aria-label="Remove from saved"
+                          disabled={isBusy}
+                          onClick={(e) => {
+                            e.preventDefault();
+                            e.stopPropagation();
+                            removeSaved(r.id);
+                          }}
+                          onKeyDown={(e) => {
+                            e.stopPropagation();
+                            if (e.key === " " || e.key === "Enter") e.preventDefault();
+                          }}
+                          title="Remove from saved"
+                        >
+                          {isBusy ? "…" : "♥"}
+                        </button>
+                      </div>
+                    );
+                  })}
+                </div>
+              </>
             )}
           </div>
         </Card>
@@ -226,6 +277,7 @@ export default function Saved() {
     </div>
   );
 }
+
 
 
 

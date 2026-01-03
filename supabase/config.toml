@@ -1,0 +1,6 @@
+[functions.admin-stats]
+enabled = true
+verify_jwt = false
+import_map = "./functions/admin-stats/deno.json"
+entrypoint = "./functions/admin-stats/index.ts"
+

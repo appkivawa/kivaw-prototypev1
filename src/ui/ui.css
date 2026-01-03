@@ -1541,3 +1541,200 @@ textarea {
   justify-content: center;
 }
 
+/* --- Item card covers (Explore + Waves) --- */
+.kivaw-rec-card {
+  overflow: hidden; /* so the cover corners match the card */
+}
+
+.kivaw-rec-card__cover {
+  position: relative;
+  width: 100%;
+  height: 94px; /* tweak: 84–110 range is usually sweet */
+  border-bottom: 1px solid rgba(140, 155, 190, 0.18);
+  background: rgba(240, 243, 252, 0.6);
+}
+
+.kivaw-rec-card__coverFallback {
+  position: absolute;
+  inset: 0;
+  display: grid;
+  place-items: center;
+  font-size: 26px;
+  opacity: 0.95;
+}
+
+.kivaw-rec-card__coverImg {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+/* make titles feel less “wall of text” */
+.kivaw-rec-card__title {
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+
+/* meta spacing read cleaner with cover */
+.kivaw-rec-card__meta {
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+/* --- Row card layout (thumbnail + content) --- */
+.kivaw-rowCard {
+  display: flex;
+  gap: 14px;
+  align-items: flex-start;
+}
+
+.kivaw-rowCard__content {
+  min-width: 0;
+  flex: 1;
+}
+
+.kivaw-rowCard__top {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 10px;
+}
+
+.kivaw-rowCard__meta {
+  font-size: 12px;
+  color: var(--muted);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  min-width: 0;
+}
+
+.kivaw-rowCard__title {
+  margin-top: 6px;
+  font-weight: 700;
+  font-size: 18px;
+  color: var(--text);
+  line-height: 1.2;
+
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+
+/* --- Squircle thumbnail (image if exists, emoji fallback) --- */
+.kivaw-thumb {
+  width: 64px;
+  height: 64px;
+  border-radius: 18px; /* 👈 square with round ends */
+  background: rgba(240, 243, 252, 0.9);
+  border: 1px solid rgba(140, 155, 190, 0.18);
+  position: relative;
+  overflow: hidden;
+  flex: 0 0 64px;
+}
+
+.kivaw-thumb__emoji {
+  position: absolute;
+  inset: 0;
+  display: grid;
+  place-items: center;
+  font-size: 26px;
+  opacity: 0.95;
+}
+
+.kivaw-thumb__img {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+/* keep the card from feeling too tall */
+.kivaw-rec-card {
+  padding: 16px 16px;
+}
+/* ---------- Sticky filter bar (Explore) ---------- */
+.kivaw-stickybar {
+  position: sticky;
+  top: 78px; /* tweak if your TopNav height differs */
+  z-index: 5;
+
+  background: rgba(255, 255, 255, 0.75);
+  backdrop-filter: blur(10px);
+  border: 1px solid rgba(140, 155, 190, 0.18);
+  border-radius: 18px;
+  padding: 10px 10px;
+}
+
+.kivaw-stickybar__sub {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 10px;
+  margin-top: 8px;
+}
+
+/* ---------- Smaller mood pills ---------- */
+.kivaw-filters--compact {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.kivaw-pill {
+  font-size: 13px;
+  padding: 8px 10px;
+  border-radius: 999px;
+  line-height: 1;
+}
+
+.kivaw-pill__emoji {
+  margin-right: 6px;
+  font-size: 14px;
+}
+
+/* ---------- Waves “stats” styling ---------- */
+.kivaw-meta-pill {
+  display: inline-flex;
+  align-items: center;
+  padding: 4px 8px;
+  border-radius: 999px;
+  border: 1px solid rgba(140, 155, 190, 0.22);
+  background: rgba(240, 243, 252, 0.7);
+  font-size: 12px;
+  color: var(--text);
+}
+
+.kivaw-meta-dot {
+  margin: 0 8px;
+  opacity: 0.45;
+}
+
+.kivaw-meta-strong {
+  font-weight: 800;
+  color: var(--text);
+}
+
+.kivaw-meta-soft {
+  color: var(--muted);
+  font-size: 12px;
+  margin-left: 4px;
+}
+
+.kivaw-meta-up {
+  color: #1a9b62; /* if you want no hard color, tell me and I’ll convert to var */
+  font-weight: 700;
+  font-size: 12px;
+}
+
+.kivaw-meta-mid {
+  color: var(--muted);
+  font-weight: 700;
+  font-size: 12px;
+}
