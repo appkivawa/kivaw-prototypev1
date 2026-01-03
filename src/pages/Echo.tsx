@@ -21,14 +21,14 @@ function cls(...parts: Array<string | false | null | undefined>) {
 const DEFAULT_TAGS = ["focus", "unwind", "study", "heal", "reset", "laugh"] as const;
 
 type DraftEcho = {
-  contentId: string | null; // ✅ optional linked item
+  contentId: string | null; // optional linked item
   usageTag: string;
   note?: string;
   shareToWaves?: boolean;
 };
 
 /**
- * ✅ Persist the echo draft across magic-link redirect AND across tabs/windows.
+ * Persist the echo draft across magic-link redirect AND across tabs/windows.
  */
 const PENDING_ECHO_KEY = "kivaw_pending_echo_v1";
 
@@ -49,6 +49,20 @@ function getPendingEcho(): DraftEcho | null {
 
 function clearPendingEcho() {
   localStorage.removeItem(PENDING_ECHO_KEY);
+}
+
+/**
+ * ✅ Stable auth redirect builder
+ * - Prefer explicit deployed URL (set in Vercel as VITE_PUBLIC_SITE_URL="https://www.kivaw.com")
+ * - Fall back to current origin for local dev
+ */
+function getAuthRedirectTo() {
+  // Vite exposes env vars as strings or undefined
+  const site =
+    (import.meta as any).env?.VITE_PUBLIC_SITE_URL?.trim?.() || window.location.origin;
+
+  // Ensure we always end up with: https://whatever.com/auth/callback
+  return new URL("/auth/callback", site).toString();
 }
 
 function kindIcon(kind?: string | null) {
@@ -97,13 +111,18 @@ function SaveGateModal({
 
   async function sendMagicLink() {
     if (!email.trim()) return;
+
     setBusy(true);
     setErr(null);
 
     try {
+      const redirectTo = getAuthRedirectTo();
+
       const { error } = await supabase.auth.signInWithOtp({
-        email,
-        options: { emailRedirectTo: window.location.origin + "/auth/callback" },
+        email: email.trim(),
+        options: {
+          emailRedirectTo: redirectTo,
+        },
       });
 
       if (error) throw error;
@@ -162,6 +181,7 @@ function SaveGateModal({
                 onChange={(e) => setEmail(e.target.value)}
                 autoComplete="email"
               />
+
               {err && (
                 <div className="echo-alert" style={{ marginTop: 10 }}>
                   {err}
@@ -268,7 +288,7 @@ function LinkItemModal({
           />
           <div style={{ height: 12 }} />
 
-          {/* ✅ clear option */}
+          {/* clear/unlinked option */}
           <button
             type="button"
             className="echo-result"
@@ -379,7 +399,7 @@ export default function Echo() {
     setErr(null);
     try {
       await createEcho({
-        contentId: draft.contentId, // ✅ can be null
+        contentId: draft.contentId, // can be null
         usageTag: draft.usageTag,
         note: draft.note,
         shareToWaves: draft.shareToWaves,
@@ -398,7 +418,7 @@ export default function Echo() {
     }
   }
 
-  // ✅ Auto-select linked item from URL: /echo?contentId=...
+  // Auto-select linked item from URL: /echo?contentId=...
   useEffect(() => {
     let alive = true;
 
@@ -426,7 +446,7 @@ export default function Echo() {
   }, []);
 
   /**
-   * ✅ Auto-save after login if a pending draft exists in localStorage.
+   * Auto-save after login if a pending draft exists in localStorage.
    */
   useEffect(() => {
     let alive = true;
@@ -468,7 +488,7 @@ export default function Echo() {
     }
 
     const draft: DraftEcho = {
-      contentId: linked?.id ?? null, // ✅ optional
+      contentId: linked?.id ?? null, // optional
       usageTag: effectiveTag,
       note: note.trim(),
     };
@@ -615,11 +635,17 @@ export default function Echo() {
           onPick={setLinked}
           onClear={() => setLinked(null)}
         />
-        <SaveGateModal open={saveGateOpen} draft={pendingDraft} onClose={() => setSaveGateOpen(false)} />
+
+        <SaveGateModal
+          open={saveGateOpen}
+          draft={pendingDraft}
+          onClose={() => setSaveGateOpen(false)}
+        />
       </div>
     </div>
   );
 }
+
 
 
 
