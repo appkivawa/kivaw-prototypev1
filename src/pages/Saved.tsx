@@ -58,6 +58,24 @@ function MediaCover({
   );
 }
 
+function HeartIcon({ filled }: { filled: boolean }) {
+  // simple inline heart (no dependency)
+  return (
+    <svg
+      width="18"
+      height="18"
+      viewBox="0 0 24 24"
+      aria-hidden="true"
+      style={{ display: "block" }}
+      fill={filled ? "currentColor" : "none"}
+      stroke="currentColor"
+      strokeWidth="2"
+    >
+      <path d="M20.8 4.6c-1.6-1.6-4.1-1.6-5.7 0L12 7.7 8.9 4.6c-1.6-1.6-4.1-1.6-5.7 0s-1.6 4.1 0 5.7L12 21.1l8.8-10.8c1.6-1.6 1.6-4.1 0-5.7z" />
+    </svg>
+  );
+}
+
 export default function Saved() {
   const navigate = useNavigate();
 
@@ -136,7 +154,7 @@ export default function Saved() {
       setItems((prev) => prev.filter((x) => x.id !== contentId));
     } catch (e) {
       console.error(e);
-      alert("Couldn’t remove right now.");
+      alert("Couldn’t update saved right now.");
     } finally {
       setBusyId(null);
     }
@@ -166,11 +184,22 @@ export default function Saved() {
             ) : errorMsg ? (
               <p className="muted">{errorMsg}</p>
             ) : !isAuthed ? (
-              <p className="muted">Sign in to view your saved items.</p>
+              <div style={{ display: "grid", gap: 10 }}>
+                <p className="muted">Sign in to view (and save) your items.</p>
+                <button
+                  type="button"
+                  className="btn"
+                  onClick={() => navigate("/auth")}
+                >
+                  Sign in
+                </button>
+              </div>
             ) : ids.length === 0 ? (
               <p className="muted">Nothing saved yet. Go heart a few items.</p>
             ) : items.length === 0 ? (
-              <p className="muted">Saved items exist, but nothing matched in the database.</p>
+              <p className="muted">
+                Saved items exist, but nothing matched in the database.
+              </p>
             ) : (
               <div className="kivaw-rec-grid" style={{ marginTop: 10 }}>
                 {items.map((r) => {
@@ -186,7 +215,6 @@ export default function Saved() {
                       onKeyDown={(e) => onCardKeyDown(e, r.id)}
                       aria-label={`Open ${r.title}`}
                     >
-                      {/* ✅ FIX: ensure kind is a string */}
                       <MediaCover
                         id={r.id}
                         kind={r.kind || "Other"}
@@ -214,16 +242,25 @@ export default function Saved() {
                         )}
                       </div>
 
+                      {/* Heart button = unsave */}
                       <button
                         type="button"
                         className="btn btn-small btn-ghost kivaw-rec-action"
+                        aria-label="Unsave"
                         disabled={isBusy}
                         onClick={(e) => {
                           e.stopPropagation();
                           removeSaved(r.id);
                         }}
+                        style={{
+                          display: "inline-flex",
+                          alignItems: "center",
+                          justifyContent: "center",
+                          gap: 8,
+                          minWidth: 44,
+                        }}
                       >
-                        {isBusy ? "…" : "Remove"}
+                        {isBusy ? "…" : <HeartIcon filled={true} />}
                       </button>
                     </div>
                   );
@@ -236,6 +273,7 @@ export default function Saved() {
     </div>
   );
 }
+
 
 
 

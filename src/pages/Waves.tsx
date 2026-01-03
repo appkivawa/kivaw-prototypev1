@@ -1,9 +1,10 @@
 import { useEffect, useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import Card from "../ui/Card";
-import { fetchSavedIds, saveItem, unsaveItem } from "../data/savesApi";
+import { fetchSavedIds, saveItem, unsaveItem, getUserId } from "../data/savesApi";
 import { listWavesFeed } from "../data/wavesApi";
 import type { WavesFeedItem } from "../data/wavesApi";
+import { requireAuth } from "../auth/requireAuth";
 
 function timeAgo(iso: string) {
   const t = new Date(iso).getTime();
@@ -38,25 +39,63 @@ export default function Waves() {
   const navigate = useNavigate();
   const [feed, setFeed] = useState<WavesFeedItem[]>([]);
   const [savedIds, setSavedIds] = useState<string[]>([]);
+  const [isAuthed, setIsAuthed] = useState(false);
+
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string>("");
+  const [busyId, setBusyId] = useState<string | null>(null);
 
   useEffect(() => {
+    let cancelled = false;
+
     (async () => {
       try {
         setError("");
-        const [rows, saved] = await Promise.all([listWavesFeed(60), fetchSavedIds()]);
+        setLoading(true);
+
+        const rows = await listWavesFeed(60);
+        if (cancelled) return;
         setFeed(rows || []);
-        setSavedIds(saved || []);
+
+        const uid = await getUserId();
+        if (cancelled) return;
+
+        const authed = !!uid;
+        setIsAuthed(authed);
+
+        if (authed) {
+          const saved = await fetchSavedIds();
+          if (!cancelled) setSavedIds(saved || []);
+        } else {
+          setSavedIds([]);
+        }
       } catch (e: any) {
-        setError(e?.message || "Could not load Waves.");
+        if (!cancelled) setError(e?.message || "Could not load Waves.");
       } finally {
-        setLoading(false);
+        if (!cancelled) setLoading(false);
       }
     })();
+
+    return () => {
+      cancelled = true;
+    };
   }, []);
 
   async function toggleSave(contentId: string, isSaved: boolean) {
+    const uid = await requireAuth(navigate, "/waves");
+    if (!uid) return;
+
+    if (busyId) return;
+    setBusyId(contentId);
+
+    // optimistic update
+    setSavedIds((prev) => {
+      const set = new Set(prev);
+      if (isSaved) set.delete(contentId);
+      else set.add(contentId);
+      return Array.from(set);
+    });
+
     try {
       if (isSaved) await unsaveItem(contentId);
       else await saveItem(contentId);
@@ -64,7 +103,13 @@ export default function Waves() {
       const updated = await fetchSavedIds();
       setSavedIds(updated || []);
     } catch {
-      // intentionally silent — don't make Waves feel fragile
+      // rollback via re-fetch
+      try {
+        const updated = await fetchSavedIds();
+        setSavedIds(updated || []);
+      } catch {}
+    } finally {
+      setBusyId(null);
     }
   }
 
@@ -85,7 +130,7 @@ export default function Waves() {
             <div>
               <p className="muted">{error}</p>
               <div className="spacer-16" />
-              <button className="btn" onClick={() => navigate("/explore")}>
+              <button className="btn" onClick={() => navigate("/explore")} type="button">
                 Browse everything →
               </button>
             </div>
@@ -93,15 +138,31 @@ export default function Waves() {
             <div>
               <p className="muted">Nothing is trending yet.</p>
               <div className="spacer-16" />
-              <button className="btn" onClick={() => navigate("/explore")}>
+              <button className="btn" onClick={() => navigate("/explore")} type="button">
                 Browse everything →
               </button>
             </div>
           ) : (
             <div className="kivaw-rec-grid">
+              {!isAuthed ? (
+                <div style={{ marginBottom: 12 }}>
+                  <p className="muted" style={{ marginBottom: 8 }}>
+                    Want to save items? Sign in to heart them.
+                  </p>
+                  <button
+                    className="btn btn-ghost"
+                    onClick={() => navigate("/auth?returnTo=/waves")}
+                    type="button"
+                  >
+                    Sign in →
+                  </button>
+                </div>
+              ) : null}
+
               {feed.map((row) => {
                 const item = row.content;
                 const isSaved = savedIds.includes(item.id);
+                const isBusy = busyId === item.id;
 
                 return (
                   <div
@@ -129,13 +190,22 @@ export default function Waves() {
 
                         <button
                           className="kivaw-heart"
+                          type="button"
                           aria-label={isSaved ? "Unsave" : "Save"}
+                          disabled={isBusy}
+                          title={!isAuthed ? "Sign in to save" : isSaved ? "Unsave" : "Save"}
                           onClick={(e) => {
+                            e.preventDefault();
                             e.stopPropagation();
                             toggleSave(item.id, isSaved);
                           }}
+                          onKeyDown={(e) => {
+                            // prevent Space/Enter bubbling to the card
+                            e.stopPropagation();
+                            if (e.key === " " || e.key === "Enter") e.preventDefault();
+                          }}
                         >
-                          {isSaved ? "♥" : "♡"}
+                          {isBusy ? "…" : isSaved ? "♥" : "♡"}
                         </button>
                       </div>
 
@@ -163,6 +233,9 @@ export default function Waves() {
     </div>
   );
 }
+
+
+
 
 
 

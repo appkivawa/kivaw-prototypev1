@@ -9,14 +9,19 @@ export default function AuthCallback() {
   useEffect(() => {
     let alive = true;
 
-    async function waitForSession(maxMs = 2500) {
+    async function waitForAuth(maxMs = 3500) {
       const start = Date.now();
       while (Date.now() - start < maxMs) {
-        const { data } = await supabase.auth.getSession();
-        if (data.session) return data.session;
+        // session can lag; user is a decent fallback signal
+        const [{ data: s }, { data: u }] = await Promise.all([
+          supabase.auth.getSession(),
+          supabase.auth.getUser(),
+        ]);
+
+        if (s.session || u.user) return true;
         await new Promise((r) => setTimeout(r, 200));
       }
-      return null;
+      return false;
     }
 
     (async () => {
@@ -24,7 +29,7 @@ export default function AuthCallback() {
         const url = new URL(window.location.href);
         const code = url.searchParams.get("code");
 
-        // PKCE: exchange ?code= for session
+        // ✅ PKCE: exchange ?code= for session
         if (code) {
           const { error } = await supabase.auth.exchangeCodeForSession(code);
           if (error) throw error;
@@ -33,13 +38,12 @@ export default function AuthCallback() {
           window.history.replaceState({}, document.title, url.pathname + url.search + url.hash);
         }
 
-        // Give auth a moment to settle (hash flow + storage timing)
-        await new Promise((r) => setTimeout(r, 400));
+        // ✅ If provider returned tokens in hash, Supabase usually picks them up automatically.
+        // We still give it a moment to write storage.
+        await new Promise((r) => setTimeout(r, 350));
 
-        const session = await waitForSession(2500);
-        if (!session) {
-          throw new Error("Sign-in didn’t finish. Please try again.");
-        }
+        const ok = await waitForAuth(3500);
+        if (!ok) throw new Error("Sign-in didn’t finish. Please try again.");
 
         const backTo = localStorage.getItem("kivaw_post_auth_path") || "/echo";
         localStorage.removeItem("kivaw_post_auth_path");
@@ -49,6 +53,7 @@ export default function AuthCallback() {
       } catch (e: any) {
         console.error("Auth callback error:", e);
         if (!alive) return;
+
         setMsg(e?.message || "Sign-in failed. Try again.");
       }
     })();
@@ -66,6 +71,7 @@ export default function AuthCallback() {
     </div>
   );
 }
+
 
 
 

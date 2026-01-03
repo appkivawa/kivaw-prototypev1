@@ -3,8 +3,9 @@ import { useNavigate, useParams } from "react-router-dom";
 import Card from "../ui/Card";
 import { supabase } from "../lib/supabaseClient";
 import type { ContentItem } from "../data/contentApi";
-import { getUserId } from "../data/echoApi";
 import { listWavesForItem, type WaveSummaryRow } from "../data/wavesApi";
+import { fetchSavedIds, saveItem, unsaveItem, getUserId } from "../data/savesApi";
+import { requireAuth } from "../auth/requireAuth";
 
 function kindEmoji(kind: string) {
   switch ((kind || "").toLowerCase()) {
@@ -30,6 +31,23 @@ function isUuid(v: string) {
   return /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(v);
 }
 
+function HeartIcon({ filled }: { filled: boolean }) {
+  return (
+    <svg
+      width="18"
+      height="18"
+      viewBox="0 0 24 24"
+      aria-hidden="true"
+      style={{ display: "block" }}
+      fill={filled ? "currentColor" : "none"}
+      stroke="currentColor"
+      strokeWidth="2"
+    >
+      <path d="M20.8 4.6c-1.6-1.6-4.1-1.6-5.7 0L12 7.7 8.9 4.6c-1.6-1.6-1.6-4.1 0-5.7z" />
+    </svg>
+  );
+}
+
 export default function ItemDetail() {
   const navigate = useNavigate();
   const { id } = useParams();
@@ -40,10 +58,10 @@ export default function ItemDetail() {
   const [errMsg, setErrMsg] = useState<string | null>(null);
   const [imgFailed, setImgFailed] = useState(false);
 
-  // Auth (just for tiny messaging if you want)
   const [isAuthed, setIsAuthed] = useState(false);
+  const [isSaved, setIsSaved] = useState(false);
+  const [saveBusy, setSaveBusy] = useState(false);
 
-  // Waves
   const [waves, setWaves] = useState<WaveSummaryRow[]>([]);
   const [wavesLoading, setWavesLoading] = useState(true);
 
@@ -62,16 +80,11 @@ export default function ItemDetail() {
           return;
         }
 
-        // Fetch item (by UUID or external_id)
-        if (isUuid(param)) {
-          const byId = await supabase
-            .from("content_items")
-            .select(
-              "id,external_id,kind,title,byline,meta,image_url,url,state_tags,focus_tags,source,created_at"
-            )
-            .eq("id", param)
-            .maybeSingle();
+        const selectCols =
+          "id,external_id,kind,title,byline,meta,image_url,url,state_tags,focus_tags,source,created_at";
 
+        if (isUuid(param)) {
+          const byId = await supabase.from("content_items").select(selectCols).eq("id", param).maybeSingle();
           if (byId.error) throw byId.error;
 
           if (byId.data) {
@@ -79,9 +92,7 @@ export default function ItemDetail() {
           } else {
             const byExternal = await supabase
               .from("content_items")
-              .select(
-                "id,external_id,kind,title,byline,meta,image_url,url,state_tags,focus_tags,source,created_at"
-              )
+              .select(selectCols)
               .eq("external_id", param)
               .maybeSingle();
 
@@ -95,9 +106,7 @@ export default function ItemDetail() {
         } else {
           const byExternal = await supabase
             .from("content_items")
-            .select(
-              "id,external_id,kind,title,byline,meta,image_url,url,state_tags,focus_tags,source,created_at"
-            )
+            .select(selectCols)
             .eq("external_id", param)
             .maybeSingle();
 
@@ -122,7 +131,6 @@ export default function ItemDetail() {
     };
   }, [param]);
 
-  // Load auth + waves once item is available
   useEffect(() => {
     let cancelled = false;
 
@@ -134,7 +142,16 @@ export default function ItemDetail() {
 
         const uid = await getUserId();
         if (cancelled) return;
-        setIsAuthed(!!uid);
+
+        const authed = !!uid;
+        setIsAuthed(authed);
+
+        if (authed) {
+          const saved = await fetchSavedIds();
+          if (!cancelled) setIsSaved(saved.includes(item.id));
+        } else {
+          setIsSaved(false);
+        }
 
         const waveRows = await listWavesForItem(item.id, 25);
         if (!cancelled) setWaves(waveRows);
@@ -153,6 +170,30 @@ export default function ItemDetail() {
   function goEcho() {
     if (!item?.id) return;
     navigate(`/echo?contentId=${item.id}`);
+  }
+
+  async function toggleSaved() {
+    if (!item?.id) return;
+
+    const uid = await requireAuth(navigate, `/item/${item.id}`);
+    if (!uid) return;
+
+    if (saveBusy) return;
+    setSaveBusy(true);
+
+    const next = !isSaved;
+    setIsSaved(next); // optimistic
+
+    try {
+      if (next) await saveItem(item.id);
+      else await unsaveItem(item.id);
+    } catch (e) {
+      console.error(e);
+      setIsSaved(!next); // rollback
+      alert("Couldn’t update saved right now.");
+    } finally {
+      setSaveBusy(false);
+    }
   }
 
   return (
@@ -191,7 +232,6 @@ export default function ItemDetail() {
                   textAlign: "center",
                 }}
               >
-                {/* Icon / Image */}
                 <div
                   style={{
                     width: 92,
@@ -203,6 +243,7 @@ export default function ItemDetail() {
                     display: "flex",
                     alignItems: "center",
                     justifyContent: "center",
+                    position: "relative",
                   }}
                 >
                   {item.image_url && !imgFailed ? (
@@ -217,16 +258,39 @@ export default function ItemDetail() {
                   ) : (
                     <div style={{ fontSize: 34, opacity: 0.9 }}>{kindEmoji(item.kind || "Other")}</div>
                   )}
+
+                  <button
+                    type="button"
+                    aria-label={isSaved ? "Unsave" : "Save"}
+                    onClick={toggleSaved}
+                    disabled={saveBusy}
+                    style={{
+                      position: "absolute",
+                      right: 10,
+                      top: 10,
+                      width: 36,
+                      height: 36,
+                      borderRadius: 999,
+                      border: "1px solid rgba(0,0,0,0.10)",
+                      background: "rgba(255,255,255,0.85)",
+                      display: "flex",
+                      alignItems: "center",
+                      justifyContent: "center",
+                      cursor: "pointer",
+                      color: isSaved ? "var(--primary)" : "var(--text)",
+                    }}
+                    title={!isAuthed ? "Sign in to save" : isSaved ? "Unsave" : "Save"}
+                  >
+                    {saveBusy ? "…" : <HeartIcon filled={isSaved} />}
+                  </button>
                 </div>
 
-                {/* Meta line */}
                 <div style={{ color: "var(--muted)", fontSize: 13 }}>
                   {item.kind || "Item"}
                   <span style={{ margin: "0 8px" }}>•</span>
                   {item.meta || "—"}
                 </div>
 
-                {/* Title */}
                 <h2
                   style={{
                     marginTop: 8,
@@ -239,14 +303,8 @@ export default function ItemDetail() {
                   {item.title}
                 </h2>
 
-                {/* Byline */}
-                {item.byline && (
-                  <div style={{ marginTop: 6, fontSize: 14, color: "var(--muted)" }}>
-                    {item.byline}
-                  </div>
-                )}
+                {item.byline && <div style={{ marginTop: 6, fontSize: 14, color: "var(--muted)" }}>{item.byline}</div>}
 
-                {/* Tags */}
                 <div style={{ marginTop: 18, fontSize: 13, color: "var(--muted)" }}>
                   <div>
                     <b>State tags:</b> {(item.state_tags || []).join(", ") || "—"}
@@ -256,7 +314,6 @@ export default function ItemDetail() {
                   </div>
                 </div>
 
-                {/* External link */}
                 {item.url && (
                   <div style={{ marginTop: 18 }}>
                     <a
@@ -280,7 +337,6 @@ export default function ItemDetail() {
                   </div>
                 )}
 
-                {/* ---------- Echo CTA ---------- */}
                 <div
                   style={{
                     marginTop: 24,
@@ -306,7 +362,6 @@ export default function ItemDetail() {
                   </button>
                 </div>
 
-                {/* ---------- Waves (public) ---------- */}
                 <div style={{ marginTop: 18, textAlign: "left" }}>
                   <div style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline" }}>
                     <div style={{ fontWeight: 800, color: "var(--text)" }}>Waves</div>
@@ -354,6 +409,8 @@ export default function ItemDetail() {
     </div>
   );
 }
+
+
 
 
 

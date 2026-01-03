@@ -41,7 +41,9 @@ export default function App() {
   return (
     <Routes>
       {/* --------- PUBLIC / STANDALONE ROUTES (NO LAYOUT) --------- */}
+      {/* Keep /login, but also support /auth as an alias (so save prompts don't bounce to home) */}
       <Route path="/login" element={<Login />} />
+      <Route path="/auth" element={<Login />} />
       <Route path="/auth/callback" element={<AuthCallback />} />
 
       {/* --------- APP WITH SHELL --------- */}
@@ -83,6 +85,7 @@ export default function App() {
     </Routes>
   );
 }
+
 
 
 
