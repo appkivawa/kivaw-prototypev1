@@ -3,7 +3,7 @@ import { useNavigate, useParams } from "react-router-dom";
 import Card from "../ui/Card";
 import { supabase } from "../lib/supabaseClient";
 import type { ContentItem } from "../data/contentApi";
-import { createEcho, deleteEcho, getUserId, listMyEchoesForItem } from "../data/echoApi";
+import { getUserId } from "../data/echoApi";
 import { listWavesForItem, type WaveSummaryRow } from "../data/wavesApi";
 
 function kindEmoji(kind: string) {
@@ -40,13 +40,8 @@ export default function ItemDetail() {
   const [errMsg, setErrMsg] = useState<string | null>(null);
   const [imgFailed, setImgFailed] = useState(false);
 
-  // Echo
+  // Auth (just for tiny messaging if you want)
   const [isAuthed, setIsAuthed] = useState(false);
-  const [echoBusy, setEchoBusy] = useState(false);
-  const [usageTag, setUsageTag] = useState("");
-  const [note, setNote] = useState("");
-  const [shareToWaves, setShareToWaves] = useState(true);
-  const [myEchoes, setMyEchoes] = useState<any[]>([]);
 
   // Waves
   const [waves, setWaves] = useState<WaveSummaryRow[]>([]);
@@ -78,6 +73,7 @@ export default function ItemDetail() {
             .maybeSingle();
 
           if (byId.error) throw byId.error;
+
           if (byId.data) {
             if (!cancelled) setItem(byId.data as ContentItem);
           } else {
@@ -126,7 +122,7 @@ export default function ItemDetail() {
     };
   }, [param]);
 
-  // Load auth + my echoes + waves once item is available
+  // Load auth + waves once item is available
   useEffect(() => {
     let cancelled = false;
 
@@ -140,15 +136,8 @@ export default function ItemDetail() {
         if (cancelled) return;
         setIsAuthed(!!uid);
 
-        const [mine, waveRows] = await Promise.all([
-          uid ? listMyEchoesForItem(item.id, 20) : Promise.resolve([]),
-          listWavesForItem(item.id, 25),
-        ]);
-
-        if (!cancelled) {
-          setMyEchoes(mine as any[]);
-          setWaves(waveRows);
-        }
+        const waveRows = await listWavesForItem(item.id, 25);
+        if (!cancelled) setWaves(waveRows);
       } catch (e) {
         console.error(e);
       } finally {
@@ -161,59 +150,9 @@ export default function ItemDetail() {
     };
   }, [item?.id]);
 
-  async function addEcho() {
+  function goEcho() {
     if (!item?.id) return;
-    if (!isAuthed) return alert("Sign in to use Echo.");
-    if (echoBusy) return;
-
-    const tag = usageTag.trim();
-    if (!tag) return alert("Add a usage tag (how you used it).");
-
-    try {
-      setEchoBusy(true);
-
-      await createEcho({
-        contentId: item.id,
-        usageTag: tag,
-        note,
-        shareToWaves,
-      });
-
-      // refresh both panels
-      const [mine, waveRows] = await Promise.all([
-        listMyEchoesForItem(item.id, 20),
-        listWavesForItem(item.id, 25),
-      ]);
-
-      setMyEchoes(mine as any[]);
-      setWaves(waveRows);
-
-      setUsageTag("");
-      setNote("");
-    } catch (e: any) {
-      console.error(e);
-      alert(e?.message || "Couldn’t save Echo.");
-    } finally {
-      setEchoBusy(false);
-    }
-  }
-
-  async function removeEcho(echoId: string) {
-    if (!item?.id) return;
-    if (!isAuthed) return;
-    if (echoBusy) return;
-
-    try {
-      setEchoBusy(true);
-      await deleteEcho(echoId);
-      const mine = await listMyEchoesForItem(item.id, 20);
-      setMyEchoes(mine as any[]);
-    } catch (e) {
-      console.error(e);
-      alert("Couldn’t remove right now.");
-    } finally {
-      setEchoBusy(false);
-    }
+    navigate(`/echo?contentId=${item.id}`);
   }
 
   return (
@@ -276,7 +215,6 @@ export default function ItemDetail() {
                       onError={() => setImgFailed(true)}
                     />
                   ) : (
-                    // ✅ FIX: item.kind can be undefined, so provide a fallback
                     <div style={{ fontSize: 34, opacity: 0.9 }}>{kindEmoji(item.kind || "Other")}</div>
                   )}
                 </div>
@@ -342,7 +280,7 @@ export default function ItemDetail() {
                   </div>
                 )}
 
-                {/* ---------- Echo (private) ---------- */}
+                {/* ---------- Echo CTA ---------- */}
                 <div
                   style={{
                     marginTop: 24,
@@ -354,104 +292,18 @@ export default function ItemDetail() {
                 >
                   <div style={{ display: "flex", alignItems: "baseline", justifyContent: "space-between" }}>
                     <div style={{ fontWeight: 800, color: "var(--text)" }}>Echo</div>
-                    <div style={{ fontSize: 12, color: "var(--muted)" }}>Private log (you only)</div>
+                    <div style={{ fontSize: 12, color: "var(--muted)" }}>
+                      {isAuthed ? "Saved to your account" : "Guest ok — save with magic link"}
+                    </div>
                   </div>
 
-                  {!isAuthed ? (
-                    <p style={{ color: "var(--muted)", marginTop: 10 }}>Sign in to log echoes.</p>
-                  ) : (
-                    <>
-                      <div style={{ display: "grid", gap: 10, marginTop: 10 }}>
-                        <input
-                          value={usageTag}
-                          onChange={(e) => setUsageTag(e.target.value)}
-                          placeholder='Usage tag (ex: "soft reset", "focus sprint")'
-                          style={{
-                            width: "100%",
-                            padding: "12px 14px",
-                            borderRadius: 14,
-                            border: "1px solid rgba(0,0,0,0.08)",
-                            outline: "none",
-                          }}
-                        />
+                  <p style={{ color: "var(--muted)", marginTop: 10, marginBottom: 12 }}>
+                    Capture what shifted for you — then find it later without digging.
+                  </p>
 
-                        <textarea
-                          value={note}
-                          onChange={(e) => setNote(e.target.value)}
-                          placeholder="Optional note (private)"
-                          rows={3}
-                          style={{
-                            width: "100%",
-                            padding: "12px 14px",
-                            borderRadius: 14,
-                            border: "1px solid rgba(0,0,0,0.08)",
-                            outline: "none",
-                            resize: "vertical",
-                          }}
-                        />
-
-                        <label style={{ display: "flex", gap: 10, alignItems: "center" }}>
-                          <input
-                            type="checkbox"
-                            checked={shareToWaves}
-                            onChange={(e) => setShareToWaves(e.target.checked)}
-                          />
-                          <span style={{ color: "var(--muted)", fontSize: 13 }}>
-                            Share anonymized tag to Waves
-                          </span>
-                        </label>
-
-                        <button
-                          className="btn btn-primary"
-                          type="button"
-                          onClick={addEcho}
-                          disabled={echoBusy}
-                        >
-                          {echoBusy ? "Saving…" : "Save Echo →"}
-                        </button>
-                      </div>
-
-                      {/* My echoes for this item */}
-                      {myEchoes.length > 0 && (
-                        <div style={{ marginTop: 14, display: "grid", gap: 10 }}>
-                          <div style={{ fontSize: 12, color: "var(--muted)" }}>Recent echoes</div>
-                          {myEchoes.slice(0, 6).map((e: any) => (
-                            <div
-                              key={e.id}
-                              style={{
-                                display: "flex",
-                                alignItems: "center",
-                                justifyContent: "space-between",
-                                padding: "10px 12px",
-                                borderRadius: 14,
-                                background: "rgba(255,255,255,0.55)",
-                                border: "1px solid rgba(0,0,0,0.06)",
-                              }}
-                            >
-                              <div style={{ minWidth: 0 }}>
-                                <div style={{ fontWeight: 800, color: "var(--primary)" }}>{e.usage_tag}</div>
-                                {e.note && (
-                                  <div style={{ fontSize: 12, color: "var(--muted)", marginTop: 4 }}>
-                                    {e.note}
-                                  </div>
-                                )}
-                              </div>
-
-                              <button
-                                type="button"
-                                className="btn btn-ghost"
-                                onClick={() => removeEcho(e.id)}
-                                disabled={echoBusy}
-                                style={{ padding: "8px 10px" }}
-                              >
-                                Remove
-                              </button>
-                            </div>
-                          ))}
-                        </div>
-                      )}
-                    </>
-                  )}
+                  <button className="btn btn-primary" type="button" onClick={goEcho}>
+                    Echo this →
+                  </button>
                 </div>
 
                 {/* ---------- Waves (public) ---------- */}
@@ -502,6 +354,7 @@ export default function ItemDetail() {
     </div>
   );
 }
+
 
 
 

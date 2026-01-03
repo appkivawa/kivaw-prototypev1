@@ -12,12 +12,18 @@ import QuizState from "./pages/quiz/QuizState";
 import QuizFocus from "./pages/quiz/QuizFocus";
 import QuizResult from "./pages/quiz/QuizResult";
 
+import Login from "./pages/Login";
+import AuthCallback from "./auth/AuthCallback";
 import FAQPage from "./pages/FAQ";
 
 export default function App() {
   return (
     <Routes>
-      {/* Layout route */}
+      {/* --------- PUBLIC / STANDALONE ROUTES (NO LAYOUT) --------- */}
+      <Route path="/login" element={<Login />} />
+      <Route path="/auth/callback" element={<AuthCallback />} />
+
+      {/* --------- APP WITH SHELL --------- */}
       <Route path="/" element={<AppShell />}>
         {/* Home */}
         <Route index element={<Home />} />
@@ -43,7 +49,7 @@ export default function App() {
         <Route path="*" element={<Navigate to="/" replace />} />
       </Route>
 
-      {/* Optional: catch-all OUTSIDE layout too (extra safety) */}
+      {/* Final safety net */}
       <Route path="*" element={<Navigate to="/" replace />} />
     </Routes>
   );

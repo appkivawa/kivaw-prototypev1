@@ -331,6 +331,52 @@ h1, h2, h3, h4 { margin: 0; letter-spacing: -0.02em; }
   background: rgba(92, 114, 255, 0.08);
 }
 
+.topnav__right{
+  display:flex;
+  align-items:center;
+  justify-content:flex-end;
+  gap:12px;
+}
+
+.nav-auth{
+  display:flex;
+  align-items:center;
+  gap:10px;
+}
+
+.nav-cta{
+  padding: 10px 14px;
+  border-radius: 999px;
+  font-weight: 750;
+  border: 1px solid rgba(93,112,174,0.22);
+  background: rgba(93,112,174,0.10);
+  color: var(--text);
+  cursor:pointer;
+  transition: transform 120ms ease, background 120ms ease, border-color 120ms ease;
+}
+.nav-cta:hover{
+  transform: translateY(-1px);
+  background: rgba(93,112,174,0.14);
+  border-color: rgba(93,112,174,0.28);
+}
+
+.nav-ghost{
+  padding: 10px 14px;
+  border-radius: 999px;
+  font-weight: 700;
+  border: 1px solid rgba(93,112,174,0.16);
+  background: transparent;
+  color: var(--muted);
+  cursor:pointer;
+  transition: transform 120ms ease, background 120ms ease, color 120ms ease;
+}
+.nav-ghost:hover{
+  transform: translateY(-1px);
+  background: rgba(93,112,174,0.08);
+  color: var(--text);
+}
+
+
 
 /* -----------------------------
    Bottom tab bar (mobile)
