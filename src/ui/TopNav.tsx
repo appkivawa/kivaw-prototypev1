@@ -1,4 +1,6 @@
-import React, { SVGProps, useEffect, useState } from "react";
+import { useEffect, useState } from "react";
+import type { SVGProps } from "react";
+
 import { NavLink, useNavigate, useLocation } from "react-router-dom";
 import { useTheme } from "../theme/ThemeContext";
 import { supabase } from "../lib/supabaseClient";

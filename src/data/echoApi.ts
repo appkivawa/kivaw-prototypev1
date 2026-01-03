@@ -68,7 +68,7 @@ export async function createEcho(input: {
 
   const payload = {
     user_id: uid,
-    content_id: input.contentId ?? null, // ✅ allow null insert
+    content_id: input.contentId ?? null,
     usage_tag: input.usageTag,
     note: input.note || null,
     shared_to_waves: !!input.shareToWaves,
@@ -76,6 +76,32 @@ export async function createEcho(input: {
 
   const { error } = await supabase.from("echoes").insert(payload);
   if (error) throw error;
+}
+
+type RawEchoRow = {
+  id: any;
+  user_id: any;
+  content_id: any;
+  usage_tag: any;
+  note: any;
+  shared_to_waves: any;
+  created_at: any;
+  // Supabase can return a single object OR an array depending on relationship config
+  content_items: any;
+};
+
+function normalizeContentItem(x: any): ContentItemLite | null {
+  if (!x) return null;
+  // If it’s an array, take first
+  const it = Array.isArray(x) ? x[0] : x;
+  if (!it) return null;
+
+  return {
+    id: String(it.id),
+    kind: it.kind ?? null,
+    title: String(it.title ?? ""),
+    image_url: it.image_url ?? null,
+  };
 }
 
 export async function listMyEchoes(limit = 100) {
@@ -92,7 +118,21 @@ export async function listMyEchoes(limit = 100) {
     .limit(limit);
 
   if (error) throw error;
-  return (data || []) as EchoWithContent[];
+
+  const rows = (data || []) as RawEchoRow[];
+
+  const normalized: EchoWithContent[] = rows.map((r) => ({
+    id: r.id,
+    user_id: r.user_id,
+    content_id: r.content_id ?? null,
+    usage_tag: r.usage_tag,
+    note: r.note ?? null,
+    shared_to_waves: !!r.shared_to_waves,
+    created_at: r.created_at,
+    content_items: normalizeContentItem(r.content_items),
+  }));
+
+  return normalized;
 }
 
 export async function deleteEcho(echoId: string) {
@@ -107,6 +147,7 @@ export async function deleteEcho(echoId: string) {
 
   if (error) throw error;
 }
+
 
 
 
