@@ -12,17 +12,21 @@ function timeAgo(iso: string) {
   const t = new Date(iso).getTime();
   if (!t) return "";
   const diff = Date.now() - t;
+
   const sec = Math.floor(diff / 1000);
   if (sec < 60) return `${sec}s`;
+
   const min = Math.floor(sec / 60);
   if (min < 60) return `${min}m`;
+
   const hr = Math.floor(min / 60);
   if (hr < 24) return `${hr}h`;
+
   const day = Math.floor(hr / 24);
   return `${day}d`;
 }
 
-function kindEmoji(kind?: string) {
+function kindEmoji(kind?: string | null) {
   const k = (kind || "").toLowerCase();
   if (k.includes("movement") || k.includes("walk") || k.includes("exercise")) return "🚶";
   if (k.includes("music") || k.includes("sound") || k.includes("playlist")) return "🎵";
@@ -33,8 +37,12 @@ function kindEmoji(kind?: string) {
   return "🌊";
 }
 
-// Hide internal/system-only content from Waves feed (ex: Unlinked Echo)
-function isInternalDiscoverableItem(item: { title?: string; meta?: string; kind?: string }) {
+// ✅ null-safe for ContentItem fields (meta is often string | null)
+function isInternalDiscoverableItem(item: {
+  title?: string | null;
+  meta?: string | null;
+  kind?: string | null;
+}) {
   const title = (item.title || "").toLowerCase().trim();
   const meta = (item.meta || "").toLowerCase().trim();
   const kind = (item.kind || "").toLowerCase().trim();
@@ -114,10 +122,10 @@ export default function Waves() {
       if (isSaved) await unsaveItem(contentId);
       else await saveItem(contentId);
 
-      // re-sync from server
       const updated = await fetchSavedIds();
       setSavedIds(updated || []);
     } catch {
+      // rollback to server truth
       try {
         const updated = await fetchSavedIds();
         setSavedIds(updated || []);
@@ -175,7 +183,7 @@ export default function Waves() {
                 const isBusy = busyId === item.id;
 
                 const emoji = kindEmoji(item.kind);
-                const img = item.image_url || "";
+                const img = item.image_url || null;
 
                 return (
                   <div
@@ -189,6 +197,7 @@ export default function Waves() {
                     }}
                   >
                     <div className="kivaw-rowCard">
+                      {/* squircle thumbnail */}
                       <div className="kivaw-thumb" aria-hidden="true">
                         <div className="kivaw-thumb__emoji">{emoji}</div>
                         {img ? (
@@ -224,7 +233,7 @@ export default function Waves() {
                             disabled={isBusy}
                             onClick={(e) => {
                               e.preventDefault();
-                              e.stopPropagation();
+                              e.stopPropagation(); // ✅ prevents card click navigating away
                               toggleSave(item.id, isSaved);
                             }}
                             onKeyDown={(e) => {
@@ -255,6 +264,7 @@ export default function Waves() {
     </div>
   );
 }
+
 
 
 
