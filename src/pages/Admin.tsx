@@ -35,7 +35,9 @@ export default function Admin() {
   const [err, setErr] = useState("");
   const [stats, setStats] = useState<Stats | null>(null);
   const [userId, setUserId] = useState<string>("");
-  const [activeTab, setActiveTab] = useState<"overview" | "users" | "content" | "analytics">("overview");
+  const [activeTab, setActiveTab] = useState<
+    "overview" | "users" | "content" | "analytics" | "operations" | "settings" | "support" | "system" | "security"
+  >("overview");
   const [users, setUsers] = useState<User[]>([]);
   const [contentItems, setContentItems] = useState<ContentItem[]>([]);
   const [loadingUsers, setLoadingUsers] = useState(false);
@@ -631,6 +633,46 @@ export default function Admin() {
                   <span className="admin-tab-icon">📈</span>
                   Analytics
                 </button>
+                <button
+                  className={`admin-tab ${activeTab === "operations" ? "admin-tab-active" : ""}`}
+                  type="button"
+                  onClick={() => setActiveTab("operations")}
+                >
+                  <span className="admin-tab-icon">⚙️</span>
+                  Operations
+                </button>
+                <button
+                  className={`admin-tab ${activeTab === "settings" ? "admin-tab-active" : ""}`}
+                  type="button"
+                  onClick={() => setActiveTab("settings")}
+                >
+                  <span className="admin-tab-icon">🔧</span>
+                  Settings
+                </button>
+                <button
+                  className={`admin-tab ${activeTab === "support" ? "admin-tab-active" : ""}`}
+                  type="button"
+                  onClick={() => setActiveTab("support")}
+                >
+                  <span className="admin-tab-icon">🎧</span>
+                  Support
+                </button>
+                <button
+                  className={`admin-tab ${activeTab === "system" ? "admin-tab-active" : ""}`}
+                  type="button"
+                  onClick={() => setActiveTab("system")}
+                >
+                  <span className="admin-tab-icon">💚</span>
+                  System Health
+                </button>
+                <button
+                  className={`admin-tab ${activeTab === "security" ? "admin-tab-active" : ""}`}
+                  type="button"
+                  onClick={() => setActiveTab("security")}
+                >
+                  <span className="admin-tab-icon">🔒</span>
+                  Security
+                </button>
               </div>
 
               {/* Overview Tab */}
@@ -1128,6 +1170,9 @@ export default function Admin() {
                   </div>
                 </div>
               )}
+
+              {/* Note: Operations, Settings, Support, System Health, and Security tabs have been moved to nested routes */}
+              {/* See src/admin/tabs/*.tsx for the new route-based implementation */}
             </>
           )}
         </Card>

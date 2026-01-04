@@ -124,7 +124,7 @@ export default function Waves() {
     const sorted = [...feed].sort((a, b) => b.uses - a.uses);
     const hot = sorted.slice(0, 3);
     const rising = sorted.slice(3, 6);
-    const favorites = sorted.slice(0, 3); // Top favorites
+    const favorites = sorted.slice(0, 6); // All-time favorites (top 6 by total uses)
     const comeback = sorted.slice(6, 8);
 
     return { hot, rising, favorites, comeback };

@@ -17,7 +17,17 @@ import QuizResult from "./pages/quiz/QuizResult";
 import Login from "./pages/Login";
 import AuthCallback from "./auth/AuthCallback";
 import FAQPage from "./pages/FAQ";
-import Admin from "./pages/Admin"; // ✅ NEW
+import RequireAdmin from "./admin/RequireAdmin";
+import AdminLayout from "./admin/AdminLayout";
+import Overview from "./admin/tabs/Overview";
+import Users from "./admin/tabs/Users";
+import Content from "./admin/tabs/Content";
+import Analytics from "./admin/tabs/Analytics";
+import Operations from "./admin/tabs/Operations";
+import Settings from "./admin/tabs/Settings";
+import Support from "./admin/tabs/Support";
+import Health from "./admin/tabs/Health";
+import Security from "./admin/tabs/Security";
 
 function HashAuthRedirect() {
   const nav = useNavigate();
@@ -39,8 +49,25 @@ export default function App() {
       <Route path="/login" element={<Login />} />
       <Route path="/auth/callback" element={<AuthCallback />} />
 
-      {/* ✅ Admin should be standalone */}
-      <Route path="/admin" element={<Admin />} />
+      {/* Admin routes with nested tabs */}
+      <Route
+        path="/admin"
+        element={
+          <RequireAdmin>
+            <AdminLayout />
+          </RequireAdmin>
+        }
+      >
+        <Route index element={<Overview />} />
+        <Route path="users" element={<Users />} />
+        <Route path="content" element={<Content />} />
+        <Route path="analytics" element={<Analytics />} />
+        <Route path="operations" element={<Operations />} />
+        <Route path="settings" element={<Settings />} />
+        <Route path="support" element={<Support />} />
+        <Route path="health" element={<Health />} />
+        <Route path="security" element={<Security />} />
+      </Route>
 
       {/* --------- APP WITH SHELL --------- */}
       <Route

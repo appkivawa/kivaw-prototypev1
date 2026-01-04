@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
+import { useLocation } from "react-router-dom";
 import Card from "../ui/Card";
 import { supabase } from "../lib/supabaseClient";
 import {
@@ -450,19 +451,24 @@ export default function Echo() {
     }
   }
 
+  const location = useLocation();
+
   // Auto-select linked item from URL: /echo?contentId=...
+  // This effect only runs when the URL parameter changes
   useEffect(() => {
     let alive = true;
 
     (async () => {
-      const params = new URLSearchParams(window.location.search);
+      const params = new URLSearchParams(location.search);
       const contentId = params.get("contentId");
       if (!contentId) return;
 
       try {
         const it = await getContentItemLiteById(contentId);
         if (!alive) return;
-        if (it) setLinked(it);
+        if (it) {
+          setLinked(it);
+        }
       } catch {
         // silent
       }
@@ -471,7 +477,34 @@ export default function Echo() {
     return () => {
       alive = false;
     };
-  }, []);
+  }, [location.search]); // Only re-run when URL search params change
+
+  // Scroll to linked echo when saved list updates and linked item exists
+  useEffect(() => {
+    if (!linked) return;
+
+    const contentId = linked.id;
+    const linkedEcho = saved.find((e) => e.content_id === contentId);
+    if (!linkedEcho) return;
+
+    // Scroll to linked echo after a short delay to allow list to render
+    const timeoutId = setTimeout(() => {
+      const element = document.querySelector(`[data-echo-id="${linkedEcho.id}"]`);
+      if (element) {
+        element.scrollIntoView({ behavior: "smooth", block: "center" });
+        // Highlight briefly
+        (element as HTMLElement).style.transition = "background-color 0.3s";
+        (element as HTMLElement).style.backgroundColor = "var(--accent)20";
+        setTimeout(() => {
+          (element as HTMLElement).style.backgroundColor = "";
+        }, 2000);
+      }
+    }, 500);
+
+    return () => {
+      clearTimeout(timeoutId);
+    };
+  }, [saved, linked]); // Re-run when saved list or linked item changes
 
   useEffect(() => {
     refreshSaved();
@@ -833,7 +866,7 @@ export default function Echo() {
               {filteredSaved.slice(0, 4).map((e) => {
                 const it = e.content_items;
                 return (
-                  <Card key={e.id} className="echo-savedcard-enhanced">
+                  <Card key={e.id} className="echo-savedcard-enhanced" data-echo-id={e.id}>
                     <div className="echo-entrytop">
                       <div className="echo-entryleft">
                         <div className="echo-entry-date">

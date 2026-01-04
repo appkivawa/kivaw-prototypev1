@@ -2,6 +2,8 @@ import { useEffect, useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import Card from "../ui/Card";
 import { listWavesFeed, type WavesFeedItem } from "../data/wavesApi";
+import { getLastState, saveLastState } from "../data/userPreferences";
+import { getTrendingStats } from "../data/trendingStats";
 
 type MoodKey = "blank" | "destructive" | "expansive" | "minimize";
 
@@ -18,8 +20,6 @@ const MOODS: Mood[] = [
   { key: "expansive", label: "Expansive", desc: "Want to grow and explore", emoji: "🌱" },
   { key: "minimize", label: "Minimize", desc: "Need simplicity and calm", emoji: "🌙" },
 ];
-
-const LAST_STATE_KEY = "kivaw_last_state";
 
 function getGreeting(d = new Date()) {
   const h = d.getHours();
@@ -59,20 +59,47 @@ function uniqByTitle(items: WavesFeedItem[]) {
 export default function Home() {
   const nav = useNavigate();
 
-  const [lastState, setLastState] = useState<string | null>(() => {
-    try {
-      return localStorage.getItem(LAST_STATE_KEY);
-    } catch {
-      return null;
-    }
-  });
-
+  const [lastState, setLastState] = useState<string | null>(null);
   const [trend, setTrend] = useState<WavesFeedItem[]>([]);
   const [trendLoading, setTrendLoading] = useState(false);
+  const [trendingStats, setTrendingStats] = useState<{
+    topTag: { tag: string; count: number } | null;
+    mostActiveTime: { time: string; count: number } | null;
+    recurringTheme: { title: string; count: number } | null;
+  } | null>(null);
 
   const greeting = useMemo(() => getGreeting(), []);
   const tod = useMemo(() => timeOfDayLabel(), []);
 
+  // Load last state from database/localStorage
+  useEffect(() => {
+    let alive = true;
+    (async () => {
+      const state = await getLastState();
+      if (alive) setLastState(state);
+    })();
+    return () => {
+      alive = false;
+    };
+  }, []);
+
+  // Load trending stats
+  useEffect(() => {
+    let alive = true;
+    (async () => {
+      try {
+        const stats = await getTrendingStats();
+        if (alive) setTrendingStats(stats);
+      } catch (e) {
+        console.error("Error loading trending stats:", e);
+      }
+    })();
+    return () => {
+      alive = false;
+    };
+  }, []);
+
+  // Load trending items
   useEffect(() => {
     let alive = true;
 
@@ -97,27 +124,31 @@ export default function Home() {
 
   const lastStateLabel = moodLabelFromKey(lastState);
 
-  const onPickMood = (m: Mood) => {
+  const onPickMood = async (m: Mood) => {
     try {
-      localStorage.setItem(LAST_STATE_KEY, m.key);
       sessionStorage.setItem("kivaw_state", m.key);
+      await saveLastState(m.key);
     } catch {}
     setLastState(m.key);
     nav(`/quiz/focus?state=${m.key}`);
   };
 
-  // “Real usage stats” chips (based on waves_summary counts)
-  const chip1 =
-    trend[0]?.content?.title && typeof trend[0].uses === "number"
-      ? `📈 ${trend[0].content.title} — ${trend[0].uses} uses`
-      : `📈 Trending right now`;
+  // Trending stats chips
+  const chip1 = trendingStats?.topTag
+    ? `📈 #${trendingStats.topTag.tag} — ${trendingStats.topTag.count} uses`
+    : trendLoading
+    ? "Loading…"
+    : `📈 Trending right now`;
 
-  const chip2 = `🕒 Most active ${tod}`;
+  const chip2 = trendingStats?.mostActiveTime
+    ? `🕒 Most active ${trendingStats.mostActiveTime.time}`
+    : `🕒 Most active ${tod}`;
 
-  const chip3 =
-    trend[1]?.content?.title && typeof trend[1].uses === "number"
-      ? `✨ ${trend[1].content.title} keeps showing up (${trend[1].uses})`
-      : `✨ Recurring favorite`;
+  const chip3 = trendingStats?.recurringTheme
+    ? `✨ ${trendingStats.recurringTheme.title} keeps showing up (${trendingStats.recurringTheme.count})`
+    : trend[1]?.content?.title && typeof trend[1].uses === "number"
+    ? `✨ ${trend[1].content.title} keeps showing up (${trend[1].uses})`
+    : `✨ Recurring favorite`;
 
   return (
     <div className="homev2">

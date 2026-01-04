@@ -8,6 +8,17 @@ import { listWavesForItem } from "../data/wavesApi";
 import { requireAuth } from "../auth/requireAuth";
 import { isInternalContentItem } from "../utils/contentFilters";
 
+function kindEmoji(kind?: string | null) {
+  const k = (kind || "").toLowerCase();
+  if (k.includes("movement") || k.includes("walk") || k.includes("exercise")) return "🚶";
+  if (k.includes("music") || k.includes("sound") || k.includes("playlist")) return "🎵";
+  if (k.includes("logic")) return "🧠";
+  if (k.includes("visual") || k.includes("aesthetic") || k.includes("art")) return "🎨";
+  if (k.includes("prompt") || k.includes("reflection")) return "📝";
+  if (k.includes("faith")) return "🙏";
+  return "✦";
+}
+
 function norm(s: string) {
   return (s || "").trim().toLowerCase();
 }
@@ -183,6 +194,15 @@ export default function ItemDetail() {
             <div className="spacer-16" />
 
             <div className="kivaw-detail-head">
+              {/* Emoji/Image Display */}
+              <div className="kivaw-detail-icon">
+                {item.image_url ? (
+                  <img src={item.image_url} alt={item.title} className="kivaw-detail-image" />
+                ) : (
+                  <div className="kivaw-detail-emoji">{kindEmoji(item.kind)}</div>
+                )}
+              </div>
+
               <div className="kivaw-detail-kind">{item.kind}</div>
 
               <h1 className="kivaw-detail-title">{item.title}</h1>
@@ -190,6 +210,22 @@ export default function ItemDetail() {
               {item.byline ? <div className="kivaw-detail-byline">{item.byline}</div> : null}
 
               {item.meta ? <div className="kivaw-detail-meta">{item.meta}</div> : null}
+
+              <div className="spacer-16" />
+
+              {/* Bookmark Button */}
+              <div className="item-detail-bookmark">
+                <button
+                  className={`item-detail-bookmark-btn ${isSaved ? "item-detail-bookmark-saved" : ""}`}
+                  type="button"
+                  onClick={toggleSave}
+                  disabled={saveBusy}
+                  aria-label={isSaved ? "Remove bookmark" : "Bookmark"}
+                >
+                  {saveBusy ? "⏳" : isSaved ? "🔖" : "🔖"}
+                  <span>{saveBusy ? "Saving…" : isSaved ? "Bookmarked" : "Bookmark"}</span>
+                </button>
+              </div>
 
               <div className="spacer-16" />
 
@@ -210,8 +246,20 @@ export default function ItemDetail() {
                 <div className="item-detail-action-group">
                   <h3 className="item-detail-action-title">Want to help others?</h3>
                   <p className="item-detail-action-desc">Save to Waves</p>
-                  <button className="btn btn-ghost" type="button" onClick={toggleSave} disabled={saveBusy}>
-                    {saveBusy ? "Saving…" : isSaved ? "Saved to Waves ♥" : "Save to Waves ♡"}
+                  <button
+                    className="btn btn-ghost"
+                    type="button"
+                    onClick={() => {
+                      // Focus on the wave tag input below
+                      const input = document.querySelector('.kivaw-wave-row input') as HTMLInputElement;
+                      if (input) {
+                        input.focus();
+                        input.scrollIntoView({ behavior: 'smooth', block: 'center' });
+                      }
+                    }}
+                    disabled={isUnlinked}
+                  >
+                    🌊 Save to Waves
                   </button>
                   <p className="item-detail-action-hint">Add one anonymous tag, shows how you used it, no personal details</p>
                 </div>
