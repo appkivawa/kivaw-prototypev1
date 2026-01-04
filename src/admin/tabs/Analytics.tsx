@@ -2,6 +2,7 @@ import { useEffect, useState } from "react";
 import Card from "../../ui/Card";
 import { supabase } from "../../lib/supabaseClient";
 import { logAdminAction } from "../auditLog";
+import * as XLSX from "xlsx";
 
 type DailyActivity = {
   date: string;
@@ -44,6 +45,7 @@ export default function Analytics() {
   const [loadingStateHealth, setLoadingStateHealth] = useState(false);
   const [loadingEchoPatterns, setLoadingEchoPatterns] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [showExportMenu, setShowExportMenu] = useState(false);
 
   async function loadAnalytics() {
     setLoading(true);
@@ -326,88 +328,170 @@ export default function Analytics() {
     }
   }
 
-  async function exportForReflection() {
+  async function gatherExportData() {
+    // Get weekly state usage
+    const { data: profiles } = await supabase
+      .from("profiles")
+      .select("last_state, updated_at")
+      .not("last_state", "is", null);
+
+    const stateUsage: Record<string, number> = {};
+    profiles?.forEach((p) => {
+      if (p.last_state) {
+        stateUsage[p.last_state] = (stateUsage[p.last_state] || 0) + 1;
+      }
+    });
+
+    // Get top themes (from content items tags/categories)
+    const { data: contentItems } = await supabase
+      .from("content_items")
+      .select("tags, category");
+
+    const themeCounts: Record<string, number> = {};
+    contentItems?.forEach((item) => {
+      if (item.tags && Array.isArray(item.tags)) {
+        item.tags.forEach((tag: string) => {
+          themeCounts[tag] = (themeCounts[tag] || 0) + 1;
+        });
+      }
+      if (item.category) {
+        themeCounts[item.category] = (themeCounts[item.category] || 0) + 1;
+      }
+    });
+
+    const topThemes = Object.entries(themeCounts)
+      .sort((a, b) => b[1] - a[1])
+      .slice(0, 10)
+      .map(([theme, count]) => ({ theme, count }));
+
+    // Get time-of-day trends (from echoes)
+    const { data: echoes } = await supabase
+      .from("echoes")
+      .select("created_at");
+
+    const timeOfDayCounts: Record<number, number> = {};
+    echoes?.forEach((echo) => {
+      const hour = new Date(echo.created_at).getHours();
+      timeOfDayCounts[hour] = (timeOfDayCounts[hour] || 0) + 1;
+    });
+
+    const timeOfDayTrends = Array.from({ length: 24 }, (_, i) => ({
+      hour: i,
+      count: timeOfDayCounts[i] || 0,
+    }));
+
+    return {
+      export_date: new Date().toISOString(),
+      weekly_state_usage: Object.entries(stateUsage).map(([state, count]) => ({
+        state,
+        user_count: count,
+      })),
+      top_themes: topThemes,
+      time_of_day_trends: timeOfDayTrends,
+      summary: {
+        total_users: profiles?.length || 0,
+        total_echoes: echoes?.length || 0,
+        most_used_state: Object.entries(stateUsage).sort((a, b) => b[1] - a[1])[0]?.[0] || "N/A",
+        peak_hour: timeOfDayTrends.sort((a, b) => b.count - a.count)[0]?.hour || null,
+      },
+    };
+  }
+
+  function downloadFile(blob: Blob, filename: string) {
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = filename;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+  }
+
+  async function exportForReflection(format: "json" | "csv" | "xlsx" = "json") {
     try {
-      // Get weekly state usage
-      const { data: profiles } = await supabase
-        .from("profiles")
-        .select("last_state, updated_at")
-        .not("last_state", "is", null);
+      const exportData = await gatherExportData();
+      const dateStr = new Date().toISOString().split("T")[0];
 
-      const stateUsage: Record<string, number> = {};
-      profiles?.forEach((p) => {
-        if (p.last_state) {
-          stateUsage[p.last_state] = (stateUsage[p.last_state] || 0) + 1;
-        }
-      });
+      if (format === "json") {
+        const blob = new Blob([JSON.stringify(exportData, null, 2)], { type: "application/json" });
+        downloadFile(blob, `kivaw-reflection-export-${dateStr}.json`);
+      } else if (format === "csv") {
+        // Create CSV content
+        let csvContent = "Kivaw Reflection Export\n";
+        csvContent += `Export Date,${exportData.export_date}\n\n`;
 
-      // Get top themes (from content items tags/categories)
-      const { data: contentItems } = await supabase
-        .from("content_items")
-        .select("tags, category");
+        // Summary
+        csvContent += "Summary\n";
+        csvContent += `Total Users,${exportData.summary.total_users}\n`;
+        csvContent += `Total Echoes,${exportData.summary.total_echoes}\n`;
+        csvContent += `Most Used State,${exportData.summary.most_used_state}\n`;
+        csvContent += `Peak Hour,${exportData.summary.peak_hour}\n\n`;
 
-      const themeCounts: Record<string, number> = {};
-      contentItems?.forEach((item) => {
-        if (item.tags && Array.isArray(item.tags)) {
-          item.tags.forEach((tag: string) => {
-            themeCounts[tag] = (themeCounts[tag] || 0) + 1;
-          });
-        }
-        if (item.category) {
-          themeCounts[item.category] = (themeCounts[item.category] || 0) + 1;
-        }
-      });
+        // Weekly State Usage
+        csvContent += "Weekly State Usage\n";
+        csvContent += "State,User Count\n";
+        exportData.weekly_state_usage.forEach((item) => {
+          csvContent += `${item.state},${item.user_count}\n`;
+        });
+        csvContent += "\n";
 
-      const topThemes = Object.entries(themeCounts)
-        .sort((a, b) => b[1] - a[1])
-        .slice(0, 10)
-        .map(([theme, count]) => ({ theme, count }));
+        // Top Themes
+        csvContent += "Top Themes\n";
+        csvContent += "Theme,Count\n";
+        exportData.top_themes.forEach((item) => {
+          csvContent += `${item.theme},${item.count}\n`;
+        });
+        csvContent += "\n";
 
-      // Get time-of-day trends (from echoes)
-      const { data: echoes } = await supabase
-        .from("echoes")
-        .select("created_at");
+        // Time of Day Trends
+        csvContent += "Time of Day Trends\n";
+        csvContent += "Hour,Count\n";
+        exportData.time_of_day_trends.forEach((item) => {
+          csvContent += `${item.hour},${item.count}\n`;
+        });
 
-      const timeOfDayCounts: Record<number, number> = {};
-      echoes?.forEach((echo) => {
-        const hour = new Date(echo.created_at).getHours();
-        timeOfDayCounts[hour] = (timeOfDayCounts[hour] || 0) + 1;
-      });
+        const blob = new Blob([csvContent], { type: "text/csv;charset=utf-8;" });
+        downloadFile(blob, `kivaw-reflection-export-${dateStr}.csv`);
+      } else if (format === "xlsx") {
+        // Create workbook
+        const wb = XLSX.utils.book_new();
 
-      const timeOfDayTrends = Array.from({ length: 24 }, (_, i) => ({
-        hour: i,
-        count: timeOfDayCounts[i] || 0,
-      }));
+        // Summary sheet
+        const summaryData = [
+          ["Kivaw Reflection Export"],
+          ["Export Date", exportData.export_date],
+          [],
+          ["Summary"],
+          ["Total Users", exportData.summary.total_users],
+          ["Total Echoes", exportData.summary.total_echoes],
+          ["Most Used State", exportData.summary.most_used_state],
+          ["Peak Hour", exportData.summary.peak_hour],
+        ];
+        const summaryWs = XLSX.utils.aoa_to_sheet(summaryData);
+        XLSX.utils.book_append_sheet(wb, summaryWs, "Summary");
 
-      // Create export data (anonymized)
-      const exportData = {
-        export_date: new Date().toISOString(),
-        weekly_state_usage: Object.entries(stateUsage).map(([state, count]) => ({
-          state,
-          user_count: count,
-        })),
-        top_themes: topThemes,
-        time_of_day_trends: timeOfDayTrends,
-        summary: {
-          total_users: profiles?.length || 0,
-          total_echoes: echoes?.length || 0,
-          most_used_state: Object.entries(stateUsage).sort((a, b) => b[1] - a[1])[0]?.[0] || "N/A",
-          peak_hour: timeOfDayTrends.sort((a, b) => b.count - a.count)[0]?.hour || null,
-        },
-      };
+        // Weekly State Usage sheet
+        const stateUsageData = [["State", "User Count"], ...exportData.weekly_state_usage.map((item) => [item.state, item.user_count])];
+        const stateUsageWs = XLSX.utils.aoa_to_sheet(stateUsageData);
+        XLSX.utils.book_append_sheet(wb, stateUsageWs, "State Usage");
 
-      // Download as JSON
-      const blob = new Blob([JSON.stringify(exportData, null, 2)], { type: "application/json" });
-      const url = URL.createObjectURL(blob);
-      const a = document.createElement("a");
-      a.href = url;
-      a.download = `kivaw-reflection-export-${new Date().toISOString().split("T")[0]}.json`;
-      document.body.appendChild(a);
-      a.click();
-      document.body.removeChild(a);
-      URL.revokeObjectURL(url);
+        // Top Themes sheet
+        const themesData = [["Theme", "Count"], ...exportData.top_themes.map((item) => [item.theme, item.count])];
+        const themesWs = XLSX.utils.aoa_to_sheet(themesData);
+        XLSX.utils.book_append_sheet(wb, themesWs, "Top Themes");
 
-      await logAdminAction("export_reflection", null, {});
+        // Time of Day Trends sheet
+        const timeOfDayData = [["Hour", "Count"], ...exportData.time_of_day_trends.map((item) => [item.hour, item.count])];
+        const timeOfDayWs = XLSX.utils.aoa_to_sheet(timeOfDayData);
+        XLSX.utils.book_append_sheet(wb, timeOfDayWs, "Time of Day");
+
+        // Write file
+        XLSX.writeFile(wb, `kivaw-reflection-export-${dateStr}.xlsx`);
+      }
+
+      await logAdminAction("export_reflection", null, { format });
+      setShowExportMenu(false);
     } catch (e: any) {
       console.error("Error exporting data:", e);
       alert("Error: " + (e?.message || "Could not export data."));
@@ -419,6 +503,21 @@ export default function Analytics() {
     loadStateHealth();
     loadEchoPatterns();
   }, []);
+
+  // Close export menu when clicking outside
+  useEffect(() => {
+    if (!showExportMenu) return;
+
+    function handleClickOutside(event: MouseEvent) {
+      const target = event.target as HTMLElement;
+      if (!target.closest('[data-export-menu]')) {
+        setShowExportMenu(false);
+      }
+    }
+
+    document.addEventListener("mousedown", handleClickOutside);
+    return () => document.removeEventListener("mousedown", handleClickOutside);
+  }, [showExportMenu]);
 
   if (loading) {
     return <p className="muted">Loading analytics…</p>;
@@ -449,10 +548,72 @@ export default function Analytics() {
     <div className="admin-analytics">
       <div className="admin-section-header">
         <h3 className="admin-section-title">Analytics & Reporting</h3>
-        <div style={{ display: "flex", gap: 8 }}>
-          <button className="btn" type="button" onClick={exportForReflection}>
-            📥 Export for Reflection
-          </button>
+        <div style={{ display: "flex", gap: 8, position: "relative" }}>
+          <div style={{ position: "relative" }} data-export-menu>
+            <button
+              className="btn"
+              type="button"
+              onClick={() => setShowExportMenu(!showExportMenu)}
+            >
+              📥 Export for Reflection
+            </button>
+            {showExportMenu && (
+              <div
+                style={{
+                  position: "absolute",
+                  top: "100%",
+                  right: 0,
+                  marginTop: 8,
+                  background: "var(--white)",
+                  border: "1px solid var(--border)",
+                  borderRadius: 8,
+                  boxShadow: "0 4px 12px rgba(0,0,0,0.15)",
+                  zIndex: 1000,
+                  minWidth: 180,
+                  padding: 8,
+                }}
+              >
+                <button
+                  className="admin-action-btn"
+                  type="button"
+                  onClick={() => exportForReflection("json")}
+                  style={{
+                    width: "100%",
+                    textAlign: "left",
+                    padding: "10px 14px",
+                    marginBottom: 4,
+                  }}
+                >
+                  📄 JSON
+                </button>
+                <button
+                  className="admin-action-btn"
+                  type="button"
+                  onClick={() => exportForReflection("csv")}
+                  style={{
+                    width: "100%",
+                    textAlign: "left",
+                    padding: "10px 14px",
+                    marginBottom: 4,
+                  }}
+                >
+                  📊 CSV
+                </button>
+                <button
+                  className="admin-action-btn"
+                  type="button"
+                  onClick={() => exportForReflection("xlsx")}
+                  style={{
+                    width: "100%",
+                    textAlign: "left",
+                    padding: "10px 14px",
+                  }}
+                >
+                  📈 XLSX
+                </button>
+              </div>
+            )}
+          </div>
           <button className="btn btn-ghost" type="button" onClick={loadAnalytics}>
             🔄 Refresh
           </button>
