@@ -621,54 +621,40 @@ export default function Echo() {
         </div>
 
         <Card className="echo-maincard">
-          {/* Header Section with Linked Item */}
-          <div className="echo-header-section">
-            <div className="echo-header-icon">✨</div>
-            <div className="echo-header-content">
-              <h3 className="echo-header-title">What's on your mind?</h3>
-              <p className="echo-header-subtitle">Write it out, tag it however makes sense to you, keep it just for you.</p>
-              {linked && (
-                <div className="echo-linked-badge">
-                  <span className="echo-linked-badge-icon">🔗</span>
-                  <span className="echo-linked-badge-text">{linkedTitle}</span>
-                  <button
-                    className="echo-linked-badge-remove"
-                    onClick={() => setLinked(null)}
-                    type="button"
-                    aria-label="Remove linked item"
-                  >
-                    ×
-                  </button>
-                </div>
-              )}
-            </div>
-            {!linked && (
-              <button className="echo-pillbtn" type="button" onClick={() => setLinkOpen(true)}>
-                Link an item
-              </button>
-            )}
-          </div>
 
           {/* Linked Item Row (when linked) */}
           {linked && (
             <div className="echo-linkedrow">
               <div className="echo-linkedleft">
-                {linked?.image_url ? (
-                  <img className="echo-linkedthumb" src={linked.image_url} alt="" />
-                ) : (
-                  <div className="echo-kindicon echo-kindicon--selected" aria-hidden="true">
-                    {kindIcon(linked.kind)}
-                  </div>
-                )}
+                <div className="echo-linked-icon-circle">🔗</div>
                 <div className="echo-linkedtext">
-                  <div className="echo-kicker">LINKED ITEM</div>
+                  <div className="echo-kicker">LINKED ITEM (OPTIONAL)</div>
                   <div className="echo-linkedtitle">{linkedTitle}</div>
                   <div className="echo-linkedmeta">{linkedMeta}</div>
                 </div>
               </div>
               <div className="echo-linkedactions">
                 <button className="echo-pillbtn" type="button" onClick={() => setLinkOpen(true)}>
-                  Change
+                  Link an item
+                </button>
+              </div>
+            </div>
+          )}
+
+          {/* Unlinked Item Row (when not linked) */}
+          {!linked && (
+            <div className="echo-linkedrow echo-linkedrow-unlinked">
+              <div className="echo-linkedleft">
+                <div className="echo-linked-icon-circle">🔗</div>
+                <div className="echo-linkedtext">
+                  <div className="echo-kicker">LINKED ITEM (OPTIONAL)</div>
+                  <div className="echo-linkedtitle">Unlinked moment</div>
+                  <div className="echo-linkedmeta">Linking is optional.</div>
+                </div>
+              </div>
+              <div className="echo-linkedactions">
+                <button className="echo-pillbtn" type="button" onClick={() => setLinkOpen(true)}>
+                  Link an item
                 </button>
               </div>
             </div>
@@ -745,8 +731,8 @@ export default function Echo() {
             </div>
 
             <input
-              className="input"
-              placeholder="Or your own tag…"
+              className="input echo-custom-tag-input"
+              placeholder="Or your own tag..."
               value={customTag}
               onChange={(e) => {
                 setCustomTag(e.target.value);
@@ -759,7 +745,7 @@ export default function Echo() {
           {err ? <div className="echo-alert">{err}</div> : null}
 
           <button className="echo-primary" type="button" onClick={onSave} disabled={saving || !note.trim()}>
-            {saving ? "Saving…" : "Save this moment ✨"}
+            {saving ? "Saving…" : "Save this moment"}
           </button>
         </Card>
 
@@ -849,9 +835,7 @@ export default function Echo() {
             <div className="echo-muted">Loading…</div>
           ) : saved.length === 0 ? (
             <div className="echo-empty-state">
-              <div className="echo-empty-icon">📖</div>
-              <p className="echo-empty-text">Your echoes will live here</p>
-              <p className="echo-empty-hint">Start writing above whenever something feels worth remembering.</p>
+              <p className="echo-empty-text">No saved echoes yet.</p>
             </div>
           ) : filteredSaved.length === 0 ? (
             <div className="echo-empty-state">

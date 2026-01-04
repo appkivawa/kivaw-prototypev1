@@ -65,18 +65,20 @@ export default function TopNav() {
         </nav>
 
         <div className="topnav__right">
-          <div className="nav-auth">
-            <button className="nav-cta" onClick={handleAuthClick}>
-              {isSignedIn ? "Sign out" : "Continue"}
-            </button>
-            <button
-              className="moon"
-              onClick={toggle}
-              aria-label="Toggle theme"
-            >
-              {theme === "dark" ? "☀️" : "🌙"}
-            </button>
-          </div>
+          <button
+            className="nav-cta-btn"
+            onClick={handleAuthClick}
+            type="button"
+          >
+            {isSignedIn ? "Sign out" : "Continue"}
+          </button>
+          <button
+            className="moon"
+            onClick={toggle}
+            aria-label="Toggle theme"
+          >
+            {theme === "dark" ? "☀️" : "🌙"}
+          </button>
         </div>
       </div>
 

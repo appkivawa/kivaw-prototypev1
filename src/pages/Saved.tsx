@@ -165,7 +165,7 @@ export default function Saved() {
         ) : visibleItems.length === 0 ? (
           <div className="saved-empty-state">
             <div className="saved-empty-icon">💜</div>
-            <h3 className="saved-empty-title">Your collection starts here</h3>
+            <h2 className="saved-empty-title">Your collection starts here</h2>
             <p className="saved-empty-text">
               Save activities that resonate with you. Build a personalized toolkit for different moods and moments.
             </p>
@@ -263,37 +263,55 @@ export default function Saved() {
                   const isBusy = busyId === it.id;
 
                   return (
-                    <ItemCard
-                      key={it.id}
-                      item={it}
-                      onOpen={() => navigate(`/item/${it.id}`)}
-                      topMeta={
-                        <>
-                          <span className="kivaw-meta-pill">{it.kind || "Item"}</span>
-                          {it.byline ? (
-                            <>
-                              <span className="kivaw-meta-dot">•</span>
-                              <span className="kivaw-meta-soft">{it.byline}</span>
-                            </>
-                          ) : null}
-                        </>
-                      }
-                      action={
-                        <button
-                          className="kivaw-heart"
-                          type="button"
-                          aria-label="Remove"
-                          disabled={isBusy}
-                          onClick={(e) => {
-                            e.preventDefault();
-                            e.stopPropagation();
-                            removeSaved(it.id);
-                          }}
-                        >
-                          {isBusy ? "…" : "♥"}
+                    <div key={it.id} className="saved-item-wrapper">
+                      <ItemCard
+                        item={it}
+                        onOpen={() => navigate(`/item/${it.id}`)}
+                        topMeta={
+                          <>
+                            <span className="kivaw-meta-pill">{it.kind || "Item"}</span>
+                            {it.byline ? (
+                              <>
+                                <span className="kivaw-meta-dot">•</span>
+                                <span className="kivaw-meta-soft">{it.byline}</span>
+                              </>
+                            ) : null}
+                          </>
+                        }
+                        action={
+                          <button
+                            className="kivaw-heart"
+                            type="button"
+                            aria-label="Remove"
+                            disabled={isBusy}
+                            onClick={(e) => {
+                              e.preventDefault();
+                              e.stopPropagation();
+                              removeSaved(it.id);
+                            }}
+                          >
+                            {isBusy ? "…" : "♥"}
+                          </button>
+                        }
+                      />
+                      <div className="saved-item-share">
+                        <button className="saved-share-btn" type="button" aria-label="Share to Google">
+                          <span>G</span>
                         </button>
-                      }
-                    />
+                        <button className="saved-share-btn" type="button" aria-label="Share to Facebook">
+                          <span>f</span>
+                        </button>
+                        <button className="saved-share-btn" type="button" aria-label="Share to Twitter">
+                          <span>🐦</span>
+                        </button>
+                        <button className="saved-share-btn" type="button" aria-label="Share to Instagram">
+                          <span>📷</span>
+                        </button>
+                        <button className="saved-share-btn" type="button" aria-label="Share">
+                          <span>↗</span>
+                        </button>
+                      </div>
+                    </div>
                   );
                 })}
               </div>

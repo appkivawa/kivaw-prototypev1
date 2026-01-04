@@ -1,4 +1,5 @@
 import { supabase } from "../lib/supabaseClient";
+import { sanitizeSearchQuery } from "../utils/security";
 
 export type ContentItem = {
   id: string;
@@ -24,9 +25,10 @@ export async function listContentItems(params?: {
   q?: string; // search string
   limit?: number;
 }) {
-  const kind = params?.kind && params.kind !== "All" ? params.kind : null;
-  const q = (params?.q || "").trim();
-  const limit = params?.limit ?? 80;
+  // Sanitize and validate inputs
+  const kind = params?.kind && params.kind !== "All" ? sanitizeSearchQuery(params.kind, 50) : null;
+  const q = params?.q ? sanitizeSearchQuery(params.q) : "";
+  const limit = Math.min(Math.max(1, params?.limit ?? 80), 200); // Limit between 1-200
 
   let query = supabase
     .from("content_items")
@@ -39,6 +41,7 @@ export async function listContentItems(params?: {
   if (kind) query = query.eq("kind", kind);
 
   if (q) {
+    // Supabase PostgREST safely handles parameterized queries
     query = query.or(`title.ilike.%${q}%,byline.ilike.%${q}%,meta.ilike.%${q}%`);
   }
 

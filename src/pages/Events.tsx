@@ -1,11 +1,9 @@
 import { useEffect, useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
-import Card from "../ui/Card";
 import { getUserId } from "../data/savesApi";
 import { requireAuth } from "../auth/requireAuth";
 import { fetchAllEvents, type EventFilters, type Event } from "../data/eventsApi";
 
-type ViewMode = "grid" | "list";
 type MoodFilter = "all" | "destructive" | "expansive" | "minimize" | "blank";
 
 const MOOD_CONFIG: Record<MoodFilter, { emoji: string; label: string; desc?: string }> = {
@@ -16,221 +14,6 @@ const MOOD_CONFIG: Record<MoodFilter, { emoji: string; label: string; desc?: str
   blank: { emoji: "🌙", label: "Blank", desc: "Chill, social" },
 };
 
-function EventCard({
-  event,
-  onSave,
-  isSaved,
-  view = "grid",
-  matchScore,
-}: {
-  event: Event;
-  onSave: (id: string) => void;
-  isSaved: boolean;
-  view?: ViewMode;
-  matchScore?: number;
-}) {
-  const [, setIsHovered] = useState(false);
-
-  const getMoodColor = (mood: MoodFilter) => {
-    const colors: Record<MoodFilter, string> = {
-      all: "events-mood-gray",
-      destructive: "events-mood-red",
-      expansive: "events-mood-green",
-      minimize: "events-mood-blue",
-      blank: "events-mood-purple",
-    };
-    return colors[mood] || colors.all;
-  };
-
-  if (view === "list") {
-    return (
-      <Card className="events-card-list">
-        <div
-          onMouseEnter={() => setIsHovered(true)}
-          onMouseLeave={() => setIsHovered(false)}
-        >
-        <div className="events-list-date">
-          <div className="events-list-date-month">{event.date.month}</div>
-          <div className="events-list-date-day">{event.date.day}</div>
-        </div>
-
-        <div className="events-list-image">
-          {event.image ? (
-            <img src={event.image} alt={event.title} />
-          ) : (
-            <div className="events-list-emoji">{event.emoji}</div>
-          )}
-        </div>
-
-        <div className="events-list-content">
-          <div className="events-list-header">
-            <h3 className="events-list-title">{event.title}</h3>
-            {matchScore && (
-              <div className="events-match-badge">
-                <span className="events-match-icon">✨</span>
-                {matchScore}%
-              </div>
-            )}
-          </div>
-
-          <p className="events-list-description">{event.description}</p>
-
-          <div className="events-list-meta">
-            <div className="events-meta-item">
-              <span className="events-meta-icon">🕐</span>
-              {event.time}
-            </div>
-            <div className="events-meta-item">
-              <span className="events-meta-icon">📍</span>
-              {event.location}
-            </div>
-            <div className="events-meta-item">
-              <span className="events-meta-icon">👥</span>
-              {event.attendees}
-            </div>
-            <div className="events-meta-item events-meta-price">
-              <span className="events-meta-icon">💰</span>
-              {event.price}
-            </div>
-          </div>
-
-          <div className="events-list-tags">
-            {event.moods.map((mood, i) => {
-              const moodKey = mood as MoodFilter;
-              return (
-                <span key={i} className={`events-mood-tag ${getMoodColor(moodKey)}`}>
-                  {MOOD_CONFIG[moodKey].emoji} {MOOD_CONFIG[moodKey].label}
-                </span>
-              );
-            })}
-            {event.tags.slice(0, 2).map((tag, i) => (
-              <span key={i} className="events-tag">
-                #{tag}
-              </span>
-            ))}
-          </div>
-        </div>
-
-        <div className="events-list-actions">
-          <button
-            className={`events-heart-btn ${isSaved ? "events-heart-saved" : ""}`}
-            type="button"
-            onClick={(e) => {
-              e.stopPropagation();
-              onSave(event.id);
-            }}
-            aria-label={isSaved ? "Unsave" : "Save"}
-          >
-            {isSaved ? "♥" : "♡"}
-          </button>
-          <button
-            className="events-view-btn"
-            type="button"
-            onClick={() => window.open(event.url || "#", "_blank")}
-          >
-            View →
-          </button>
-        </div>
-        </div>
-      </Card>
-    );
-  }
-
-  return (
-    <Card className="events-card-grid">
-      <div
-        onMouseEnter={() => setIsHovered(true)}
-        onMouseLeave={() => setIsHovered(false)}
-      >
-      <div className="events-card-image">
-        {event.image ? (
-          <img src={event.image} alt={event.title} />
-        ) : (
-          <div className="events-card-emoji">{event.emoji}</div>
-        )}
-
-        <button
-          className={`events-card-heart ${isSaved ? "events-heart-saved" : ""}`}
-          type="button"
-          onClick={(e) => {
-            e.stopPropagation();
-            onSave(event.id);
-          }}
-          aria-label={isSaved ? "Unsave" : "Save"}
-        >
-          {isSaved ? "♥" : "♡"}
-        </button>
-
-        {matchScore && (
-          <div className="events-card-match">
-            <span className="events-match-icon">✨</span>
-            {matchScore}% match
-          </div>
-        )}
-
-        <div className="events-card-source">{event.source}</div>
-      </div>
-
-      <div className="events-card-content">
-        <div className="events-card-date">
-          <span className="events-date-icon">📅</span>
-          {event.date.full}
-        </div>
-
-        <h3 className="events-card-title">{event.title}</h3>
-        <p className="events-card-description">{event.description}</p>
-
-        <div className="events-card-meta">
-          <div className="events-meta-item">
-            <span className="events-meta-icon">🕐</span>
-            {event.time}
-          </div>
-          <div className="events-meta-item">
-            <span className="events-meta-icon">📍</span>
-            {event.location}
-          </div>
-          <div className="events-meta-item">
-            <span className="events-meta-icon">👥</span>
-            {event.attendees}
-          </div>
-          <div className="events-meta-item events-meta-price">
-            <span className="events-meta-icon">💰</span>
-            {event.price}
-          </div>
-        </div>
-
-        <div className="events-card-tags">
-          {event.moods.map((mood, i) => {
-            const moodKey = mood as MoodFilter;
-            return (
-              <span key={i} className={`events-mood-tag ${getMoodColor(moodKey)}`}>
-                {MOOD_CONFIG[moodKey].emoji} {MOOD_CONFIG[moodKey].label}
-              </span>
-            );
-          })}
-        </div>
-
-        <div className="events-card-tags">
-          {event.tags.map((tag, i) => (
-            <span key={i} className="events-tag">
-              #{tag}
-            </span>
-          ))}
-        </div>
-
-        <button
-          className="events-card-cta"
-          type="button"
-          onClick={() => window.open(event.url || "#", "_blank")}
-        >
-          View Event Details →
-        </button>
-      </div>
-      </div>
-    </Card>
-  );
-}
-
 export default function Events() {
   const navigate = useNavigate();
 
@@ -240,14 +23,8 @@ export default function Events() {
   const [loading, setLoading] = useState(true);
 
   const [selectedMood, setSelectedMood] = useState<MoodFilter>("all");
-  const [viewMode, setViewMode] = useState<ViewMode>("grid");
-  const [selectedDate, setSelectedDate] = useState<number | null>(null);
   const [searchQuery, setSearchQuery] = useState("");
-  const [activeFilters, setActiveFilters] = useState<string[]>([]);
   const [userLocation, setUserLocation] = useState<{ lat: number; lng: number } | null>(null);
-
-  // Quick filters
-  const quickFilters = ["This Weekend", "Free", "Online", "Outdoors", "Beginner Friendly", "Small Group"];
 
   useEffect(() => {
     let cancelled = false;
@@ -391,11 +168,10 @@ export default function Events() {
       const matchesSearch =
         event.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
         event.description.toLowerCase().includes(searchQuery.toLowerCase());
-      const matchesDate = !selectedDate || event.date.day === selectedDate;
 
-      return matchesMood && matchesSearch && matchesDate;
+      return matchesMood && matchesSearch;
     });
-  }, [events, selectedMood, searchQuery, selectedDate]);
+  }, [events, selectedMood, searchQuery]);
 
   const recommendedEvents = useMemo(() => {
     return events
@@ -421,16 +197,11 @@ export default function Events() {
     // TODO: Save to database
   };
 
-  const handleFilterToggle = (filter: string) => {
-    setActiveFilters((prev) =>
-      prev.includes(filter) ? prev.filter((f) => f !== filter) : [...prev, filter]
-    );
-  };
 
   return (
     <div className="page">
-      <div className="kivaw-pagehead">
-        <div className="events-header-icon">📅</div>
+      <div className="events-page-header">
+        <div className="events-page-icon">📅</div>
         <h1>Events</h1>
         <p>Find experiences that match your mood</p>
       </div>
@@ -438,211 +209,123 @@ export default function Events() {
       <div className="center-wrap">
         {/* Recommended Section */}
         {recommendedEvents.length > 0 && !loading && (
-          <Card className="events-recommended">
-            <div className="events-recommended-header">
+          <div className="events-recommended-section">
+            <h2>
               <span className="events-recommended-icon">✨</span>
-              <h3 className="events-recommended-title">Recommended for You</h3>
-            </div>
-            <p className="events-recommended-desc">Based on your activity patterns and preferences</p>
-            <div className="events-recommended-grid">
+              Recommended for You
+            </h2>
+            <p>Based on your activity patterns and preferences</p>
+            <div className="events-grid">
               {recommendedEvents.map((event) => (
-                <button
+                <div
                   key={event.id}
-                  className="events-recommended-card"
-                  type="button"
+                  className="events-event-card"
                   onClick={() => window.open(event.url || "#", "_blank")}
                 >
-                  <div className="events-recommended-emoji">{event.emoji}</div>
-                  <div className="events-recommended-match">{event.matchScore}% match</div>
-                  <h4 className="events-recommended-title-small">{event.title}</h4>
-                  <div className="events-recommended-meta">
-                    <div className="events-recommended-meta-item">
-                      <span>📅</span>
-                      {event.date.full}
-                    </div>
-                    <div className="events-recommended-meta-item">
-                      <span>📍</span>
-                      {event.location}
-                    </div>
-                  </div>
-                </button>
+                  <div className="events-event-icon">{event.emoji}</div>
+                  <div className="events-match-score">{event.matchScore}% match</div>
+                  <div className="events-event-title">{event.title}</div>
+                  <div className="events-event-meta">📅 {event.date.full}</div>
+                  <div className="events-event-meta">📍 {event.location}</div>
+                </div>
               ))}
             </div>
-          </Card>
+          </div>
         )}
 
-        <Card className="center card-pad">
-          {/* Search */}
-          <div className="explore-search-wrapper">
-            <div className="explore-search-icon">🔍</div>
-            <input
-              className="explore-search-input"
-              placeholder="Search events..."
-              value={searchQuery}
-              onChange={(e) => setSearchQuery(e.target.value)}
-            />
-            {searchQuery && (
-              <button
-                className="explore-search-clear"
-                type="button"
-                onClick={() => setSearchQuery("")}
-                aria-label="Clear search"
-              >
-                ×
-              </button>
-            )}
+        <div className="events-search-section">
+          <input
+            type="text"
+            className="events-search-input"
+            placeholder="Search events..."
+            value={searchQuery}
+            onChange={(e) => setSearchQuery(e.target.value)}
+          />
+          <div className="events-mood-filters">
+            {(Object.keys(MOOD_CONFIG) as MoodFilter[]).map((mood) => {
+              const config = MOOD_CONFIG[mood];
+              return (
+                <button
+                  key={mood}
+                  className={`events-mood-btn ${selectedMood === mood ? "events-mood-btn-active" : ""}`}
+                  type="button"
+                  onClick={() => setSelectedMood(mood)}
+                >
+                  {config.emoji} {config.label}
+                </button>
+              );
+            })}
           </div>
+        </div>
 
-          {/* Mood Filter */}
-          <div className="events-mood-filter-section">
-            <h3 className="events-section-title">Filter by mood</h3>
-            <div className="events-mood-filter-grid">
-              {(Object.keys(MOOD_CONFIG) as MoodFilter[]).map((mood) => {
-                const config = MOOD_CONFIG[mood];
-                return (
+        {loading ? (
+          <div className="events-card">
+            <p className="muted">Loading events…</p>
+          </div>
+        ) : filteredEvents.length === 0 ? (
+          <div className="events-card">
+            <div className="events-empty-icon">🔍</div>
+            <h3 className="events-empty-title">No events found</h3>
+            <p className="events-empty-text">Try adjusting your filters or search terms</p>
+            <button
+              className="events-empty-btn"
+              type="button"
+              onClick={() => {
+                setSearchQuery("");
+                setSelectedMood("all");
+              }}
+            >
+              Clear all filters
+            </button>
+          </div>
+        ) : (
+          <div className="events-grid">
+            {filteredEvents.map((event) => (
+              <div
+                key={event.id}
+                className="events-event-card"
+                onClick={() => window.open(event.url || "#", "_blank")}
+              >
+                <div className="events-event-header">
+                  <div>
+                    <div className="events-event-icon">{event.emoji}</div>
+                  </div>
                   <button
-                    key={mood}
-                    className={`events-mood-filter-btn ${selectedMood === mood ? "events-mood-filter-active" : ""}`}
+                    className={`events-heart-btn ${savedIds.has(event.id) ? "events-heart-saved" : ""}`}
                     type="button"
-                    onClick={() => setSelectedMood(mood)}
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      handleSave(event.id);
+                    }}
+                    aria-label={savedIds.has(event.id) ? "Unsave" : "Save"}
                   >
-                    <div className="events-mood-filter-emoji">{config.emoji}</div>
-                    <div className="events-mood-filter-label">{config.label}</div>
-                    {config.desc && (
-                      <div className="events-mood-filter-desc">{config.desc}</div>
-                    )}
+                    {savedIds.has(event.id) ? "♥" : "♡"}
                   </button>
-                );
-              })}
-            </div>
-          </div>
-
-          {/* Quick Filters & Controls */}
-          <div className="explore-controls">
-            <div className="explore-controls-left">
-              <span className="explore-results-count">
-                {filteredEvents.length} {filteredEvents.length === 1 ? "event" : "events"}
-              </span>
-              {(selectedMood !== "all" || searchQuery || activeFilters.length > 0) && (
-                <button
-                  className="explore-clear-filters"
-                  type="button"
-                  onClick={() => {
-                    setSelectedMood("all");
-                    setSearchQuery("");
-                    setActiveFilters([]);
-                    setSelectedDate(null);
-                  }}
-                >
-                  Clear filters
-                </button>
-              )}
-            </div>
-            <div className="explore-controls-right">
-              <div className="explore-view-toggle">
-                <button
-                  className={`explore-view-btn ${viewMode === "grid" ? "explore-view-btn-active" : ""}`}
-                  type="button"
-                  onClick={() => setViewMode("grid")}
-                  aria-label="Grid view"
-                >
-                  ⬜
-                </button>
-                <button
-                  className={`explore-view-btn ${viewMode === "list" ? "explore-view-btn-active" : ""}`}
-                  type="button"
-                  onClick={() => setViewMode("list")}
-                  aria-label="List view"
-                >
-                  ☰
-                </button>
+                </div>
+                {event.matchScore && (
+                  <div className="events-match-score">{event.matchScore}% match</div>
+                )}
+                <div className="events-event-title">{event.title}</div>
+                <div className="events-event-meta">📅 {event.date.full}</div>
+                <div className="events-event-meta">📍 {event.location}</div>
               </div>
-            </div>
-          </div>
-
-          {/* Quick Filters */}
-          <div className="events-quick-filters">
-            {quickFilters.map((filter) => (
-              <button
-                key={filter}
-                className={`events-quick-filter ${activeFilters.includes(filter) ? "events-quick-filter-active" : ""}`}
-                type="button"
-                onClick={() => handleFilterToggle(filter)}
-              >
-                {filter}
-              </button>
             ))}
           </div>
+        )}
 
-          {!isAuthed && (
-            <div className="kivaw-signinPrompt" style={{ marginTop: 12, marginBottom: 16 }}>
-              <p className="muted" style={{ margin: 0 }}>
-                Want to save events? Sign in to heart them.
-              </p>
-              <button
-                className="btn btn-ghost"
-                type="button"
-                onClick={() => navigate("/login", { state: { from: "/events" } })}
-              >
-                Sign in →
-              </button>
-            </div>
-          )}
-
-          {loading ? (
-            <p className="muted">Loading events…</p>
-          ) : filteredEvents.length === 0 ? (
-            <div className="explore-empty-state">
-              <div className="explore-empty-icon">🔍</div>
-              <h3 className="explore-empty-title">No events found</h3>
-              <p className="explore-empty-text">Try adjusting your filters or search terms</p>
-              <button
-                className="explore-empty-btn"
-                type="button"
-                onClick={() => {
-                  setSearchQuery("");
-                  setSelectedMood("all");
-                  setActiveFilters([]);
-                  setSelectedDate(null);
-                }}
-              >
-                Clear all filters
-              </button>
-            </div>
-          ) : (
-            <div className={viewMode === "grid" ? "kivaw-rec-grid" : "events-list-view"}>
-              {filteredEvents.map((event) => (
-                <EventCard
-                  key={event.id}
-                  event={event}
-                  onSave={handleSave}
-                  isSaved={savedIds.has(event.id)}
-                  view={viewMode}
-                  matchScore={event.matchScore}
-                />
-              ))}
-            </div>
-          )}
-        </Card>
-
-        {/* Sign In CTA */}
         {!isAuthed && !loading && (
-          <Card className="explore-signin-card">
-            <div className="explore-signin-icon">🎟️</div>
-            <h3 className="explore-signin-title">Never miss an event</h3>
-            <p className="explore-signin-text">
-              Sign in to get personalized event recommendations and save your favorites
+          <div className="events-card">
+            <p className="muted" style={{ margin: 0 }}>
+              Want to save events? Sign in to heart them.
             </p>
-            <div className="explore-signin-actions">
-              <button
-                className="explore-signin-btn-primary"
-                type="button"
-                onClick={() => navigate("/login", { state: { from: "/events" } })}
-              >
-                Sign in to save events →
-              </button>
-            </div>
-          </Card>
+            <button
+              className="events-signin-btn"
+              type="button"
+              onClick={() => navigate("/login", { state: { from: "/events" } })}
+            >
+              Sign in →
+            </button>
+          </div>
         )}
       </div>
     </div>

@@ -1,6 +1,6 @@
+import { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import Card from "../../ui/Card";
-import Popover from "../../ui/Popover";
 
 const STATES = [
   // ✅ key stays "minimizer" (DB + Home), label updated, emoji aligned
@@ -16,62 +16,82 @@ const STATES = [
   { key: "blank", label: "Blank", emoji: "☁️" },
 ] as const;
 
+const LENSES = [
+  { key: "music", label: "Music" },
+  { key: "watch", label: "Watch" },
+  { key: "read", label: "Read" },
+  { key: "move", label: "Move" },
+  { key: "create", label: "Create" },
+  { key: "reset", label: "Reset" },
+] as const;
+
 export default function QuizState() {
   const navigate = useNavigate();
+  const [selectedState, setSelectedState] = useState("");
+  const [selectedLens, setSelectedLens] = useState("");
 
-  function choose(state: string) {
-    sessionStorage.setItem("kivaw_state", state);
-    navigate("/quiz/focus");
+  function handleExplore() {
+    if (selectedState && selectedLens) {
+      sessionStorage.setItem("kivaw_state", selectedState);
+      sessionStorage.setItem("kivaw_focus", selectedLens);
+      navigate("/quiz/result");
+    }
   }
 
   return (
-    <div className="page quiz-page">
-      <div className="quiz-wrap">
-        <Card className="quiz-card">
-          <div className="quiz-top">
-            <button className="quiz-back" onClick={() => navigate(-1)} type="button">
-              ← Back
-            </button>
+    <div className="page quiz-page state-lens-page">
+      <div className="center-wrap">
+        <div className="state-lens-shell">
+          <h1 className="state-lens-header">Pick Your State & Lens</h1>
 
-            <Popover
-              label="Help"
-              content={
-                <div className="quiz-popover">
-                  <div className="popover__title">Quick definitions</div>
-                  <p>
-                    <strong>State</strong> = your current mode (how you’re processing today).
-                  </p>
-                  <p>
-                    <strong>Focus</strong> = the area you’re aiming at.
-                  </p>
-                  <p>
-                    <strong>State + Focus</strong> = your recommendation style for right now.
-                  </p>
-                </div>
-              }
+          <Card className="state-lens-card">
+            <h2 className="state-lens-section-title">Select Your Mood</h2>
+            <p className="state-lens-instruction">Choose your current state and preferred mood lens.</p>
+
+            <div className="state-lens-dropdowns">
+              <div className="state-lens-dropdown-wrapper">
+                <label className="state-lens-label">State</label>
+                <select
+                  className="state-lens-select"
+                  value={selectedState}
+                  onChange={(e) => setSelectedState(e.target.value)}
+                >
+                  <option value="">Select state</option>
+                  {STATES.map((s) => (
+                    <option key={s.key} value={s.key}>
+                      {s.emoji} {s.label}
+                    </option>
+                  ))}
+                </select>
+              </div>
+
+              <div className="state-lens-dropdown-wrapper">
+                <label className="state-lens-label">Lens</label>
+                <select
+                  className="state-lens-select"
+                  value={selectedLens}
+                  onChange={(e) => setSelectedLens(e.target.value)}
+                >
+                  <option value="">Select lens</option>
+                  {LENSES.map((l) => (
+                    <option key={l.key} value={l.key}>
+                      {l.label}
+                    </option>
+                  ))}
+                </select>
+              </div>
+            </div>
+
+            <button
+              className="state-lens-explore-btn"
+              type="button"
+              onClick={handleExplore}
+              disabled={!selectedState || !selectedLens}
             >
-              <span className="quiz-helpchip">?</span>
-            </Popover>
-          </div>
-
-          <h1 className="quiz-title">What’s your current state?</h1>
-
-          <div className="quiz-options">
-            {STATES.map((s) => (
-              <button
-                key={s.key}
-                className="quiz-option"
-                onClick={() => choose(s.key)}
-                type="button"
-              >
-                <span className="quiz-emoji" aria-hidden="true">
-                  {s.emoji}
-                </span>
-                <span>{s.label}</span>
-              </button>
-            ))}
-          </div>
-        </Card>
+              Explore
+            </button>
+          </Card>
+        </div>
       </div>
     </div>
   );

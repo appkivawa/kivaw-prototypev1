@@ -62,6 +62,12 @@ export default function QuizFocus() {
     navigate("/quiz/result");
   }
 
+  function chooseForMe() {
+    // Randomly select a focus
+    const randomFocus = FOCUSES[Math.floor(Math.random() * FOCUSES.length)];
+    choose(randomFocus.key);
+  }
+
   return (
     <div className="page quiz-page">
       <div className="quiz-wrap">
@@ -92,9 +98,11 @@ export default function QuizFocus() {
             </div>
           </div>
 
-          <h1 className="quiz-title">What feels right?</h1>
-          <div className="quiz-subline">
-            You're feeling <strong>{stateLabel}</strong> — what do you want to focus on?
+          <div className="quiz-header">
+            <h1 className="quiz-title">What feels right?</h1>
+            <p className="quiz-subline">
+              You're feeling <strong>{stateLabel}</strong> — what do you want to focus on?
+            </p>
           </div>
 
           <Card className="quiz-card">
@@ -131,6 +139,19 @@ export default function QuizFocus() {
                   </button>
                 );
               })}
+            </div>
+            
+            <div className="focus-divider">
+              <button
+                className="focus-row focus-row--choose"
+                type="button"
+                onClick={chooseForMe}
+              >
+                <span className="focus-row__emoji" aria-hidden="true">
+                  🎲
+                </span>
+                <span className="focus-row__label">Choose for me</span>
+              </button>
             </div>
           </Card>
         </div>

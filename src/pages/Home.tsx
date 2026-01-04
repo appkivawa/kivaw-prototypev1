@@ -133,6 +133,12 @@ export default function Home() {
     nav(`/quiz/focus?state=${m.key}`);
   };
 
+  const onChooseForMe = async () => {
+    // Randomly select a mood
+    const randomMood = MOODS[Math.floor(Math.random() * MOODS.length)];
+    await onPickMood(randomMood);
+  };
+
   // Trending stats chips
   const chip1 = trendingStats?.topTag
     ? `📈 #${trendingStats.topTag.tag} — ${trendingStats.topTag.count} uses`
@@ -218,7 +224,15 @@ export default function Home() {
             <button
               className="homev2__justBrowsingBtn"
               type="button"
+              onClick={onChooseForMe}
+            >
+              🎲 Choose for me <span aria-hidden>→</span>
+            </button>
+            <button
+              className="homev2__justBrowsingBtn"
+              type="button"
               onClick={() => nav("/explore")}
+              style={{ marginTop: 8 }}
             >
               ✨ Or just browse around <span aria-hidden>→</span>
             </button>

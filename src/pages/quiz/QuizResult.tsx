@@ -139,10 +139,12 @@ export default function QuizResult() {
             </div>
           </div>
 
-          <h1 className="quiz-title">Results</h1>
-          <div className="quiz-subline">
-            State: <strong>{stateLabel}</strong> <span style={{ opacity: 0.6 }}>•</span>{" "}
-            Focus: <strong>{focusLabel}</strong> <span aria-hidden="true">{focusIcon}</span>
+          <div className="quiz-header">
+            <h1 className="quiz-title">Results</h1>
+            <p className="quiz-subline">
+              State: <strong>{stateLabel}</strong> <span style={{ opacity: 0.6 }}>•</span>{" "}
+              Focus: <strong>{focusLabel}</strong> <span aria-hidden="true">{focusIcon}</span>
+            </p>
           </div>
 
           <Card className="quiz-card">

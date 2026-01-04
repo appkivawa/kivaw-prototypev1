@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
 import Card from "../ui/Card";
 import { supabase } from "../lib/supabaseClient";
+import { isValidEmail } from "../utils/security";
 
 type LocState = { from?: string };
 
@@ -51,6 +52,11 @@ export default function Login() {
     const clean = email.trim();
     if (!clean) return setErr("Add your email first.");
 
+    // Validate email format
+    if (!isValidEmail(clean)) {
+      return setErr("Please enter a valid email address.");
+    }
+
     setBusy(true);
     try {
       // ✅ Remember where they were trying to go
@@ -74,65 +80,46 @@ export default function Login() {
   }
 
   return (
-    <div className="page">
+    <div className="page login-page">
       <div className="center-wrap">
-        <div className="quiz-shell">
-          <div className="quiz-shell__top">
-            <button className="btn-ghost" onClick={() => navigate(-1)} type="button">
-              ← Back
-            </button>
-          </div>
-
-          <h1 className="quiz-title">Continue</h1>
-          <div className="quiz-subline">
-            Save your Echoes with a magic link. No password. No chaos.
-          </div>
-
-          <Card className="quiz-card">
+        <div className="login-shell">
+          <Card className="login-card">
             {err ? (
-              <div style={{ marginBottom: 12 }} className="echo-alert">
+              <div className="login-error">
                 {err}
               </div>
             ) : null}
 
             {!sent ? (
               <>
-                <label className="muted" style={{ display: "block", marginBottom: 8 }}>
-                  Email
-                </label>
-                <input
-                  className="input"
-                  placeholder="you@example.com"
-                  value={email}
-                  onChange={(e) => setEmail(e.target.value)}
-                  autoComplete="email"
-                />
-
-                <div style={{ height: 12 }} />
+                <h1 className="login-header">Sign in to continue</h1>
+                <p className="login-description">We'll send you a magic link to sign in.</p>
+                
+                <div className="login-email-wrapper">
+                  <input
+                    className="login-email-input"
+                    placeholder="you@email.com"
+                    value={email}
+                    onChange={(e) => setEmail(e.target.value)}
+                    autoComplete="email"
+                    type="email"
+                  />
+                </div>
 
                 <button
-                  className="btn btn-primary btn-wide"
+                  className="login-magic-btn"
                   type="button"
                   onClick={sendLink}
                   disabled={busy}
                 >
-                  {busy ? "Sending…" : "Send magic link →"}
+                  {busy ? "Sending…" : "Send magic link"}
                 </button>
-
-                <div style={{ height: 12 }} />
-
-                <button className="btn btn-ghost btn-wide" type="button" onClick={() => navigate(from)}>
-                  Not now (browse as guest)
-                </button>
-
-                <p className="muted" style={{ marginTop: 14 }}>
-                  Tip: check Promotions/Spam if your inbox plays hard to get.
-                </p>
               </>
             ) : (
               <>
-                <div className="echo-empty" style={{ marginBottom: 14 }}>
-                  Link sent. Open your email and tap the button.
+                <div className="login-success">
+                  <h1 className="login-header">Check your email</h1>
+                  <p className="login-description">We sent a magic link to <strong>{email}</strong>. Click it to sign in.</p>
                 </div>
                 <button className="btn btn-ghost btn-wide" type="button" onClick={() => setSent(false)}>
                   Use a different email

@@ -1,4 +1,5 @@
 import { supabase } from "../lib/supabaseClient";
+import { isValidUUID } from "../utils/security";
 
 const TABLE = "saves_v2";
 
@@ -27,6 +28,11 @@ export async function saveItem(contentItemId: string) {
   const userId = await getUserId();
   if (!userId) throw new Error("Not signed in");
 
+  // Validate UUID format
+  if (!isValidUUID(contentItemId)) {
+    throw new Error("Invalid content item ID format");
+  }
+
   const { error } = await supabase.from(TABLE).insert([
     { user_id: userId, content_item_id: contentItemId },
   ]);
@@ -37,6 +43,11 @@ export async function saveItem(contentItemId: string) {
 export async function unsaveItem(contentItemId: string) {
   const userId = await getUserId();
   if (!userId) throw new Error("Not signed in");
+
+  // Validate UUID format
+  if (!isValidUUID(contentItemId)) {
+    throw new Error("Invalid content item ID format");
+  }
 
   const { error } = await supabase
     .from(TABLE)

@@ -1,4 +1,5 @@
 import { supabase } from "../lib/supabaseClient";
+import { sanitizeTag, sanitizeTextContent, isValidUUID } from "../utils/security";
 
 export type ContentItemLite = {
   id: string;
@@ -26,9 +27,12 @@ export async function getUserId(): Promise<string | null> {
   return data.session?.user?.id ?? null;
 }
 
+import { sanitizeSearchQuery } from "../utils/security";
+
 export async function listContentItemsLite(params?: { q?: string; limit?: number }) {
-  const q = (params?.q || "").trim();
-  const limit = params?.limit ?? 30;
+  // Sanitize and validate input
+  const q = params?.q ? sanitizeSearchQuery(params.q) : "";
+  const limit = Math.min(Math.max(1, params?.limit ?? 30), 100); // Limit between 1-100
 
   let query = supabase
     .from("content_items")
@@ -37,6 +41,7 @@ export async function listContentItemsLite(params?: { q?: string; limit?: number
     .limit(limit);
 
   if (q) {
+    // Supabase PostgREST safely handles parameterized queries
     query = query.or(`title.ilike.%${q}%,meta.ilike.%${q}%,byline.ilike.%${q}%`);
   }
 
@@ -46,6 +51,11 @@ export async function listContentItemsLite(params?: { q?: string; limit?: number
 }
 
 export async function getContentItemLiteById(contentId: string) {
+  // Validate UUID format
+  if (!isValidUUID(contentId)) {
+    throw new Error("Invalid content ID format");
+  }
+
   const { data, error } = await supabase
     .from("content_items")
     .select("id,kind,title,image_url")
@@ -65,11 +75,24 @@ export async function createEcho(input: {
   const uid = await getUserId();
   if (!uid) throw new Error("Auth session missing!");
 
+  // Validate and sanitize inputs
+  const usageTag = sanitizeTag(input.usageTag);
+  if (!usageTag) {
+    throw new Error("Usage tag is required");
+  }
+
+  // Validate contentId if provided
+  if (input.contentId && !isValidUUID(input.contentId)) {
+    throw new Error("Invalid content ID format");
+  }
+
+  const note = input.note ? sanitizeTextContent(input.note) : null;
+
   const payload = {
     user_id: uid,
     content_id: input.contentId ?? null, // ✅
-    usage_tag: input.usageTag,
-    note: input.note || null,
+    usage_tag: usageTag,
+    note: note,
     shared_to_waves: !!input.shareToWaves,
   };
 
@@ -105,6 +128,11 @@ export async function listMyEchoes(limit = 100) {
 export async function deleteEcho(echoId: string) {
   const uid = await getUserId();
   if (!uid) throw new Error("Auth session missing!");
+
+  // Validate UUID format
+  if (!isValidUUID(echoId)) {
+    throw new Error("Invalid echo ID format");
+  }
 
   const { error } = await supabase.from("echoes").delete().eq("id", echoId).eq("user_id", uid);
 

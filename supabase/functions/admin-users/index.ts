@@ -16,28 +16,56 @@ interface AdminUsersResponse {
   error?: string;
 }
 
+// Get allowed origins from environment or use default
+const getAllowedOrigins = (): string[] => {
+  const envOrigins = Deno.env.get("ALLOWED_ORIGINS");
+  if (envOrigins) {
+    return envOrigins.split(",").map((o) => o.trim());
+  }
+  // Default to common production domains - UPDATE THESE
+  return [
+    "https://kivaw.com",
+    "https://www.kivaw.com",
+    "https://app.kivaw.com",
+    // Add your Vercel/Netlify domain here
+  ];
+};
+
+const allowedOrigins = getAllowedOrigins();
+
+// Check if origin is allowed
+const isOriginAllowed = (origin: string | null): boolean => {
+  if (!origin) return false;
+  return allowedOrigins.some((allowed) => origin === allowed || origin.endsWith(`.${allowed.replace(/^https?:\/\//, "")}`));
+};
+
 serve(async (req) => {
+  const origin = req.headers.get("Origin");
+  const isAllowed = isOriginAllowed(origin);
+
   // Handle CORS preflight - MUST be first and return immediately
   if (req.method === "OPTIONS") {
-    console.log("Handling OPTIONS preflight request");
+    console.log("Handling OPTIONS preflight request from:", origin);
     return new Response(null, {
       status: 200,
       headers: {
-        "Access-Control-Allow-Origin": "*",
+        "Access-Control-Allow-Origin": isAllowed ? origin! : allowedOrigins[0] || "*",
         "Access-Control-Allow-Methods": "GET, POST, OPTIONS",
         "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
         "Access-Control-Max-Age": "86400",
+        "Access-Control-Allow-Credentials": "true",
       },
     });
   }
 
-  console.log("Handling", req.method, "request to admin-users");
+  console.log("Handling", req.method, "request to admin-users from:", origin);
 
-  // CORS headers for all responses
+  // CORS headers for all responses - restrict to allowed origins
   const corsHeaders = {
-    "Access-Control-Allow-Origin": "*",
+    "Access-Control-Allow-Origin": isAllowed ? origin! : allowedOrigins[0] || "*",
     "Access-Control-Allow-Methods": "GET, POST, OPTIONS",
     "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
+    "Access-Control-Allow-Credentials": "true",
   };
 
   try {

@@ -209,28 +209,9 @@ export default function Explore() {
           </Card>
         )}
 
-        <Card className="center card-pad">
-          {/* Enhanced Search */}
-          <div className="explore-search-wrapper">
-            <div className="explore-search-icon">🔍</div>
-              <input
-                className="explore-search-input"
-                placeholder="What are you looking for?"
-                value={q}
-                onChange={(e) => setQ(e.target.value)}
-              />
-            {q && (
-              <button
-                className="explore-search-clear"
-                type="button"
-                onClick={() => setQ("")}
-                aria-label="Clear search"
-              >
-                ×
-              </button>
-            )}
-          </div>
-
+        <Card className="explore-filters-card">
+          <h3 className="explore-filters-heading">What are you looking for</h3>
+          
           {/* Mood Selector */}
           <div className="explore-mood-selector-wrapper">
             <div className="explore-mood-selector">
@@ -267,6 +248,9 @@ export default function Explore() {
               ))}
             </div>
           </div>
+        </Card>
+
+        <Card className="center card-pad">
 
           {/* Controls Bar */}
           <div className="explore-controls">
