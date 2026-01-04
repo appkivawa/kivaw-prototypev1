@@ -119,6 +119,20 @@ export default function AdminLayout() {
               <span className="admin-tab-icon">🔒</span>
               Security
             </NavLink>
+            <NavLink
+              to="/admin/finance"
+              className={({ isActive }) => `admin-tab ${isActive ? "admin-tab-active" : ""}`}
+            >
+              <span className="admin-tab-icon">💰</span>
+              Finance
+            </NavLink>
+            <NavLink
+              to="/admin/experiments"
+              className={({ isActive }) => `admin-tab ${isActive ? "admin-tab-active" : ""}`}
+            >
+              <span className="admin-tab-icon">🧪</span>
+              Experiments
+            </NavLink>
           </div>
 
           {/* Nested Route Content */}

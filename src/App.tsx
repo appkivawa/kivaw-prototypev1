@@ -28,6 +28,8 @@ import Settings from "./admin/tabs/Settings";
 import Support from "./admin/tabs/Support";
 import Health from "./admin/tabs/Health";
 import Security from "./admin/tabs/Security";
+import Finance from "./admin/tabs/Finance";
+import Experiments from "./admin/tabs/Experiments";
 
 function HashAuthRedirect() {
   const nav = useNavigate();
@@ -67,6 +69,8 @@ export default function App() {
         <Route path="support" element={<Support />} />
         <Route path="health" element={<Health />} />
         <Route path="security" element={<Security />} />
+        <Route path="finance" element={<Finance />} />
+        <Route path="experiments" element={<Experiments />} />
       </Route>
 
       {/* --------- APP WITH SHELL --------- */}

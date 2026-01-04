@@ -43,7 +43,7 @@ export default function Health() {
       // Check 1: Supabase connection
       const connectionStart = Date.now();
       try {
-        const { data, error: queryError } = await supabase
+        const { error: queryError } = await supabase
           .from("profiles")
           .select("count")
           .limit(1)

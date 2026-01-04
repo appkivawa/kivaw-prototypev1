@@ -1,5 +1,6 @@
 import { useEffect, useState, useMemo } from "react";
 import { supabase } from "../../lib/supabaseClient";
+import UserJourneyInspector from "../components/UserJourneyInspector";
 
 type User = {
   id: string;
@@ -15,6 +16,8 @@ export default function Users() {
   const [usersError, setUsersError] = useState<string>("");
   const [errorDetails, setErrorDetails] = useState<string>(""); // Store detailed error for debugging
   const [searchQuery, setSearchQuery] = useState("");
+  const [selectedUserId, setSelectedUserId] = useState<string | null>(null);
+  const [selectedUserEmail, setSelectedUserEmail] = useState<string | null>(null);
 
   async function loadUsers() {
     setLoadingUsers(true);
@@ -189,10 +192,11 @@ export default function Users() {
                         className="admin-action-btn"
                         type="button"
                         onClick={() => {
-                          alert(`User actions for ${user.id}`);
+                          setSelectedUserId(user.id);
+                          setSelectedUserEmail(user.email);
                         }}
                       >
-                        View
+                        👤 Journey
                       </button>
                     </td>
                   </tr>
@@ -205,6 +209,17 @@ export default function Users() {
         <p className="muted">No users found matching "{searchQuery}"</p>
       ) : (
         <p className="muted">No users found.</p>
+      )}
+
+      {selectedUserId && (
+        <UserJourneyInspector
+          userId={selectedUserId}
+          userEmail={selectedUserEmail}
+          onClose={() => {
+            setSelectedUserId(null);
+            setSelectedUserEmail(null);
+          }}
+        />
       )}
     </div>
   );
