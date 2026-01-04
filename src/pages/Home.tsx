@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import Card from "../ui/Card";
 import { listWavesFeed, type WavesFeedItem } from "../data/wavesApi";

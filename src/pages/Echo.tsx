@@ -382,7 +382,6 @@ export default function Echo() {
   const [pendingDraft, setPendingDraft] = useState<DraftEcho | null>(null);
 
   const [showPrompts, setShowPrompts] = useState(true);
-  const [charCount, setCharCount] = useState(0);
   const [searchQuery, setSearchQuery] = useState("");
 
   const prompts = [
@@ -572,9 +571,13 @@ export default function Echo() {
     setErr(null);
   }
 
+  function handlePromptSelect(prompt: string) {
+    setNote(prompt);
+    setShowPrompts(false);
+  }
+
   const linkedTitle = linked ? linked.title : "Unlinked moment";
   const linkedMeta = linked ? linked.kind || "Item" : "Linking is optional.";
-  const linkButtonLabel = linked ? "Change" : "Link an item";
 
   return (
     <div className="page echo-page">
@@ -678,9 +681,9 @@ export default function Echo() {
               onFocus={() => setShowPrompts(false)}
             />
             <div className="echo-textarea-footer">
-              {charCount > 0 && (
-                <span className={cls("echo-char-count", charCount > 500 && "echo-char-count-warning")}>
-                  {charCount} characters
+              {note.length > 0 && (
+                <span className={cls("echo-char-count", note.length > 500 && "echo-char-count-warning")}>
+                  {note.length} characters
                 </span>
               )}
               {note.length > 20 && (

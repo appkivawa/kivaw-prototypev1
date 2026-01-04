@@ -10,7 +10,23 @@
  * TODO: Add API keys and implement actual API calls
  */
 
-import type { Event } from "../pages/Events";
+export type Event = {
+  id: string;
+  title: string;
+  emoji: string;
+  description: string;
+  date: { day: number; month: string; full: string };
+  time: string;
+  location: string;
+  price: string;
+  attendees: string;
+  moods: string[];
+  tags: string[];
+  source: string;
+  matchScore?: number;
+  url?: string;
+  image?: string | null;
+};
 
 export interface LocationCoords {
   lat: number;
@@ -45,7 +61,7 @@ export interface EventFilters {
  * - Required params: location.latitude, location.longitude
  * - Optional: q (search), categories, price, start_date, end_date
  */
-export async function fetchEventbriteEvents(filters: EventFilters): Promise<Event[]> {
+export async function fetchEventbriteEvents(_filters: EventFilters): Promise<Event[]> {
   // TODO: Implement Eventbrite API call
   // const apiKey = import.meta.env.VITE_EVENTBRITE_API_KEY;
   // const response = await fetch(`https://www.eventbriteapi.com/v3/events/search/?...`);
@@ -65,7 +81,7 @@ export async function fetchEventbriteEvents(filters: EventFilters): Promise<Even
  * - Required params: lat, lon
  * - Optional: text (search), category, radius, time
  */
-export async function fetchMeetupEvents(filters: EventFilters): Promise<Event[]> {
+export async function fetchMeetupEvents(_filters: EventFilters): Promise<Event[]> {
   // TODO: Implement Meetup API call
   // const apiKey = import.meta.env.VITE_MEETUP_API_KEY;
   // const response = await fetch(`https://api.meetup.com/find/upcoming_events?...`);
@@ -82,7 +98,7 @@ export async function fetchMeetupEvents(filters: EventFilters): Promise<Event[]>
  * TODO: Implement Posh API integration
  * - Check Posh API documentation for endpoint and authentication
  */
-export async function fetchPoshEvents(filters: EventFilters): Promise<Event[]> {
+export async function fetchPoshEvents(_filters: EventFilters): Promise<Event[]> {
   // TODO: Implement Posh API call
   return [];
 }
@@ -130,8 +146,8 @@ export async function fetchAllEvents(filters: EventFilters): Promise<Event[]> {
  * - Consider time preferences
  */
 export function calculateMatchScore(
-  event: Event,
-  userPreferences: {
+  _event: Event,
+  _userPreferences: {
     savedActivities?: any[];
     echoPatterns?: any[];
     location?: LocationCoords;
@@ -153,7 +169,7 @@ export function calculateMatchScore(
  * @param eventId - Event ID
  * @param source - Event source (Eventbrite, Meetup, etc.)
  */
-export async function saveEvent(userId: string, eventId: string, source: string) {
+export async function saveEvent(_userId: string, _eventId: string, _source: string) {
   // TODO: Save to Supabase
   // const { error } = await supabase
   //   .from("saved_events")
@@ -168,7 +184,7 @@ export async function saveEvent(userId: string, eventId: string, source: string)
  * @param userId - User ID
  * @returns Promise<Event[]>
  */
-export async function getSavedEvents(userId: string): Promise<Event[]> {
+export async function getSavedEvents(_userId: string): Promise<Event[]> {
   // TODO: Fetch from Supabase
   // const { data, error } = await supabase
   //   .from("saved_events")

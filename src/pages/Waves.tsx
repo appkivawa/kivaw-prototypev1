@@ -1,7 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import Card from "../ui/Card";
-import ItemCard from "../ui/ItemCard";
 
 import { listWavesFeed } from "../data/wavesApi";
 import type { WavesFeedItem } from "../data/wavesApi";
@@ -222,14 +221,14 @@ export default function Waves() {
               <h2 className="waves-section-title">Trending by category</h2>
             </div>
             <div className="waves-category-grid">
-              {categoryBreakdown.slice(0, 3).map((cat, index) => (
+              {categoryBreakdown.slice(0, 3).map((cat) => (
                 <Card key={cat.category} className="waves-category-card">
                   <div className="waves-category-header">
                     <h4 className="waves-category-name">{cat.category}</h4>
                     <span className="waves-category-icon">🔥</span>
                   </div>
                   <div className="waves-category-list">
-                    {cat.items.map((item, i) => (
+                    {cat.items.map((item) => (
                       <div key={item.content.id} className="waves-category-item">
                         <span className="waves-category-emoji">
                           {item.content.kind?.toLowerCase().includes("movement") ? "🚶" :

@@ -59,7 +59,7 @@ export async function requireAdmin(
   try {
     const userId = await getUserId();
     if (!userId) {
-      navigate("/login", { state: { from: "/admin" } });
+      navigate("/login");
       return null;
     }
 

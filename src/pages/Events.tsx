@@ -3,32 +3,10 @@ import { useNavigate } from "react-router-dom";
 import Card from "../ui/Card";
 import { getUserId } from "../data/savesApi";
 import { requireAuth } from "../auth/requireAuth";
-import { fetchAllEvents, type EventFilters } from "../data/eventsApi";
+import { fetchAllEvents, type EventFilters, type Event } from "../data/eventsApi";
 
 type ViewMode = "grid" | "list";
 type MoodFilter = "all" | "destructive" | "expansive" | "minimize" | "blank";
-
-interface Event {
-  id: string;
-  title: string;
-  description: string;
-  emoji: string;
-  date: {
-    day: number;
-    month: string;
-    full: string;
-  };
-  time: string;
-  location: string;
-  price: string;
-  attendees: string;
-  moods: MoodFilter[];
-  tags: string[];
-  source: "Eventbrite" | "Meetup" | "Posh" | "Other";
-  matchScore?: number;
-  image?: string | null;
-  url?: string;
-}
 
 const MOOD_CONFIG: Record<MoodFilter, { emoji: string; label: string; desc?: string }> = {
   all: { emoji: "✨", label: "All Events" },
@@ -51,7 +29,7 @@ function EventCard({
   view?: ViewMode;
   matchScore?: number;
 }) {
-  const [isHovered, setIsHovered] = useState(false);
+  const [, setIsHovered] = useState(false);
 
   const getMoodColor = (mood: MoodFilter) => {
     const colors: Record<MoodFilter, string> = {
@@ -66,11 +44,11 @@ function EventCard({
 
   if (view === "list") {
     return (
-      <Card
-        className="events-card-list"
-        onMouseEnter={() => setIsHovered(true)}
-        onMouseLeave={() => setIsHovered(false)}
-      >
+      <Card className="events-card-list">
+        <div
+          onMouseEnter={() => setIsHovered(true)}
+          onMouseLeave={() => setIsHovered(false)}
+        >
         <div className="events-list-date">
           <div className="events-list-date-month">{event.date.month}</div>
           <div className="events-list-date-day">{event.date.day}</div>
@@ -117,11 +95,14 @@ function EventCard({
           </div>
 
           <div className="events-list-tags">
-            {event.moods.map((mood, i) => (
-              <span key={i} className={`events-mood-tag ${getMoodColor(mood)}`}>
-                {MOOD_CONFIG[mood].emoji} {MOOD_CONFIG[mood].label}
-              </span>
-            ))}
+            {event.moods.map((mood, i) => {
+              const moodKey = mood as MoodFilter;
+              return (
+                <span key={i} className={`events-mood-tag ${getMoodColor(moodKey)}`}>
+                  {MOOD_CONFIG[moodKey].emoji} {MOOD_CONFIG[moodKey].label}
+                </span>
+              );
+            })}
             {event.tags.slice(0, 2).map((tag, i) => (
               <span key={i} className="events-tag">
                 #{tag}
@@ -150,16 +131,17 @@ function EventCard({
             View →
           </button>
         </div>
+        </div>
       </Card>
     );
   }
 
   return (
-    <Card
-      className="events-card-grid"
-      onMouseEnter={() => setIsHovered(true)}
-      onMouseLeave={() => setIsHovered(false)}
-    >
+    <Card className="events-card-grid">
+      <div
+        onMouseEnter={() => setIsHovered(true)}
+        onMouseLeave={() => setIsHovered(false)}
+      >
       <div className="events-card-image">
         {event.image ? (
           <img src={event.image} alt={event.title} />
@@ -218,11 +200,14 @@ function EventCard({
         </div>
 
         <div className="events-card-tags">
-          {event.moods.map((mood, i) => (
-            <span key={i} className={`events-mood-tag ${getMoodColor(mood)}`}>
-              {MOOD_CONFIG[mood].emoji} {MOOD_CONFIG[mood].label}
-            </span>
-          ))}
+          {event.moods.map((mood, i) => {
+            const moodKey = mood as MoodFilter;
+            return (
+              <span key={i} className={`events-mood-tag ${getMoodColor(moodKey)}`}>
+                {MOOD_CONFIG[moodKey].emoji} {MOOD_CONFIG[moodKey].label}
+              </span>
+            );
+          })}
         </div>
 
         <div className="events-card-tags">
@@ -241,6 +226,7 @@ function EventCard({
           View Event Details →
         </button>
       </div>
+      </div>
     </Card>
   );
 }
@@ -255,7 +241,6 @@ export default function Events() {
 
   const [selectedMood, setSelectedMood] = useState<MoodFilter>("all");
   const [viewMode, setViewMode] = useState<ViewMode>("grid");
-  const [showCalendar, setShowCalendar] = useState(false);
   const [selectedDate, setSelectedDate] = useState<number | null>(null);
   const [searchQuery, setSearchQuery] = useState("");
   const [activeFilters, setActiveFilters] = useState<string[]>([]);
@@ -460,7 +445,7 @@ export default function Events() {
             </div>
             <p className="events-recommended-desc">Based on your activity patterns and preferences</p>
             <div className="events-recommended-grid">
-              {recommendedEvents.map((event, i) => (
+              {recommendedEvents.map((event) => (
                 <button
                   key={event.id}
                   className="events-recommended-card"

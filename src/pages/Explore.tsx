@@ -51,7 +51,6 @@ export default function Explore() {
   const [q, setQ] = useState("");
   const [viewMode, setViewMode] = useState<ViewMode>("grid");
   const [sortBy, setSortBy] = useState<SortBy>("recent");
-  const [showFilters, setShowFilters] = useState(false);
 
   const [loading, setLoading] = useState(true);
   const [err, setErr] = useState("");
@@ -190,7 +189,7 @@ export default function Explore() {
             </div>
             <p className="explore-suggested-desc">Based on your patterns and current mood</p>
             <div className="explore-suggested-grid">
-              {filteredItems.slice(0, 3).map((item, i) => (
+              {filteredItems.slice(0, 3).map((item) => (
                 <button
                   key={item.id}
                   className="explore-suggested-card"
