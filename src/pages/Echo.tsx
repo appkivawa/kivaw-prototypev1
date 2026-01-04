@@ -24,7 +24,7 @@ type DraftEcho = {
   contentId: string | null; // optional linked item
   usageTag: string;
   note?: string;
-  shareToWaves?: boolean;
+  // Echo is always private - removed shareToWaves
 };
 
 /**
@@ -381,6 +381,30 @@ export default function Echo() {
   const [saveGateOpen, setSaveGateOpen] = useState(false);
   const [pendingDraft, setPendingDraft] = useState<DraftEcho | null>(null);
 
+  const [showPrompts, setShowPrompts] = useState(true);
+  const [charCount, setCharCount] = useState(0);
+  const [searchQuery, setSearchQuery] = useState("");
+
+  const prompts = [
+    "What surprised you today?",
+    "What are you noticing?",
+    "What shifted?",
+    "What do you need right now?",
+    "What are you grateful for?",
+  ];
+
+  // Filter saved echoes by search query
+  const filteredSaved = useMemo(() => {
+    if (!searchQuery.trim()) return saved;
+    const query = searchQuery.toLowerCase();
+    return saved.filter((e) => {
+      const noteMatch = e.note?.toLowerCase().includes(query);
+      const tagMatch = e.usage_tag?.toLowerCase().includes(query);
+      const itemMatch = e.content_items?.title?.toLowerCase().includes(query);
+      return noteMatch || tagMatch || itemMatch;
+    });
+  }, [saved, searchQuery]);
+
   const effectiveTag = useMemo(() => {
     const chip = usageTag.trim().replace(/^#/, "");
     const typed = customTag.trim().replace(/^#/, "");
@@ -410,7 +434,7 @@ export default function Echo() {
         contentId: draft.contentId, // can be null
         usageTag: draft.usageTag,
         note: draft.note,
-        shareToWaves: draft.shareToWaves,
+        // Echo is always private
       });
 
       // clear composer
@@ -557,107 +581,308 @@ export default function Echo() {
       <div className="center-wrap echo-center">
         <div className="echo-hero">
           <h1 className="echo-h1">Echo</h1>
+          <p className="echo-sub">Your personal journal. Searchable, editable, private.</p>
         </div>
 
         <Card className="echo-maincard">
-          <div className="echo-linkedrow">
-            <div className="echo-linkedleft">
-              {/* ✅ image if exists, otherwise emoji */}
-              {linked?.image_url ? (
-                <img className="echo-linkedthumb" src={linked.image_url} alt="" />
-              ) : (
-                <div className="echo-kindicon echo-kindicon--selected" aria-hidden="true">
-                  {linked ? kindIcon(linked.kind) : "🫧"}
+          {/* Header Section with Linked Item */}
+          <div className="echo-header-section">
+            <div className="echo-header-icon">✨</div>
+            <div className="echo-header-content">
+              <h3 className="echo-header-title">Capture a shift</h3>
+              <p className="echo-header-subtitle">Write full reflection, add personal tags, keep it private.</p>
+              {linked && (
+                <div className="echo-linked-badge">
+                  <span className="echo-linked-badge-icon">🔗</span>
+                  <span className="echo-linked-badge-text">{linkedTitle}</span>
+                  <button
+                    className="echo-linked-badge-remove"
+                    onClick={() => setLinked(null)}
+                    type="button"
+                    aria-label="Remove linked item"
+                  >
+                    ×
+                  </button>
                 </div>
               )}
+            </div>
+            {!linked && (
+              <button className="echo-pillbtn" type="button" onClick={() => setLinkOpen(true)}>
+                Link an item
+              </button>
+            )}
+          </div>
 
-              <div className="echo-linkedtext">
-                <div className="echo-kicker">LINKED ITEM (OPTIONAL)</div>
-                <div className="echo-linkedtitle">{linkedTitle}</div>
-                <div className="echo-linkedmeta">{linkedMeta}</div>
+          {/* Linked Item Row (when linked) */}
+          {linked && (
+            <div className="echo-linkedrow">
+              <div className="echo-linkedleft">
+                {linked?.image_url ? (
+                  <img className="echo-linkedthumb" src={linked.image_url} alt="" />
+                ) : (
+                  <div className="echo-kindicon echo-kindicon--selected" aria-hidden="true">
+                    {kindIcon(linked.kind)}
+                  </div>
+                )}
+                <div className="echo-linkedtext">
+                  <div className="echo-kicker">LINKED ITEM</div>
+                  <div className="echo-linkedtitle">{linkedTitle}</div>
+                  <div className="echo-linkedmeta">{linkedMeta}</div>
+                </div>
+              </div>
+              <div className="echo-linkedactions">
+                <button className="echo-pillbtn" type="button" onClick={() => setLinkOpen(true)}>
+                  Change
+                </button>
               </div>
             </div>
+          )}
 
-            <div className="echo-linkedactions">
-              <button className="echo-pillbtn" type="button" onClick={() => setLinkOpen(true)}>
-                {linkButtonLabel}
+          {/* Prompts */}
+          {showPrompts && !note && (
+            <div className="echo-prompts">
+              <p className="echo-prompts-label">Need a starting point?</p>
+              <div className="echo-prompts-list">
+                {prompts.slice(0, 3).map((prompt, index) => (
+                  <button
+                    key={index}
+                    className="echo-prompt-card"
+                    type="button"
+                    onClick={() => handlePromptSelect(prompt)}
+                  >
+                    <span className="echo-prompt-text">{prompt}</span>
+                    <span className="echo-prompt-arrow">↓</span>
+                  </button>
+                ))}
+              </div>
+              <button
+                className="echo-prompts-skip"
+                type="button"
+                onClick={() => setShowPrompts(false)}
+              >
+                Skip prompts ↓
               </button>
+            </div>
+          )}
+
+          {/* Text Area */}
+          <div className="echo-textarea-wrapper">
+            <textarea
+              className="echo-textarea"
+              placeholder="What changed in you?"
+              value={note}
+              onChange={(e) => {
+                setNote(e.target.value);
+                setShowPrompts(false);
+              }}
+              onFocus={() => setShowPrompts(false)}
+            />
+            <div className="echo-textarea-footer">
+              {charCount > 0 && (
+                <span className={cls("echo-char-count", charCount > 500 && "echo-char-count-warning")}>
+                  {charCount} characters
+                </span>
+              )}
+              {note.length > 20 && (
+                <span className="echo-text-feedback">Looking good! 💚</span>
+              )}
             </div>
           </div>
 
-          <textarea
-            className="echo-textarea"
-            placeholder="What changed in you?"
-            value={note}
-            onChange={(e) => setNote(e.target.value)}
-          />
+          {/* Tags */}
+          <div className="echo-tags-section">
+            <div className="echo-tags-header">
+              <span className="echo-tags-icon">🏷️</span>
+              <span className="echo-tags-label">Add tags</span>
+            </div>
+            <div className="echo-chips">
+              {DEFAULT_TAGS.map((t) => (
+                <button
+                  key={t}
+                  type="button"
+                  className={cls("echo-chip", usageTag === t && "is-active")}
+                  onClick={() => clickTag(t)}
+                >
+                  #{t}
+                </button>
+              ))}
+            </div>
 
-          <div className="echo-chips">
-            {DEFAULT_TAGS.map((t) => (
-              <button
-                key={t}
-                type="button"
-                className={cls("echo-chip", usageTag === t && "is-active")}
-                onClick={() => clickTag(t)}
-              >
-                #{t}
-              </button>
-            ))}
+            <input
+              className="input"
+              placeholder="Or your own tag…"
+              value={customTag}
+              onChange={(e) => {
+                setCustomTag(e.target.value);
+                if (e.target.value.trim()) setUsageTag("");
+                setErr(null);
+              }}
+            />
           </div>
-
-          <input
-            className="input"
-            placeholder="Or your own tag…"
-            value={customTag}
-            onChange={(e) => {
-              setCustomTag(e.target.value);
-              if (e.target.value.trim()) setUsageTag("");
-              setErr(null);
-            }}
-          />
 
           {err ? <div className="echo-alert">{err}</div> : null}
 
-          <button className="echo-primary" type="button" onClick={onSave} disabled={saving}>
-            {saving ? "Saving…" : "Save this moment"}
+          <button className="echo-primary" type="button" onClick={onSave} disabled={saving || !note.trim()}>
+            {saving ? "Saving…" : "Save this moment ✨"}
           </button>
         </Card>
 
-        <div className="echo-savedhead">
-          <div className="echo-savedtitle">Saved Echoes</div>
-        </div>
+        {/* Pattern Insights */}
+        {saved.length > 0 && (
+          <div className="echo-patterns">
+            <h2 className="echo-patterns-title">
+              <span className="echo-patterns-icon">📈</span>
+              Your patterns
+            </h2>
+            <div className="echo-patterns-grid">
+              <div className="echo-pattern-card echo-pattern-blue">
+                <div className="echo-pattern-icon">📅</div>
+                <div className="echo-pattern-content">
+                  <h4 className="echo-pattern-card-title">Most reflective day</h4>
+                  <p className="echo-pattern-card-desc">You tend to Echo on Tuesdays</p>
+                </div>
+              </div>
+              <div className="echo-pattern-card echo-pattern-purple">
+                <div className="echo-pattern-icon">🏷️</div>
+                <div className="echo-pattern-content">
+                  <h4 className="echo-pattern-card-title">Common theme</h4>
+                  <p className="echo-pattern-card-desc">
+                    Your most used tag: #{effectiveTag || "focus"} ({saved.length} times)
+                  </p>
+                </div>
+              </div>
+              <div className="echo-pattern-card echo-pattern-green">
+                <div className="echo-pattern-icon">🔗</div>
+                <div className="echo-pattern-content">
+                  <h4 className="echo-pattern-card-title">Most helpful</h4>
+                  <p className="echo-pattern-card-desc">
+                    {saved.filter((e) => e.content_items).length > 0
+                      ? `${saved.filter((e) => e.content_items).length} linked moments`
+                      : "Start linking items"}
+                  </p>
+                </div>
+              </div>
+              <div className="echo-pattern-card echo-pattern-orange">
+                <div className="echo-pattern-icon">✨</div>
+                <div className="echo-pattern-content">
+                  <h4 className="echo-pattern-card-title">Growth insight</h4>
+                  <p className="echo-pattern-card-desc">
+                    You're reflecting regularly ({saved.length} echoes)
+                  </p>
+                </div>
+              </div>
+            </div>
+          </div>
+        )}
 
-        {loadingSaved ? (
-          <div className="echo-muted">Loading…</div>
-        ) : saved.length === 0 ? (
-          <div className="echo-empty">No saved echoes yet.</div>
-        ) : (
-          <div className="echo-day">
-            {saved.map((e) => {
-              const it = e.content_items;
-              return (
-                <Card key={e.id} className="echo-savedcard">
-                  <div className="echo-entrytop">
-                    <div className="echo-entryleft">
-                      <span className="echo-tagpill">{e.usage_tag ? `#${e.usage_tag}` : "—"}</span>
-                      <div className="echo-entrytitle">{it?.title || "Unlinked moment"}</div>
+        {/* Saved Echoes */}
+        <div className="echo-saved-section">
+          <div className="echo-savedhead">
+            <div className="echo-savedtitle">Your Echoes</div>
+            {saved.length > 4 && (
+              <button className="echo-view-all" type="button">
+                View all →
+              </button>
+            )}
+          </div>
+
+          {/* Search Bar */}
+          {saved.length > 0 && (
+            <div className="echo-search-wrapper">
+              <input
+                type="text"
+                className="echo-search-input"
+                placeholder="Search your echoes by text, tags, or linked items..."
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+              />
+              {searchQuery && (
+                <button
+                  className="echo-search-clear"
+                  type="button"
+                  onClick={() => setSearchQuery("")}
+                  aria-label="Clear search"
+                >
+                  ×
+                </button>
+              )}
+            </div>
+          )}
+
+          {loadingSaved ? (
+            <div className="echo-muted">Loading…</div>
+          ) : saved.length === 0 ? (
+            <div className="echo-empty-state">
+              <div className="echo-empty-icon">📖</div>
+              <p className="echo-empty-text">No saved echoes yet.</p>
+              <p className="echo-empty-hint">Start capturing your moments above.</p>
+            </div>
+          ) : filteredSaved.length === 0 ? (
+            <div className="echo-empty-state">
+              <div className="echo-empty-icon">🔍</div>
+              <p className="echo-empty-text">No echoes match your search.</p>
+              <button className="echo-search-clear-btn" type="button" onClick={() => setSearchQuery("")}>
+                Clear search
+              </button>
+            </div>
+          ) : (
+            <div className="echo-day">
+              {filteredSaved.slice(0, 4).map((e) => {
+                const it = e.content_items;
+                return (
+                  <Card key={e.id} className="echo-savedcard-enhanced">
+                    <div className="echo-entrytop">
+                      <div className="echo-entryleft">
+                        <div className="echo-entry-date">
+                          <span className="echo-entry-date-dot">●</span>
+                          <span className="echo-entry-date-text">
+                            {new Date(e.created_at).toLocaleDateString("en-US", {
+                              month: "short",
+                              day: "numeric",
+                            })}
+                          </span>
+                        </div>
+                        {it && (
+                          <div className="echo-linked-badge-small">
+                            <span className="echo-linked-badge-icon-small">🔗</span>
+                            <span className="echo-linked-badge-text-small">{it.title}</span>
+                          </div>
+                        )}
+                      </div>
+                      <button
+                        className="btn-ghost echo-delete-btn"
+                        type="button"
+                        onClick={() => onDeleteEcho(e.id)}
+                      >
+                        Delete
+                      </button>
                     </div>
 
-                    <button className="btn-ghost" type="button" onClick={() => onDeleteEcho(e.id)}>
-                      Delete
-                    </button>
-                  </div>
+                    {e.note ? (
+                      <div className="echo-entrynote-enhanced">{e.note}</div>
+                    ) : null}
 
-                  {e.note ? <div className="echo-entrynote">{e.note}</div> : null}
+                    <div className="echo-entrytags">
+                      {e.usage_tag && (
+                        <span className="echo-tagpill-enhanced">#{e.usage_tag}</span>
+                      )}
+                    </div>
+                  </Card>
+                );
+              })}
+            </div>
+          )}
+        </div>
 
-                  <div className="echo-entrymeta">
-                    {it?.kind ? `${it.kind} • ` : ""}
-                    {e.shared_to_waves ? "shared" : "private"}
-                  </div>
-                </Card>
-              );
-            })}
-          </div>
+        {/* Export Option */}
+        {saved.length > 0 && (
+          <Card className="echo-export-card">
+            <h3 className="echo-export-title">📥 Export your echoes</h3>
+            <p className="echo-export-desc">Download your reflections as a PDF or text file</p>
+            <button className="echo-export-btn" type="button" onClick={() => alert("Export feature coming soon!")}>
+              Export echoes
+            </button>
+          </Card>
         )}
 
         <LinkItemModal

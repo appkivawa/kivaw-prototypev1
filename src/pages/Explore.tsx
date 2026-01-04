@@ -26,6 +26,19 @@ function stateLabel(tag: string) {
 
 const MOODS = ["all", "reset", "beauty", "logic", "faith", "reflect", "comfort"];
 
+const MOOD_CONFIG: Record<string, { emoji: string; label: string }> = {
+  all: { emoji: "✨", label: "All Moods" },
+  reset: { emoji: "🔄", label: "Reset" },
+  beauty: { emoji: "✨", label: "Beauty" },
+  logic: { emoji: "🧠", label: "Logic" },
+  faith: { emoji: "🙏", label: "Faith" },
+  reflect: { emoji: "💭", label: "Reflect" },
+  comfort: { emoji: "🛋️", label: "Comfort" },
+};
+
+type ViewMode = "grid" | "list";
+type SortBy = "recent" | "title" | "category";
+
 export default function Explore() {
   const navigate = useNavigate();
 
@@ -34,7 +47,11 @@ export default function Explore() {
   const [isAuthed, setIsAuthed] = useState(false);
 
   const [selectedMood, setSelectedMood] = useState<string>("all");
+  const [selectedCategory, setSelectedCategory] = useState<string>("All");
   const [q, setQ] = useState("");
+  const [viewMode, setViewMode] = useState<ViewMode>("grid");
+  const [sortBy, setSortBy] = useState<SortBy>("recent");
+  const [showFilters, setShowFilters] = useState(false);
 
   const [loading, setLoading] = useState(true);
   const [err, setErr] = useState("");
@@ -79,20 +96,51 @@ export default function Explore() {
     };
   }, []);
 
+  // Get unique categories with counts
+  const categories = useMemo(() => {
+    const catMap = new Map<string, number>();
+    items.forEach((item) => {
+      const cat = item.kind || "Other";
+      catMap.set(cat, (catMap.get(cat) || 0) + 1);
+    });
+    const cats = Array.from(catMap.entries()).map(([name, count]) => ({
+      id: name,
+      name,
+      count,
+    }));
+    return [{ id: "All", name: "All", count: items.length }, ...cats];
+  }, [items]);
+
   const filteredItems = useMemo(() => {
     const query = norm(q);
-    return items.filter((it) => {
+    let filtered = items.filter((it) => {
       if (query) {
         const hay = `${it.title || ""} ${it.byline || ""} ${it.meta || ""}`.toLowerCase();
         if (!hay.includes(query)) return false;
       }
 
-      if (selectedMood === "all") return true;
+      if (selectedMood !== "all") {
+        const tags = (it.state_tags || []).map(norm);
+        if (!tags.includes(norm(selectedMood))) return false;
+      }
 
-      const tags = (it.state_tags || []).map(norm);
-      return tags.includes(norm(selectedMood));
+      if (selectedCategory !== "All") {
+        if ((it.kind || "Other") !== selectedCategory) return false;
+      }
+
+      return true;
     });
-  }, [items, q, selectedMood]);
+
+    // Sort
+    if (sortBy === "title") {
+      filtered.sort((a, b) => (a.title || "").localeCompare(b.title || ""));
+    } else if (sortBy === "category") {
+      filtered.sort((a, b) => (a.kind || "").localeCompare(b.kind || ""));
+    }
+    // "recent" is already sorted (newest first from API)
+
+    return filtered;
+  }, [items, q, selectedMood, selectedCategory, sortBy]);
 
   async function toggleSave(contentId: string, isSaved: boolean) {
     const uid = await requireAuth(navigate, "/explore");
@@ -133,31 +181,148 @@ export default function Explore() {
       </div>
 
       <div className="center-wrap">
+        {/* Suggested for You - Only show if there are items and user is browsing */}
+        {filteredItems.length > 0 && !loading && filteredItems.length <= items.length * 0.5 && (
+          <Card className="explore-suggested">
+            <div className="explore-suggested-header">
+              <span className="explore-suggested-icon">✨</span>
+              <h3 className="explore-suggested-title">Perfect for you right now</h3>
+            </div>
+            <p className="explore-suggested-desc">Based on your patterns and current mood</p>
+            <div className="explore-suggested-grid">
+              {filteredItems.slice(0, 3).map((item, i) => (
+                <button
+                  key={item.id}
+                  className="explore-suggested-card"
+                  type="button"
+                  onClick={() => navigate(`/item/${item.id}`)}
+                >
+                  <div className="explore-suggested-emoji">
+                    {item.kind?.toLowerCase().includes("movement") ? "🚶" :
+                     item.kind?.toLowerCase().includes("prompt") ? "📝" :
+                     item.kind?.toLowerCase().includes("reflection") ? "🙏" : "✨"}
+                  </div>
+                  <h4 className="explore-suggested-card-title">{item.title}</h4>
+                  <p className="explore-suggested-card-meta">{item.kind || "Item"}</p>
+                </button>
+              ))}
+            </div>
+          </Card>
+        )}
+
         <Card className="center card-pad">
-          <div className="kivaw-toolbar">
+          {/* Enhanced Search */}
+          <div className="explore-search-wrapper">
+            <div className="explore-search-icon">🔍</div>
             <input
-              className="input"
-              placeholder="Search…"
+              className="explore-search-input"
+              placeholder="Search activities..."
               value={q}
               onChange={(e) => setQ(e.target.value)}
             />
-            <div className="kivaw-pills">
-              {MOODS.map((m) => (
+            {q && (
+              <button
+                className="explore-search-clear"
+                type="button"
+                onClick={() => setQ("")}
+                aria-label="Clear search"
+              >
+                ×
+              </button>
+            )}
+          </div>
+
+          {/* Mood Selector */}
+          <div className="explore-mood-selector-wrapper">
+            <div className="explore-mood-selector">
+              {MOODS.map((m) => {
+                const config = MOOD_CONFIG[m] || { emoji: "✨", label: stateLabel(m) };
+                return (
+                  <button
+                    key={m}
+                    type="button"
+                    className={`explore-mood-btn ${selectedMood === m ? "explore-mood-btn-active" : ""}`}
+                    onClick={() => setSelectedMood(m)}
+                  >
+                    <span className="explore-mood-emoji">{config.emoji}</span>
+                    <span className="explore-mood-label">{config.label}</span>
+                  </button>
+                );
+              })}
+            </div>
+          </div>
+
+          {/* Category Tabs */}
+          <div className="explore-categories-wrapper">
+            <div className="explore-categories">
+              {categories.map((cat) => (
                 <button
-                  key={m}
+                  key={cat.id}
                   type="button"
-                  className={`pill ${selectedMood === m ? "pill--on" : ""}`}
-                  onClick={() => setSelectedMood(m)}
+                  className={`explore-category-chip ${selectedCategory === cat.id ? "explore-category-chip-active" : ""}`}
+                  onClick={() => setSelectedCategory(cat.id)}
                 >
-                  {stateLabel(m)}
+                  <span>{cat.name}</span>
+                  {cat.count !== undefined && <span className="explore-category-count">({cat.count})</span>}
                 </button>
               ))}
             </div>
           </div>
 
+          {/* Controls Bar */}
+          <div className="explore-controls">
+            <div className="explore-controls-left">
+              <span className="explore-results-count">
+                {filteredItems.length} {filteredItems.length === 1 ? "activity" : "activities"}
+              </span>
+              {(selectedMood !== "all" || selectedCategory !== "All" || q) && (
+                <button
+                  className="explore-clear-filters"
+                  type="button"
+                  onClick={() => {
+                    setSelectedMood("all");
+                    setSelectedCategory("All");
+                    setQ("");
+                  }}
+                >
+                  Clear filters
+                </button>
+              )}
+            </div>
+            <div className="explore-controls-right">
+              <select
+                className="explore-sort-select"
+                value={sortBy}
+                onChange={(e) => setSortBy(e.target.value as SortBy)}
+              >
+                <option value="recent">Recently added</option>
+                <option value="title">Title</option>
+                <option value="category">Category</option>
+              </select>
+              <div className="explore-view-toggle">
+                <button
+                  className={`explore-view-btn ${viewMode === "grid" ? "explore-view-btn-active" : ""}`}
+                  type="button"
+                  onClick={() => setViewMode("grid")}
+                  aria-label="Grid view"
+                >
+                  ⬜
+                </button>
+                <button
+                  className={`explore-view-btn ${viewMode === "list" ? "explore-view-btn-active" : ""}`}
+                  type="button"
+                  onClick={() => setViewMode("list")}
+                  aria-label="List view"
+                >
+                  ☰
+                </button>
+              </div>
+            </div>
+          </div>
+
           {!isAuthed ? (
-            <div style={{ marginTop: 12 }}>
-              <p className="muted" style={{ marginBottom: 8 }}>
+            <div className="kivaw-signinPrompt" style={{ marginTop: 12, marginBottom: 16 }}>
+              <p className="muted" style={{ margin: 0 }}>
                 Want to save items? Sign in to heart them.
               </p>
               <button className="btn btn-ghost" type="button" onClick={() => navigate("/login", { state: { from: "/explore" } })}>
@@ -166,23 +331,29 @@ export default function Explore() {
             </div>
           ) : null}
 
-          <div className="spacer-16" />
-
           {loading ? (
             <p className="muted">Loading…</p>
           ) : err ? (
             <p className="muted">{err}</p>
           ) : filteredItems.length === 0 ? (
-            <div style={{ padding: 10 }}>
-              <p className="kivaw-muted" style={{ marginBottom: 10 }}>
-                Nothing matches that filter yet.
-              </p>
-              <button className="btn" type="button" onClick={() => setSelectedMood("all")}>
-                View all
+            <div className="explore-empty-state">
+              <div className="explore-empty-icon">🔍</div>
+              <h3 className="explore-empty-title">No activities found</h3>
+              <p className="explore-empty-text">Try adjusting your filters or search terms</p>
+              <button
+                className="explore-empty-btn"
+                type="button"
+                onClick={() => {
+                  setSelectedMood("all");
+                  setSelectedCategory("All");
+                  setQ("");
+                }}
+              >
+                Clear all filters
               </button>
             </div>
           ) : (
-            <div className="kivaw-rec-grid">
+            <div className={viewMode === "grid" ? "kivaw-rec-grid" : "explore-list-view"}>
               {filteredItems.map((item) => {
                 const isSaved = savedIds.includes(item.id);
                 const isBusy = busyId === item.id;
@@ -228,6 +399,33 @@ export default function Explore() {
             </div>
           )}
         </Card>
+
+        {/* Sign In Prompt at Bottom */}
+        {!isAuthed && !loading && (
+          <Card className="explore-signin-card">
+            <div className="explore-signin-icon">💜</div>
+            <h3 className="explore-signin-title">Save your favorites</h3>
+            <p className="explore-signin-text">
+              Sign in to build your personal collection and track what actually helps you
+            </p>
+            <div className="explore-signin-actions">
+              <button
+                className="explore-signin-btn-secondary"
+                type="button"
+                onClick={() => navigate("/explore")}
+              >
+                Maybe later
+              </button>
+              <button
+                className="explore-signin-btn-primary"
+                type="button"
+                onClick={() => navigate("/login", { state: { from: "/explore" } })}
+              >
+                Sign in →
+              </button>
+            </div>
+          </Card>
+        )}
       </div>
     </div>
   );

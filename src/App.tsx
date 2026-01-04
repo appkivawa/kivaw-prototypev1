@@ -7,6 +7,7 @@ import Explore from "./pages/Explore";
 import Saved from "./pages/Saved";
 import Echo from "./pages/Echo";
 import Waves from "./pages/Waves";
+import Events from "./pages/Events";
 import ItemDetail from "./pages/ItemDetail";
 
 import QuizState from "./pages/quiz/QuizState";
@@ -56,6 +57,7 @@ export default function App() {
         <Route path="waves" element={<Waves />} />
         <Route path="echo" element={<Echo />} />
         <Route path="saved" element={<Saved />} />
+        <Route path="events" element={<Events />} />
         <Route path="item/:id" element={<ItemDetail />} />
 
         <Route path="quiz/state" element={<QuizState />} />

@@ -64,7 +64,7 @@ export default function ItemCard({
 
           <div className="kivaw-rowCard__title">{item.title}</div>
 
-          {bottomRight ? <div style={{ marginTop: 10 }}>{bottomRight}</div> : null}
+          {bottomRight ? <div style={{ marginTop: 8 }}>{bottomRight}</div> : null}
         </div>
       </div>
     </div>

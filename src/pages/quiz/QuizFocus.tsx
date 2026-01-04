@@ -28,13 +28,30 @@ export default function QuizFocus() {
     () => sessionStorage.getItem("kivaw_focus") || ""
   );
 
+  // Get state from URL params first, then fall back to sessionStorage
+  const [stateRaw, setStateRaw] = useState<string>(() => {
+    const params = new URLSearchParams(window.location.search);
+    const stateFromUrl = params.get("state");
+    if (stateFromUrl) {
+      sessionStorage.setItem("kivaw_state", stateFromUrl);
+      return stateFromUrl;
+    }
+    return sessionStorage.getItem("kivaw_state") || "blank";
+  });
+
   // Keep UI in sync if user navigates back here after selecting a focus
   useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    const stateFromUrl = params.get("state");
+    if (stateFromUrl) {
+      sessionStorage.setItem("kivaw_state", stateFromUrl);
+      setStateRaw(stateFromUrl);
+    }
+    
     const current = sessionStorage.getItem("kivaw_focus") || "";
     setSelectedFocus(current);
   }, []);
 
-  const stateRaw = sessionStorage.getItem("kivaw_state") || "blank";
   const stateLabel = stateRaw === "blank" ? "Blank" : titleCase(stateRaw);
 
   const hasFocus = !!selectedFocus;
@@ -46,13 +63,13 @@ export default function QuizFocus() {
   }
 
   return (
-    <div className="page">
-      <div className="center-wrap">
+    <div className="page quiz-page">
+      <div className="quiz-wrap">
         <div className="quiz-shell">
           <div className="quiz-shell__top">
             <button
-              className="btn-ghost"
-              onClick={() => navigate(-1)}
+              className="quiz-back"
+              onClick={() => navigate("/")}
               type="button"
             >
               ← Back
@@ -75,7 +92,7 @@ export default function QuizFocus() {
             </div>
           </div>
 
-          <h1 className="quiz-title">What’s your focus?</h1>
+          <h1 className="quiz-title">What's your focus?</h1>
           <div className="quiz-subline">
             State: <strong>{stateLabel}</strong>
           </div>
@@ -104,7 +121,7 @@ export default function QuizFocus() {
                     {isSelected ? (
                       <span
                         aria-hidden="true"
-                        style={{ marginLeft: "auto", opacity: 0.8 }}
+                        style={{ marginLeft: "auto", opacity: 0.8, fontSize: "18px" }}
                       >
                         ✓
                       </span>

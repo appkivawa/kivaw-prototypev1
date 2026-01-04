@@ -193,9 +193,29 @@ export default function ItemDetail() {
 
               <div className="spacer-16" />
 
-              <button className="btn btn-primary" type="button" onClick={toggleSave} disabled={saveBusy}>
-                {saveBusy ? "Saving…" : isSaved ? "Saved ♥" : "Save ♡"}
-              </button>
+              <div className="item-detail-actions">
+                <div className="item-detail-action-group">
+                  <h3 className="item-detail-action-title">Want to remember what happened?</h3>
+                  <p className="item-detail-action-desc">Save to Echo</p>
+                  <button
+                    className="btn btn-primary"
+                    type="button"
+                    onClick={() => navigate(`/echo?contentId=${item.id}`)}
+                  >
+                    Save to Echo →
+                  </button>
+                  <p className="item-detail-action-hint">Write full reflection, add personal tags, keep it private</p>
+                </div>
+
+                <div className="item-detail-action-group">
+                  <h3 className="item-detail-action-title">Want to help others?</h3>
+                  <p className="item-detail-action-desc">Save to Waves</p>
+                  <button className="btn btn-ghost" type="button" onClick={toggleSave} disabled={saveBusy}>
+                    {saveBusy ? "Saving…" : isSaved ? "Saved to Waves ♥" : "Save to Waves ♡"}
+                  </button>
+                  <p className="item-detail-action-hint">Add one anonymous tag, shows how you used it, no personal details</p>
+                </div>
+              </div>
 
               {item.url ? (
                 <>
@@ -210,10 +230,11 @@ export default function ItemDetail() {
             <div className="spacer-24" />
 
             <div className="kivaw-detail-section">
-              <h2 className="kivaw-detail-h2">Waves</h2>
+              <h2 className="kivaw-detail-h2">Community Waves</h2>
+              <p className="kivaw-detail-section-desc">See how others are using this activity</p>
 
               {isUnlinked ? (
-                <div className="echo-empty">This item is internal and can’t receive Waves.</div>
+                <div className="echo-empty">This item is internal and can't receive Waves.</div>
               ) : (
                 <>
                   {waveErr ? <div className="echo-alert">{waveErr}</div> : null}
@@ -221,14 +242,15 @@ export default function ItemDetail() {
                   <div className="kivaw-wave-row">
                     <input
                       className="input"
-                      placeholder="tag (example: reset, comfort, clarity)"
+                      placeholder="Add one anonymous tag (example: reset, comfort, clarity)"
                       value={waveTag}
                       onChange={(e) => setWaveTag(e.target.value)}
                     />
                     <button className="btn btn-ghost" type="button" onClick={postWave} disabled={waveBusy}>
-                      {waveBusy ? "Posting…" : "Post to Waves →"}
+                      {waveBusy ? "Posting…" : "Share to Waves →"}
                     </button>
                   </div>
+                  <p className="item-detail-wave-hint">Your tag will be anonymous and help others discover new ways to use this activity</p>
 
                   <div className="spacer-12" />
 
