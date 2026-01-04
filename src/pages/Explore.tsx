@@ -1,84 +1,43 @@
 import { useEffect, useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import Card from "../ui/Card";
-import { listContentItems } from "../data/contentApi";
+import ItemCard from "../ui/ItemCard";
+
+import { listContentItems, type ContentItem } from "../data/contentApi";
 import { fetchSavedIds, saveItem, unsaveItem, getUserId } from "../data/savesApi";
-import type { ContentItem } from "../data/contentApi";
 import { requireAuth } from "../auth/requireAuth";
+import { isPublicDiscoverableContentItem } from "../utils/contentFilters";
 
-type MoodKey = "all" | "blank" | "destructive" | "expansive" | "minimizer";
-
-const MOOD_FILTERS: Array<{ key: MoodKey; emoji: string; label: string }> = [
-  { key: "all", emoji: "✨", label: "All" },
-  { key: "blank", emoji: "☁️", label: "Blank" },
-  { key: "expansive", emoji: "🌱", label: "Expansive" },
-  { key: "destructive", emoji: "🔥", label: "Destructive" },
-  { key: "minimizer", emoji: "🌙", label: "Minimizer" },
-];
-
-function getItemMoodKey(item: ContentItem): Exclude<MoodKey, "all"> | null {
-  const anyItem = item as any;
-  const candidates: string[] = [];
-
-  if (typeof anyItem.mood === "string") candidates.push(anyItem.mood);
-  if (typeof anyItem.state === "string") candidates.push(anyItem.state);
-  if (typeof anyItem.state_tag === "string") candidates.push(anyItem.state_tag);
-  if (Array.isArray(anyItem.state_tags)) candidates.push(...anyItem.state_tags);
-  if (Array.isArray(anyItem.tags)) candidates.push(...anyItem.tags);
-
-  const norm = (s: string) => s.toLowerCase().replace(/^#/, "").trim();
-  const n = candidates.map(norm);
-
-  if (n.includes("blank")) return "blank";
-  if (n.includes("destructive")) return "destructive";
-  if (n.includes("expansive")) return "expansive";
-  if (n.includes("minimize") || n.includes("minimizer")) return "minimizer";
-  return null;
+function norm(s: string) {
+  return (s || "").trim().toLowerCase();
 }
 
-function kindEmoji(kind?: string) {
-  const k = (kind || "").toLowerCase();
-  if (k.includes("movement") || k.includes("walk") || k.includes("exercise")) return "🚶";
-  if (k.includes("music") || k.includes("sound") || k.includes("playlist")) return "🎵";
-  if (k.includes("logic")) return "🧠";
-  if (k.includes("visual") || k.includes("aesthetic") || k.includes("art")) return "🎨";
-  if (k.includes("prompt") || k.includes("reflection")) return "📝";
-  if (k.includes("faith")) return "🙏";
-  return "✨";
+function stateLabel(tag: string) {
+  const t = norm(tag);
+  if (t === "all") return "All";
+  if (t === "reset") return "Reset";
+  if (t === "beauty") return "Beauty";
+  if (t === "logic") return "Logic";
+  if (t === "faith") return "Faith";
+  if (t === "reflect") return "Reflect";
+  if (t === "comfort") return "Comfort";
+  return tag;
 }
 
-function getImageUrl(item: ContentItem): string | null {
-  const anyItem = item as any;
-  return (
-    anyItem?.image_url ||
-    anyItem?.imageUrl ||
-    anyItem?.image ||
-    anyItem?.cover_url ||
-    anyItem?.coverUrl ||
-    null
-  );
-}
-
-function isInternalDiscoverableItem(item: ContentItem) {
-  const title = (item.title || "").toLowerCase().trim();
-  const meta = ((item as any).meta || "").toLowerCase().trim();
-  const kind = (item.kind || "").toLowerCase().trim();
-
-  if (title === "unlinked echo") return true;
-  if (meta.includes("used when an echo is saved")) return true;
-  if (kind.includes("system")) return true;
-
-  return false;
-}
+const MOODS = ["all", "reset", "beauty", "logic", "faith", "reflect", "comfort"];
 
 export default function Explore() {
   const navigate = useNavigate();
+
   const [items, setItems] = useState<ContentItem[]>([]);
   const [savedIds, setSavedIds] = useState<string[]>([]);
   const [isAuthed, setIsAuthed] = useState(false);
 
+  const [selectedMood, setSelectedMood] = useState<string>("all");
+  const [q, setQ] = useState("");
+
   const [loading, setLoading] = useState(true);
-  const [selectedMood, setSelectedMood] = useState<MoodKey>("all");
+  const [err, setErr] = useState("");
   const [busyId, setBusyId] = useState<string | null>(null);
 
   useEffect(() => {
@@ -86,12 +45,15 @@ export default function Explore() {
 
     (async () => {
       try {
+        setErr("");
         setLoading(true);
 
-        const content = await listContentItems({ limit: 100 });
+        const rows = await listContentItems({ limit: 120 });
         if (cancelled) return;
 
-        setItems((content || []).filter((it) => !isInternalDiscoverableItem(it)));
+        // ✅ One rule for internal items
+        const visible = (rows || []).filter((it) => isPublicDiscoverableContentItem(it));
+        setItems(visible);
 
         const uid = await getUserId();
         if (cancelled) return;
@@ -100,11 +62,13 @@ export default function Explore() {
         setIsAuthed(authed);
 
         if (authed) {
-          const saved = await fetchSavedIds();
-          if (!cancelled) setSavedIds(saved || []);
+          const ids = await fetchSavedIds();
+          if (!cancelled) setSavedIds(ids || []);
         } else {
           setSavedIds([]);
         }
+      } catch (e: any) {
+        if (!cancelled) setErr(e?.message || "Could not load Explore.");
       } finally {
         if (!cancelled) setLoading(false);
       }
@@ -115,6 +79,21 @@ export default function Explore() {
     };
   }, []);
 
+  const filteredItems = useMemo(() => {
+    const query = norm(q);
+    return items.filter((it) => {
+      if (query) {
+        const hay = `${it.title || ""} ${it.byline || ""} ${it.meta || ""}`.toLowerCase();
+        if (!hay.includes(query)) return false;
+      }
+
+      if (selectedMood === "all") return true;
+
+      const tags = (it.state_tags || []).map(norm);
+      return tags.includes(norm(selectedMood));
+    });
+  }, [items, q, selectedMood]);
+
   async function toggleSave(contentId: string, isSaved: boolean) {
     const uid = await requireAuth(navigate, "/explore");
     if (!uid) return;
@@ -122,6 +101,7 @@ export default function Explore() {
     if (busyId) return;
     setBusyId(contentId);
 
+    // optimistic
     setSavedIds((prev) => {
       const set = new Set(prev);
       if (isSaved) set.delete(contentId);
@@ -145,149 +125,114 @@ export default function Explore() {
     }
   }
 
-  const filteredItems = useMemo(() => {
-    if (selectedMood === "all") return items;
-    return items.filter((it) => getItemMoodKey(it) === selectedMood);
-  }, [items, selectedMood]);
-
   return (
     <div className="page">
+      <div className="kivaw-pagehead">
+        <h1>Explore</h1>
+        <p>Find something that matches your state.</p>
+      </div>
+
       <div className="center-wrap">
         <Card className="center card-pad">
-          <div className="kivaw-pagehead" style={{ marginBottom: 10 }}>
-            <h1 style={{ marginBottom: 6 }}>Explore</h1>
-            <p style={{ marginTop: 0 }}>Pick what fits your current state.</p>
+          <div className="kivaw-toolbar">
+            <input
+              className="input"
+              placeholder="Search…"
+              value={q}
+              onChange={(e) => setQ(e.target.value)}
+            />
+            <div className="kivaw-pills">
+              {MOODS.map((m) => (
+                <button
+                  key={m}
+                  type="button"
+                  className={`pill ${selectedMood === m ? "pill--on" : ""}`}
+                  onClick={() => setSelectedMood(m)}
+                >
+                  {stateLabel(m)}
+                </button>
+              ))}
+            </div>
           </div>
 
-          {/* sticky filter bar */}
-          <div className="kivaw-stickybar">
-            <div className="kivaw-filters kivaw-filters--compact">
-              {MOOD_FILTERS.map((m) => {
-                const active = selectedMood === m.key;
+          {!isAuthed ? (
+            <div style={{ marginTop: 12 }}>
+              <p className="muted" style={{ marginBottom: 8 }}>
+                Want to save items? Sign in to heart them.
+              </p>
+              <button className="btn btn-ghost" type="button" onClick={() => navigate("/login", { state: { from: "/explore" } })}>
+                Sign in →
+              </button>
+            </div>
+          ) : null}
+
+          <div className="spacer-16" />
+
+          {loading ? (
+            <p className="muted">Loading…</p>
+          ) : err ? (
+            <p className="muted">{err}</p>
+          ) : filteredItems.length === 0 ? (
+            <div style={{ padding: 10 }}>
+              <p className="kivaw-muted" style={{ marginBottom: 10 }}>
+                Nothing matches that filter yet.
+              </p>
+              <button className="btn" type="button" onClick={() => setSelectedMood("all")}>
+                View all
+              </button>
+            </div>
+          ) : (
+            <div className="kivaw-rec-grid">
+              {filteredItems.map((item) => {
+                const isSaved = savedIds.includes(item.id);
+                const isBusy = busyId === item.id;
+
                 return (
-                  <button
-                    key={m.key}
-                    type="button"
-                    className={active ? "kivaw-pill kivaw-pill--active" : "kivaw-pill"}
-                    onClick={() => setSelectedMood(m.key)}
-                  >
-                    <span aria-hidden="true" className="kivaw-pill__emoji">
-                      {m.emoji}
-                    </span>
-                    {m.label}
-                  </button>
+                  <ItemCard
+                    key={item.id}
+                    item={item}
+                    onOpen={() => navigate(`/item/${item.id}`)}
+                    topMeta={
+                      <>
+                        <span className="kivaw-meta-pill">{item.kind || "Item"}</span>
+                        {item.byline ? (
+                          <>
+                            <span className="kivaw-meta-dot">•</span>
+                            <span className="kivaw-meta-soft">{item.byline}</span>
+                          </>
+                        ) : null}
+                      </>
+                    }
+                    action={
+                      <button
+                        className="kivaw-heart"
+                        type="button"
+                        aria-label={isSaved ? "Unsave" : "Save"}
+                        disabled={isBusy}
+                        onClick={(e) => {
+                          e.preventDefault();
+                          e.stopPropagation();
+                          toggleSave(item.id, isSaved);
+                        }}
+                        onKeyDown={(e) => {
+                          e.stopPropagation();
+                          if (e.key === " " || e.key === "Enter") e.preventDefault();
+                        }}
+                      >
+                        {isBusy ? "…" : isSaved ? "♥" : "♡"}
+                      </button>
+                    }
+                  />
                 );
               })}
             </div>
-
-            <div className="kivaw-stickybar__sub">
-              <div className="kivaw-muted">
-                {loading ? "Loading…" : `${filteredItems.length} item${filteredItems.length === 1 ? "" : "s"}`}
-              </div>
-
-              {!isAuthed ? (
-                <button className="btn-ghost" type="button" onClick={() => navigate("/auth?returnTo=/explore")}>
-                  Sign in to save →
-                </button>
-              ) : null}
-            </div>
-          </div>
-
-          {loading ? (
-            <p className="kivaw-muted">Loading…</p>
-          ) : (
-            <>
-              <div className="kivaw-rec-grid" style={{ marginTop: 12 }}>
-                {filteredItems.map((item) => {
-                  const isSaved = savedIds.includes(item.id);
-                  const isBusy = busyId === item.id;
-                  const emoji = kindEmoji(item.kind);
-                  const img = getImageUrl(item);
-
-                  return (
-                    <div
-                      key={item.id}
-                      className="kivaw-rec-card"
-                      role="button"
-                      tabIndex={0}
-                      onClick={() => navigate(`/item/${item.id}`)}
-                      onKeyDown={(e) => {
-                        if (e.key === "Enter" || e.key === " ") navigate(`/item/${item.id}`);
-                      }}
-                    >
-                      <div className="kivaw-rowCard">
-                        <div className="kivaw-thumb" aria-hidden="true">
-                          <div className="kivaw-thumb__emoji">{emoji}</div>
-                          {img ? (
-                            <img
-                              className="kivaw-thumb__img"
-                              src={img}
-                              alt=""
-                              loading="lazy"
-                              onError={(e) => {
-                                (e.currentTarget as HTMLImageElement).style.display = "none";
-                              }}
-                            />
-                          ) : null}
-                        </div>
-
-                        <div className="kivaw-rowCard__content">
-                          <div className="kivaw-rowCard__top">
-                            <div className="kivaw-rowCard__meta">
-                              <span>{item.kind || "Item"}</span>
-                              {isSaved ? <span className="kivaw-savedBadge">Saved</span> : null}
-                            </div>
-
-                            <button
-                              className="kivaw-heart"
-                              type="button"
-                              aria-label={isSaved ? "Unsave" : "Save"}
-                              disabled={isBusy}
-                              onClick={(e) => {
-                                e.preventDefault();
-                                e.stopPropagation();
-                                toggleSave(item.id, isSaved);
-                              }}
-                              onKeyDown={(e) => {
-                                e.stopPropagation();
-                                if (e.key === " " || e.key === "Enter") e.preventDefault();
-                              }}
-                            >
-                              {isBusy ? "…" : isSaved ? "♥" : "♡"}
-                            </button>
-                          </div>
-
-                          <div className="kivaw-rowCard__title">{item.title}</div>
-
-                          {item.byline ? (
-                            <div className="muted" style={{ marginTop: 6, fontSize: 12 }}>
-                              {item.byline}
-                            </div>
-                          ) : null}
-                        </div>
-                      </div>
-                    </div>
-                  );
-                })}
-              </div>
-
-              {filteredItems.length === 0 ? (
-                <div style={{ paddingTop: 14 }}>
-                  <p className="kivaw-muted" style={{ marginBottom: 10 }}>
-                    Nothing matches that filter yet.
-                  </p>
-                  <button className="btn" type="button" onClick={() => setSelectedMood("all")}>
-                    View all
-                  </button>
-                </div>
-              ) : null}
-            </>
           )}
         </Card>
       </div>
     </div>
   );
 }
+
 
 
 

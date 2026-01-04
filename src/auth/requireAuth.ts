@@ -11,4 +11,3 @@ export async function requireAuth(
   }
   return uid;
 }
-

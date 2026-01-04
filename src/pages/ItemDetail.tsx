@@ -3,205 +3,86 @@ import { useNavigate, useParams } from "react-router-dom";
 import Card from "../ui/Card";
 import { supabase } from "../lib/supabaseClient";
 import type { ContentItem } from "../data/contentApi";
-import { listWavesForItem, type WaveSummaryRow } from "../data/wavesApi";
-import { fetchSavedIds, saveItem, unsaveItem, getUserId } from "../data/savesApi";
+import { saveItem, unsaveItem, getUserId } from "../data/savesApi";
+import { listWavesForItem } from "../data/wavesApi";
 import { requireAuth } from "../auth/requireAuth";
+import { isInternalContentItem } from "../utils/contentFilters";
 
-function kindEmoji(kind: string) {
-  switch ((kind || "").toLowerCase()) {
-    case "album":
-    case "playlist":
-      return "🎧";
-    case "concert":
-    case "event":
-      return "🎟️";
-    case "film":
-    case "movie":
-      return "🎬";
-    case "book":
-      return "📖";
-    case "practice":
-      return "🕯️";
-    default:
-      return "✦";
-  }
-}
-
-function isUuid(v: string) {
-  return /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(v);
-}
-
-// ✅ robust-ish “Unlinked Echo” detector (works even if kind/meta change)
-function isUnlinkedEchoItem(item: ContentItem | null) {
-  if (!item) return false;
-  const ext = (item.external_id || "").toLowerCase();
-  const title = (item.title || "").toLowerCase();
-  const meta = (item.meta || "").toLowerCase();
-  return (
-    ext.includes("unlinked") ||
-    title.includes("unlinked echo") ||
-    meta.includes("unlinked echo") ||
-    meta.includes("saved without linking")
-  );
-}
-
-function HeartIcon({ filled }: { filled: boolean }) {
-  // Your SVG path looked off before; keeping your existing approach but using a known-good heart.
-  return (
-    <svg
-      width="18"
-      height="18"
-      viewBox="0 0 24 24"
-      aria-hidden="true"
-      style={{ display: "block" }}
-      fill={filled ? "currentColor" : "none"}
-      stroke="currentColor"
-      strokeWidth="2"
-    >
-      <path d="M12 21s-7-4.4-9.5-8.5C.6 9.4 2 6.6 4.6 5.5c1.8-.8 3.9-.3 5.2 1l2.2 2.2 2.2-2.2c1.3-1.3 3.4-1.8 5.2-1 2.6 1.1 4 3.9 2.1 7C19 16.6 12 21 12 21z" />
-    </svg>
-  );
+function norm(s: string) {
+  return (s || "").trim().toLowerCase();
 }
 
 export default function ItemDetail() {
-  const navigate = useNavigate();
   const { id } = useParams();
-  const param = useMemo(() => (id || "").trim(), [id]);
+  const navigate = useNavigate();
 
   const [item, setItem] = useState<ContentItem | null>(null);
   const [loading, setLoading] = useState(true);
-  const [errMsg, setErrMsg] = useState<string | null>(null);
-  const [imgFailed, setImgFailed] = useState(false);
+  const [err, setErr] = useState("");
 
-  const [isAuthed, setIsAuthed] = useState(false);
   const [isSaved, setIsSaved] = useState(false);
   const [saveBusy, setSaveBusy] = useState(false);
 
-  const [waves, setWaves] = useState<WaveSummaryRow[]>([]);
-  const [wavesLoading, setWavesLoading] = useState(true);
-
-  // ✅ Wave composer
+  const [waves, setWaves] = useState<{ usage_tag: string; uses: number; last_used_at: string }[]>([]);
   const [waveTag, setWaveTag] = useState("");
   const [waveBusy, setWaveBusy] = useState(false);
   const [waveErr, setWaveErr] = useState("");
 
-  const isUnlinked = useMemo(() => isUnlinkedEchoItem(item), [item]);
+  const isUnlinked = useMemo(() => {
+    if (!item) return false;
+    return isInternalContentItem(item);
+  }, [item]);
 
-  async function loadWaves(contentId: string) {
-    setWavesLoading(true);
+  async function loadItem(contentId: string) {
+    setErr("");
+    setLoading(true);
+
     try {
-      const waveRows = await listWavesForItem(contentId, 25);
-      setWaves(waveRows);
-    } catch (e) {
-      console.error(e);
+      const { data, error } = await supabase
+        .from("content_items")
+        .select(
+          "id,external_id,kind,title,byline,meta,image_url,url,state_tags,focus_tags,usage_tags,source,created_at"
+        )
+        .eq("id", contentId)
+        .maybeSingle();
+
+      if (error) throw error;
+      setItem((data as ContentItem) || null);
+
+      const uid = await getUserId();
+      if (uid) {
+        const { data: srows } = await supabase
+          .from("saves_v2")
+          .select("content_item_id")
+          .eq("user_id", uid)
+          .eq("content_item_id", contentId)
+          .limit(1);
+
+        setIsSaved((srows || []).length > 0);
+      } else {
+        setIsSaved(false);
+      }
+
+      await loadWaves(contentId);
+    } catch (e: any) {
+      setErr(e?.message || "Could not load item.");
     } finally {
-      setWavesLoading(false);
+      setLoading(false);
     }
   }
 
-  useEffect(() => {
-    let cancelled = false;
-
-    (async () => {
-      try {
-        setLoading(true);
-        setErrMsg(null);
-        setItem(null);
-        setImgFailed(false);
-
-        if (!param) {
-          setErrMsg("Missing item id.");
-          return;
-        }
-
-        const selectCols =
-          "id,external_id,kind,title,byline,meta,image_url,url,state_tags,focus_tags,source,created_at";
-
-        if (isUuid(param)) {
-          const byId = await supabase.from("content_items").select(selectCols).eq("id", param).maybeSingle();
-          if (byId.error) throw byId.error;
-
-          if (byId.data) {
-            if (!cancelled) setItem(byId.data as ContentItem);
-          } else {
-            const byExternal = await supabase
-              .from("content_items")
-              .select(selectCols)
-              .eq("external_id", param)
-              .maybeSingle();
-
-            if (byExternal.error) throw byExternal.error;
-            if (!byExternal.data) {
-              setErrMsg(`Couldn’t find that item (id: ${param}).`);
-              return;
-            }
-            if (!cancelled) setItem(byExternal.data as ContentItem);
-          }
-        } else {
-          const byExternal = await supabase
-            .from("content_items")
-            .select(selectCols)
-            .eq("external_id", param)
-            .maybeSingle();
-
-          if (byExternal.error) throw byExternal.error;
-          if (!byExternal.data) {
-            setErrMsg(`Couldn’t find that item (id: ${param}).`);
-            return;
-          }
-          if (!cancelled) setItem(byExternal.data as ContentItem);
-        }
-      } catch (e: any) {
-        console.error("ItemDetail error:", e);
-        const msg = e?.message || e?.details || e?.hint || "Item page failed to load.";
-        if (!cancelled) setErrMsg(String(msg));
-      } finally {
-        if (!cancelled) setLoading(false);
-      }
-    })();
-
-    return () => {
-      cancelled = true;
-    };
-  }, [param]);
-
-  useEffect(() => {
-    let cancelled = false;
-
-    (async () => {
-      if (!item?.id) return;
-
-      try {
-        const uid = await getUserId();
-        if (cancelled) return;
-
-        const authed = !!uid;
-        setIsAuthed(authed);
-
-        if (authed) {
-          const saved = await fetchSavedIds();
-          if (!cancelled) setIsSaved(saved.includes(item.id));
-        } else {
-          setIsSaved(false);
-        }
-
-        if (!cancelled) await loadWaves(item.id);
-      } catch (e) {
-        console.error(e);
-      }
-    })();
-
-    return () => {
-      cancelled = true;
-    };
-  }, [item?.id]);
-
-  function goEcho() {
-    if (!item?.id) return;
-    navigate(`/echo?contentId=${item.id}`);
+  async function loadWaves(contentId: string) {
+    const rows = await listWavesForItem(contentId, 25);
+    setWaves(rows || []);
   }
 
-  async function toggleSaved() {
+  useEffect(() => {
+    if (!id) return;
+    loadItem(id);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [id]);
+
+  async function toggleSave() {
     if (!item?.id) return;
 
     const uid = await requireAuth(navigate, `/item/${item.id}`);
@@ -218,7 +99,7 @@ export default function ItemDetail() {
       else await unsaveItem(item.id);
     } catch (e) {
       console.error(e);
-      setIsSaved(!next); // rollback
+      setIsSaved(!next);
       alert("Couldn’t update saved right now.");
     } finally {
       setSaveBusy(false);
@@ -227,21 +108,23 @@ export default function ItemDetail() {
 
   async function postWave() {
     if (!item?.id) return;
-    if (isUnlinked) return; // hard block
+    if (isUnlinked) return;
+
+    const uid = await requireAuth(navigate, `/item/${item.id}`);
+    if (!uid) return;
+
     const raw = waveTag.trim();
     if (!raw) {
       setWaveErr("Add a tag first (example: reset, comfort, clarity).");
       return;
     }
 
-    // simple normalization
-    const tag = raw.replace(/\s+/g, " ").slice(0, 40);
-
+    const tag = norm(raw);
     setWaveErr("");
     setWaveBusy(true);
 
     try {
-      // ✅ assumes your table is waves_events(content_item_id, usage_tag, created_at)
+      // waves_events(content_item_id, usage_tag, created_at)
       const { error } = await supabase.from("waves_events").insert([
         { content_item_id: item.id, usage_tag: tag },
       ]);
@@ -258,255 +141,121 @@ export default function ItemDetail() {
     }
   }
 
+  if (loading) {
+    return (
+      <div className="page">
+        <div className="center-wrap">
+          <Card className="center card-pad">
+            <p className="muted">Loading…</p>
+          </Card>
+        </div>
+      </div>
+    );
+  }
+
+  if (err || !item) {
+    return (
+      <div className="page">
+        <div className="center-wrap">
+          <Card className="center card-pad">
+            <p className="muted">{err || "Not found."}</p>
+            <div className="spacer-16" />
+            <button className="btn" type="button" onClick={() => navigate("/explore")}>
+              Back to Explore →
+            </button>
+          </Card>
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div className="page">
       <div className="center-wrap">
-        <Card className="center">
+        <Card className="center card-pad">
           <div style={{ width: "100%" }}>
             <div style={{ display: "flex", justifyContent: "center" }}>
-              <button className="btn-back" onClick={() => navigate(-1)}>
+              <button className="btn-back" onClick={() => navigate(-1)} type="button">
                 ← Back
               </button>
             </div>
 
-            {loading ? (
-              <div style={{ marginTop: 18, textAlign: "center" }}>
-                <p style={{ color: "var(--muted)" }}>Loading…</p>
-              </div>
-            ) : errMsg ? (
-              <div style={{ marginTop: 18, textAlign: "center" }}>
-                <p style={{ color: "var(--muted)" }}>Couldn’t load this page right now.</p>
-                <p style={{ color: "var(--muted)", fontSize: 12, marginTop: 8 }}>
-                  <b>Debug:</b> {errMsg}
-                </p>
-              </div>
-            ) : !item ? (
-              <div style={{ marginTop: 18, textAlign: "center" }}>
-                <p style={{ color: "var(--muted)" }}>No item.</p>
-              </div>
-            ) : (
-              <div
-                style={{
-                  marginTop: 18,
-                  maxWidth: 560,
-                  marginLeft: "auto",
-                  marginRight: "auto",
-                  textAlign: "center",
-                }}
-              >
-                <div
-                  style={{
-                    width: 92,
-                    height: 92,
-                    margin: "0 auto 18px",
-                    borderRadius: 24,
-                    overflow: "hidden",
-                    background: "linear-gradient(135deg, rgba(0,0,0,0.04), rgba(0,0,0,0.02))",
-                    display: "flex",
-                    alignItems: "center",
-                    justifyContent: "center",
-                    position: "relative",
-                  }}
-                >
-                  {item.image_url && !imgFailed ? (
-                    <img
-                      src={item.image_url}
-                      alt=""
-                      loading="lazy"
-                      referrerPolicy="no-referrer"
-                      style={{ width: "100%", height: "100%", objectFit: "cover", display: "block" }}
-                      onError={() => setImgFailed(true)}
+            <div className="spacer-16" />
+
+            <div className="kivaw-detail-head">
+              <div className="kivaw-detail-kind">{item.kind}</div>
+
+              <h1 className="kivaw-detail-title">{item.title}</h1>
+
+              {item.byline ? <div className="kivaw-detail-byline">{item.byline}</div> : null}
+
+              {item.meta ? <div className="kivaw-detail-meta">{item.meta}</div> : null}
+
+              <div className="spacer-16" />
+
+              <button className="btn btn-primary" type="button" onClick={toggleSave} disabled={saveBusy}>
+                {saveBusy ? "Saving…" : isSaved ? "Saved ♥" : "Save ♡"}
+              </button>
+
+              {item.url ? (
+                <>
+                  <div className="spacer-12" />
+                  <a className="btn btn-ghost" href={item.url} target="_blank" rel="noreferrer">
+                    Open source →
+                  </a>
+                </>
+              ) : null}
+            </div>
+
+            <div className="spacer-24" />
+
+            <div className="kivaw-detail-section">
+              <h2 className="kivaw-detail-h2">Waves</h2>
+
+              {isUnlinked ? (
+                <div className="echo-empty">This item is internal and can’t receive Waves.</div>
+              ) : (
+                <>
+                  {waveErr ? <div className="echo-alert">{waveErr}</div> : null}
+
+                  <div className="kivaw-wave-row">
+                    <input
+                      className="input"
+                      placeholder="tag (example: reset, comfort, clarity)"
+                      value={waveTag}
+                      onChange={(e) => setWaveTag(e.target.value)}
                     />
+                    <button className="btn btn-ghost" type="button" onClick={postWave} disabled={waveBusy}>
+                      {waveBusy ? "Posting…" : "Post to Waves →"}
+                    </button>
+                  </div>
+
+                  <div className="spacer-12" />
+
+                  {waves.length === 0 ? (
+                    <div className="muted">No waves yet.</div>
                   ) : (
-                    <div style={{ fontSize: 34, opacity: 0.9 }}>{kindEmoji(item.kind || "Other")}</div>
-                  )}
-
-                  <button
-                    type="button"
-                    aria-label={isSaved ? "Unsave" : "Save"}
-                    onClick={toggleSaved}
-                    disabled={saveBusy}
-                    style={{
-                      position: "absolute",
-                      right: 10,
-                      top: 10,
-                      width: 36,
-                      height: 36,
-                      borderRadius: 999,
-                      border: "1px solid rgba(0,0,0,0.10)",
-                      background: "rgba(255,255,255,0.85)",
-                      display: "flex",
-                      alignItems: "center",
-                      justifyContent: "center",
-                      cursor: "pointer",
-                      color: isSaved ? "var(--primary)" : "var(--text)",
-                    }}
-                    title={!isAuthed ? "Sign in to save" : isSaved ? "Unsave" : "Save"}
-                  >
-                    {saveBusy ? "…" : <HeartIcon filled={isSaved} />}
-                  </button>
-                </div>
-
-                <div style={{ color: "var(--muted)", fontSize: 13 }}>
-                  {item.kind || "Item"}
-                  <span style={{ margin: "0 8px" }}>•</span>
-                  {item.meta || "—"}
-                </div>
-
-                <h2
-                  style={{
-                    marginTop: 8,
-                    fontSize: 24,
-                    fontWeight: 850,
-                    color: "var(--text)",
-                    lineHeight: 1.15,
-                  }}
-                >
-                  {item.title}
-                </h2>
-
-                {item.byline && <div style={{ marginTop: 6, fontSize: 14, color: "var(--muted)" }}>{item.byline}</div>}
-
-                <div style={{ marginTop: 18, fontSize: 13, color: "var(--muted)" }}>
-                  <div>
-                    <b>State tags:</b> {(item.state_tags || []).join(", ") || "—"}
-                  </div>
-                  <div style={{ marginTop: 6 }}>
-                    <b>Focus tags:</b> {(item.focus_tags || []).join(", ") || "—"}
-                  </div>
-                </div>
-
-                {item.url && (
-                  <div style={{ marginTop: 18 }}>
-                    <a
-                      href={item.url}
-                      target="_blank"
-                      rel="noreferrer"
-                      style={{
-                        display: "inline-block",
-                        padding: "10px 18px",
-                        borderRadius: 999,
-                        background: "var(--primary)",
-                        color: "#fff",
-                        fontSize: 14,
-                        fontWeight: 750,
-                        textDecoration: "none",
-                        minWidth: 140,
-                      }}
-                    >
-                      Open →
-                    </a>
-                  </div>
-                )}
-
-                {/* Echo */}
-                <div
-                  style={{
-                    marginTop: 24,
-                    textAlign: "left",
-                    padding: 14,
-                    borderRadius: 16,
-                    background: "rgba(0,0,0,0.03)",
-                  }}
-                >
-                  <div style={{ display: "flex", alignItems: "baseline", justifyContent: "space-between" }}>
-                    <div style={{ fontWeight: 800, color: "var(--text)" }}>Echo</div>
-                    <div style={{ fontSize: 12, color: "var(--muted)" }}>
-                      {isAuthed ? "Saved to your account" : "Guest ok — save with magic link"}
-                    </div>
-                  </div>
-
-                  <p style={{ color: "var(--muted)", marginTop: 10, marginBottom: 12 }}>
-                    Capture what shifted for you — then find it later without digging.
-                  </p>
-
-                  <button className="btn btn-primary" type="button" onClick={goEcho}>
-                    Echo this →
-                  </button>
-                </div>
-
-                {/* Waves */}
-                <div style={{ marginTop: 18, textAlign: "left" }}>
-                  <div style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline" }}>
-                    <div style={{ fontWeight: 800, color: "var(--text)" }}>Waves</div>
-                    <div style={{ fontSize: 12, color: "var(--muted)" }}>Public, anonymous</div>
-                  </div>
-
-                  {/* ✅ Post to Waves composer (hidden for Unlinked Echo) */}
-                  {isUnlinked ? (
-                    <p style={{ color: "var(--muted)", marginTop: 10 }}>
-                      This is a private “Unlinked Echo” placeholder — it can’t be posted to Waves.
-                    </p>
-                  ) : (
-                    <div
-                      style={{
-                        marginTop: 10,
-                        display: "grid",
-                        gridTemplateColumns: "1fr auto",
-                        gap: 10,
-                        alignItems: "center",
-                      }}
-                    >
-                      <input
-                        className="input"
-                        value={waveTag}
-                        onChange={(e) => setWaveTag(e.target.value)}
-                        placeholder="Add a wave tag (e.g., reset, comfort, clarity)"
-                        disabled={waveBusy}
-                      />
-                      <button className="btn btn-ghost" type="button" onClick={postWave} disabled={waveBusy}>
-                        {waveBusy ? "Posting…" : "Post"}
-                      </button>
-
-                      {waveErr ? (
-                        <div className="echo-alert" style={{ gridColumn: "1 / -1" }}>
-                          {waveErr}
-                        </div>
-                      ) : null}
-                    </div>
-                  )}
-
-                  {wavesLoading ? (
-                    <p style={{ color: "var(--muted)", marginTop: 10 }}>Loading waves…</p>
-                  ) : waves.length === 0 ? (
-                    <p style={{ color: "var(--muted)", marginTop: 10 }}>No waves yet. Be the first to share a tag.</p>
-                  ) : (
-                    <div style={{ marginTop: 10, display: "grid", gap: 10 }}>
-                      {waves.slice(0, 8).map((w) => (
-                        <div
-                          key={w.usage_tag}
-                          style={{
-                            display: "flex",
-                            justifyContent: "space-between",
-                            padding: "10px 12px",
-                            borderRadius: 14,
-                            border: "1px solid rgba(0,0,0,0.06)",
-                            background: "rgba(0,0,0,0.02)",
-                          }}
-                        >
-                          <div style={{ fontWeight: 800, color: "var(--primary)" }}>{w.usage_tag}</div>
-                          <div style={{ color: "var(--muted)", fontSize: 13 }}>
-                            {w.uses} wave{w.uses === 1 ? "" : "s"}
-                          </div>
+                    <div className="kivaw-wave-list">
+                      {waves.map((w) => (
+                        <div key={w.usage_tag} className="kivaw-wave-pill">
+                          <span className="tag">{w.usage_tag}</span>
+                          <span className="kivaw-meta-dot">•</span>
+                          <span className="kivaw-meta-strong">{w.uses}</span>
+                          <span className="kivaw-meta-soft">uses</span>
                         </div>
                       ))}
                     </div>
                   )}
-
-                  <div style={{ marginTop: 12 }}>
-                    <button type="button" className="btn btn-ghost" onClick={() => navigate("/waves")}>
-                      View all Waves →
-                    </button>
-                  </div>
-                </div>
-              </div>
-            )}
+                </>
+              )}
+            </div>
           </div>
         </Card>
       </div>
     </div>
   );
 }
+
 
 
 

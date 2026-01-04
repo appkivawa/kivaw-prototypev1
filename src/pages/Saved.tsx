@@ -1,68 +1,38 @@
 import { useEffect, useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import Card from "../ui/Card";
+import ItemCard from "../ui/ItemCard";
+
 import { supabase } from "../lib/supabaseClient";
 import { fetchSavedIds, unsaveItem, getUserId } from "../data/savesApi";
 import type { ContentItem } from "../data/contentApi";
-
-function kindEmoji(kind?: string) {
-  const k = (kind || "").toLowerCase();
-  if (k.includes("playlist") || k.includes("album") || k.includes("song")) return "🎧";
-  if (k.includes("reflection") || k.includes("prompt")) return "📝";
-  if (k.includes("visual") || k.includes("art")) return "🎨";
-  if (k.includes("movement") || k.includes("exercise")) return "🧘";
-  if (k.includes("creative")) return "🌸";
-  if (k.includes("expansive")) return "🌱";
-  return "✦";
-}
-
-// Heuristic: hide system-ish items from the Saved feed
-function isInternalSavedItem(item: ContentItem) {
-  const title = (item.title || "").toLowerCase().trim();
-  const meta = (item.meta || "").toLowerCase().trim();
-  const kind = (item.kind || "").toLowerCase().trim();
-
-  if (title === "unlinked echo") return true;
-
-  // The exact string you showed in UI (treat as internal)
-  if (meta.includes("used when an echo is saved")) return true;
-
-  // If you’ve got any “note/system” kinds in your db, catch them too
-  if (kind.includes("note") && title.includes("echo")) return true;
-
-  return false;
-}
+import { isPublicDiscoverableContentItem } from "../utils/contentFilters";
+import { requireAuth } from "../auth/requireAuth";
 
 export default function Saved() {
   const navigate = useNavigate();
 
   const [isAuthed, setIsAuthed] = useState(false);
-  const [ids, setIds] = useState<string[]>([]);
   const [items, setItems] = useState<ContentItem[]>([]);
   const [loading, setLoading] = useState(true);
-  const [errorMsg, setErrorMsg] = useState<string | null>(null);
+  const [err, setErr] = useState("");
   const [busyId, setBusyId] = useState<string | null>(null);
 
-  // UX: keep internal stuff accessible, but not the default vibe
-  const [showNotes, setShowNotes] = useState(false);
-
   async function loadSaved() {
+    setErr("");
     setLoading(true);
-    setErrorMsg(null);
 
     try {
       const uid = await getUserId();
       const authed = !!uid;
       setIsAuthed(authed);
 
-      if (!uid) {
-        setIds([]);
+      if (!authed) {
         setItems([]);
         return;
       }
 
-      const saved = await fetchSavedIds(); // already ordered newest-first
-      setIds(saved);
+      const saved = await fetchSavedIds(); // newest-first
 
       if (saved.length === 0) {
         setItems([]);
@@ -78,47 +48,32 @@ export default function Saved() {
 
       if (error) throw error;
 
-      // reorder to match saved ids order
-      const index = new Map<string, number>();
-      saved.forEach((x, i) => index.set(x, i));
+      // preserve saved order
+      const map = new Map<string, ContentItem>();
+      for (const it of (data || []) as ContentItem[]) map.set(it.id, it);
 
-      const sorted = (data || []).sort((a: any, b: any) => {
-        return (index.get(a.id) ?? 9999) - (index.get(b.id) ?? 9999);
-      });
-
-      setItems(sorted as ContentItem[]);
-    } catch (e) {
-      console.error(e);
-      setErrorMsg("Couldn’t load saved items right now.");
+      const ordered = saved.map((id) => map.get(id)).filter(Boolean) as ContentItem[];
+      setItems(ordered);
+    } catch (e: any) {
+      setErr(e?.message || "Could not load saved.");
     } finally {
       setLoading(false);
     }
   }
 
   useEffect(() => {
-    let cancelled = false;
-    (async () => {
-      await loadSaved();
-      if (cancelled) return;
-    })();
-    return () => {
-      cancelled = true;
-    };
+    loadSaved();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   async function removeSaved(contentId: string) {
-    const uid = await getUserId();
-    if (!uid) {
-      navigate(`/auth?returnTo=${encodeURIComponent("/saved")}`);
-      return;
-    }
+    const uid = await requireAuth(navigate, "/saved");
+    if (!uid) return;
 
     if (busyId) return;
     setBusyId(contentId);
 
     // optimistic UI
-    setIds((prev) => prev.filter((x) => x !== contentId));
     setItems((prev) => prev.filter((x) => x.id !== contentId));
 
     try {
@@ -132,151 +87,105 @@ export default function Saved() {
     }
   }
 
-  const { visibleItems, internalItems } = useMemo(() => {
-    const internal: ContentItem[] = [];
-    const normal: ContentItem[] = [];
+  const visibleItems = useMemo(() => {
+    return items.filter((it) => isPublicDiscoverableContentItem(it));
+  }, [items]);
 
-    for (const it of items) {
-      if (isInternalSavedItem(it)) internal.push(it);
-      else normal.push(it);
-    }
-
-    return {
-      visibleItems: showNotes ? [...normal, ...internal] : normal,
-      internalItems: internal,
-    };
-  }, [items, showNotes]);
+  const internalCount = useMemo(() => {
+    return items.length - visibleItems.length;
+  }, [items.length, visibleItems.length]);
 
   return (
     <div className="page">
+      <div className="kivaw-pagehead">
+        <h1>Saved</h1>
+        <p>Your personal stash of “this actually helped.”</p>
+      </div>
+
       <div className="center-wrap">
         <Card className="center card-pad">
-          <h1 className="h1">Saved</h1>
-          <p className="kivaw-sub">Your saved items live here.</p>
+          {!isAuthed ? (
+            <div>
+              <p className="muted" style={{ marginBottom: 10 }}>
+                Sign in to view your saved items.
+              </p>
+              <button
+                className="btn"
+                type="button"
+                onClick={() => navigate("/login", { state: { from: "/saved" } })}
+              >
+                Continue →
+              </button>
+            </div>
+          ) : loading ? (
+            <p className="muted">Loading…</p>
+          ) : err ? (
+            <p className="muted">{err}</p>
+          ) : visibleItems.length === 0 ? (
+            <div>
+              <p className="muted" style={{ marginBottom: 10 }}>
+                Nothing saved yet.
+              </p>
+              <button className="btn" type="button" onClick={() => navigate("/explore")}>
+                Explore →
+              </button>
+            </div>
+          ) : (
+            <>
+              {internalCount > 0 ? (
+                <div className="echo-empty" style={{ marginBottom: 12 }}>
+                  Hidden internal items: {internalCount}
+                </div>
+              ) : null}
 
-          <div style={{ marginTop: 14, width: "100%" }}>
-            {loading ? (
-              <p className="muted">Loading…</p>
-            ) : errorMsg ? (
-              <div style={{ display: "grid", gap: 10 }}>
-                <p className="muted">{errorMsg}</p>
-                <button className="btn btn-ghost" type="button" onClick={() => navigate("/explore")}>
-                  Explore →
-                </button>
-              </div>
-            ) : !isAuthed ? (
-              <div style={{ display: "grid", gap: 10 }}>
-                <p className="muted">Sign in to view (and save) your items.</p>
-                <button
-                  type="button"
-                  className="btn"
-                  onClick={() => navigate(`/auth?returnTo=${encodeURIComponent("/saved")}`)}
-                >
-                  Sign in
-                </button>
-                <button className="btn btn-ghost" type="button" onClick={() => navigate("/explore")}>
-                  Browse as guest →
-                </button>
-              </div>
-            ) : ids.length === 0 ? (
-              <div style={{ display: "grid", gap: 10 }}>
-                <p className="muted">Nothing saved yet. Go heart a few items.</p>
-                <button className="btn" type="button" onClick={() => navigate("/explore")}>
-                  Explore →
-                </button>
-              </div>
-            ) : (
-              <>
-                {/* Notes toggle row */}
-                {internalItems.length > 0 ? (
-                  <div style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline" }}>
-                    <p className="kivaw-muted" style={{ marginTop: 0 }}>
-                      {visibleItems.length} item{visibleItems.length === 1 ? "" : "s"}
-                    </p>
+              <div className="kivaw-rec-grid">
+                {visibleItems.map((it) => {
+                  const isBusy = busyId === it.id;
 
-                    <button
-                      className="btn-ghost"
-                      type="button"
-                      onClick={() => setShowNotes((v) => !v)}
-                      title="Show/hide internal notes"
-                    >
-                      {showNotes ? "Hide notes" : `Show notes (${internalItems.length})`}
-                    </button>
-                  </div>
-                ) : null}
-
-                <div className="kivaw-rec-grid" style={{ marginTop: 10 }}>
-                  {visibleItems.map((r) => {
-                    const isBusy = busyId === r.id;
-
-                    return (
-                      <div
-                        key={r.id}
-                        className="kivaw-rec-card kivaw-rec-row"
-                        role="button"
-                        tabIndex={0}
-                        onClick={() => navigate(`/item/${r.id}`)}
-                        onKeyDown={(e) => {
-                          if (e.key === "Enter" || e.key === " ") {
-                            e.preventDefault();
-                            navigate(`/item/${r.id}`);
-                          }
-                        }}
-                      >
-                        <div className="kivaw-rec-icon" aria-hidden="true">
-                          {kindEmoji(r.kind)}
-                        </div>
-
-                        <div className="kivaw-rec-content">
-                          <div className="kivaw-rec-card__meta">
-                            {(r.kind || "Item") + (r.meta ? ` • ${r.meta}` : "")}
-                          </div>
-                          <div className="kivaw-rec-card__title">{r.title}</div>
-                          {r.byline ? <div className="kivaw-rec-card__by">{r.byline}</div> : null}
-
-                          {r.url ? (
-                            <a
-                              href={r.url}
-                              target="_blank"
-                              rel="noreferrer"
-                              className="kivaw-openlink"
-                              onClick={(e) => e.stopPropagation()}
-                            >
-                              Open →
-                            </a>
+                  return (
+                    <ItemCard
+                      key={it.id}
+                      item={it}
+                      onOpen={() => navigate(`/item/${it.id}`)}
+                      topMeta={
+                        <>
+                          <span className="kivaw-meta-pill">{it.kind || "Item"}</span>
+                          {it.byline ? (
+                            <>
+                              <span className="kivaw-meta-dot">•</span>
+                              <span className="kivaw-meta-soft">{it.byline}</span>
+                            </>
                           ) : null}
-                        </div>
-
+                        </>
+                      }
+                      action={
                         <button
-                          className="kivaw-heart kivaw-remove"
+                          className="kivaw-heart"
                           type="button"
-                          aria-label="Remove from saved"
+                          aria-label="Remove"
                           disabled={isBusy}
                           onClick={(e) => {
                             e.preventDefault();
                             e.stopPropagation();
-                            removeSaved(r.id);
+                            removeSaved(it.id);
                           }}
-                          onKeyDown={(e) => {
-                            e.stopPropagation();
-                            if (e.key === " " || e.key === "Enter") e.preventDefault();
-                          }}
-                          title="Remove from saved"
                         >
                           {isBusy ? "…" : "♥"}
                         </button>
-                      </div>
-                    );
-                  })}
-                </div>
-              </>
-            )}
-          </div>
+                      }
+                    />
+                  );
+                })}
+              </div>
+            </>
+          )}
         </Card>
       </div>
     </div>
   );
 }
+
+
 
 
 
