@@ -5,6 +5,8 @@ import App from "./App";
 
 // global styles
 import "./ui/ui.css";
+import "./ui/polish.css";
+
 
 // ✅ correct path based on your folder: src/theme/ThemeContext.tsx
 import { ThemeProvider } from "./theme/ThemeContext";

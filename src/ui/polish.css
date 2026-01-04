@@ -1,0 +1,126 @@
+/* src/ui/polish.css
+   Cohesion pass: normalize page spacing + make item cards feel tighter/squarer.
+   Safe: overrides only (doesn't delete your existing styles).
+*/
+
+/* ---------- Page layout ---------- */
+.page {
+  padding-top: 22px !important;
+  padding-bottom: 70px !important;
+}
+
+.kivaw-center {
+  max-width: 980px !important;
+  padding-left: 18px !important;
+  padding-right: 18px !important;
+}
+
+/* Normalize headings across pages */
+.page h1 {
+  font-size: 44px;
+  line-height: 1.06;
+  letter-spacing: -0.02em;
+  margin: 6px 0 8px;
+  color: #2f3b59;
+}
+
+.page p {
+  color: #64739a;
+}
+
+/* Make the main content card feel consistent */
+.card.kivaw-card {
+  border-radius: 22px !important;
+  padding: 18px !important;
+}
+
+/* ---------- Item cards (Explore + Waves) ---------- */
+/* Your Explore cards */
+.kivaw-rowCard {
+  padding: 14px 14px !important;
+  border-radius: 20px !important;
+  gap: 14px !important;
+  align-items: center !important;
+}
+
+/* Squarer thumbnail (less tall / less “pill”) */
+.kivaw-thumb {
+  width: 56px !important;
+  height: 56px !important;
+  border-radius: 16px !important;
+}
+
+/* Title slightly tighter */
+.kivaw-rowTitle {
+  font-size: 18px !important;
+  line-height: 1.2 !important;
+  margin-top: 2px !important;
+}
+
+/* Meta line tighter */
+.kivaw-rowMeta {
+  font-size: 12px !important;
+  margin-bottom: 6px !important;
+}
+
+/* Chips smaller so the card doesn't balloon */
+.kivaw-chip {
+  padding: 4px 10px !important;
+  border-radius: 999px !important;
+  font-size: 12px !important;
+}
+
+/* Heart button less visually loud */
+.kivaw-heartBtn {
+  width: 36px !important;
+  height: 36px !important;
+  border-radius: 12px !important;
+}
+
+.kivaw-heartBtn svg {
+  width: 18px !important;
+  height: 18px !important;
+}
+
+/* ---------- Waves page specific ---------- */
+.kivaw-waveRow {
+  padding: 14px 14px !important;
+  border-radius: 20px !important;
+}
+
+/* Make waves grid feel more intentional */
+.kivaw-grid {
+  gap: 14px !important;
+}
+
+/* “Sign in to heart them” row: reduce “random centered” feeling */
+.kivaw-signinBar {
+  justify-content: space-between !important;
+  gap: 14px !important;
+  align-items: center !important;
+}
+
+/* ---------- Saved page: make signed-out state look less empty ---------- */
+.saved-center .card {
+  padding: 22px !important;
+}
+
+.saved-center .card p {
+  margin-top: 6px !important;
+}
+
+/* If you ever add a small “empty state” icon block, this will style it */
+.kivaw-empty {
+  display: grid;
+  gap: 10px;
+  padding: 10px 0 2px;
+}
+
+.kivaw-emptyTitle {
+  font-weight: 800;
+  color: #2f3b59;
+}
+
+.kivaw-emptyHint {
+  color: #64739a;
+}
