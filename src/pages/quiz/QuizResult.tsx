@@ -4,6 +4,7 @@ import Card from "../../ui/Card";
 import type { ContentItem } from "../../data/contentApi";
 import { getDbRecommendationsV2 } from "../../data/recommendationsDb";
 import { fetchSavedIds, saveItem, unsaveItem } from "../../data/savesApi";
+import { requireAuth } from "../../auth/requireAuth";
 
 function titleCase(s: string) {
   if (!s) return "";
@@ -103,6 +104,9 @@ export default function QuizResult() {
   }, [navigate, focusRaw, stateKey]);
 
   async function toggleSave(id: string, isSaved: boolean) {
+    const uid = await requireAuth(navigate, `/quiz/result`);
+    if (!uid) return;
+
     try {
       if (isSaved) await unsaveItem(id);
       else await saveItem(id);

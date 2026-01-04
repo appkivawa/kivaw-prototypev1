@@ -20,7 +20,14 @@ export default function Login() {
   const location = useLocation();
   const state = (location.state || {}) as LocState;
 
-  const from = useMemo(() => state.from || "/echo", [state.from]);
+  // Support both state.from and returnTo query parameter
+  const from = useMemo(() => {
+    if (state.from) return state.from;
+    const params = new URLSearchParams(location.search);
+    const returnTo = params.get("returnTo");
+    if (returnTo) return decodeURIComponent(returnTo);
+    return "/echo";
+  }, [state.from, location.search]);
 
   const [email, setEmail] = useState("");
   const [sent, setSent] = useState(false);

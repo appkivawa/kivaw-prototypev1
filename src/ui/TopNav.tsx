@@ -1,10 +1,48 @@
-import { NavLink, useNavigate } from "react-router-dom";
+import { useEffect, useState } from "react";
+import { NavLink, useNavigate, useLocation } from "react-router-dom";
 import { useTheme } from "../theme/ThemeContext";
+import { supabase } from "../lib/supabaseClient";
 import logo from "../assets/kivaw-logo-light.png";
 
 export default function TopNav() {
   const nav = useNavigate();
+  const location = useLocation();
   const { theme, toggle } = useTheme();
+  const [isSignedIn, setIsSignedIn] = useState(false);
+
+  useEffect(() => {
+    // Check initial session
+    supabase.auth.getSession().then(({ data }) => {
+      setIsSignedIn(!!data.session);
+    });
+
+    // Listen for auth changes
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
+      setIsSignedIn(!!session);
+    });
+
+    return () => {
+      subscription.unsubscribe();
+    };
+  }, []);
+
+  async function handleSignOut() {
+    try {
+      await supabase.auth.signOut();
+      nav("/");
+    } catch (error) {
+      console.error("Error signing out:", error);
+    }
+  }
+
+  function handleAuthClick() {
+    if (isSignedIn) {
+      handleSignOut();
+    } else {
+      // Always prompt login when not signed in
+      nav("/login", { state: { from: location.pathname } });
+    }
+  }
 
   return (
     <header className="topnav">
@@ -28,8 +66,8 @@ export default function TopNav() {
 
         <div className="topnav__right">
           <div className="nav-auth">
-            <button className="nav-cta" onClick={() => nav("/explore")}>
-              Continue
+            <button className="nav-cta" onClick={handleAuthClick}>
+              {isSignedIn ? "Sign out" : "Continue"}
             </button>
             <button
               className="moon"
