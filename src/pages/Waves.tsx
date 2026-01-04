@@ -167,7 +167,7 @@ export default function Waves() {
       <div className="kivaw-pagehead">
         <div className="waves-header-icon">🌊</div>
         <h1>Waves</h1>
-        <p>See how the community uses activities. Discover new ways.</p>
+        <p>See what's resonating with others. Maybe you'll find something new.</p>
       </div>
 
       <div className="center-wrap">
@@ -310,7 +310,7 @@ export default function Waves() {
               {!isAuthed ? (
                 <div className="kivaw-signinPrompt">
                   <p className="muted" style={{ margin: 0 }}>
-                    Want to save items? Sign in to heart them.
+                    Want to save things you like? Sign in to bookmark them.
                   </p>
                   <button className="btn btn-ghost" onClick={() => navigate("/login", { state: { from: "/waves" } })} type="button">
                     Sign in →

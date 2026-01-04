@@ -76,7 +76,7 @@ export default function ItemDetail() {
 
       await loadWaves(contentId);
     } catch (e: any) {
-      setErr(e?.message || "Could not load item.");
+      setErr(e?.message || "Hmm, couldn't load that right now. Try again?");
     } finally {
       setLoading(false);
     }
@@ -278,11 +278,11 @@ export default function ItemDetail() {
             <div className="spacer-24" />
 
             <div className="kivaw-detail-section">
-              <h2 className="kivaw-detail-h2">Community Waves</h2>
-              <p className="kivaw-detail-section-desc">See how others are using this activity</p>
+              <h2 className="kivaw-detail-h2">How others are using this</h2>
+              <p className="kivaw-detail-section-desc">See what's resonating with the community</p>
 
               {isUnlinked ? (
-                <div className="echo-empty">This item is internal and can't receive Waves.</div>
+                <div className="echo-empty">This is an internal item, so it can't receive Waves.</div>
               ) : (
                 <>
                   {waveErr ? <div className="echo-alert">{waveErr}</div> : null}
@@ -298,12 +298,12 @@ export default function ItemDetail() {
                       {waveBusy ? "Posting…" : "Share to Waves →"}
                     </button>
                   </div>
-                  <p className="item-detail-wave-hint">Your tag will be anonymous and help others discover new ways to use this activity</p>
+                  <p className="item-detail-wave-hint">Your tag stays anonymous and helps others find new ways to use this</p>
 
                   <div className="spacer-12" />
 
                   {waves.length === 0 ? (
-                    <div className="muted">No waves yet.</div>
+                    <div className="muted">No one's shared how they used this yet. Be the first?</div>
                   ) : (
                     <div className="kivaw-wave-list">
                       {waves.map((w) => (

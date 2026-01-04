@@ -92,9 +92,9 @@ export default function QuizFocus() {
             </div>
           </div>
 
-          <h1 className="quiz-title">What's your focus?</h1>
+          <h1 className="quiz-title">What feels right?</h1>
           <div className="quiz-subline">
-            State: <strong>{stateLabel}</strong>
+            You're feeling <strong>{stateLabel}</strong> — what do you want to focus on?
           </div>
 
           <Card className="quiz-card">

@@ -165,11 +165,11 @@ export default function Home() {
             <p className="homev2__lead">
               {lastStateLabel ? (
                 <>
-                  Last time you felt{" "}
-                  <span className="homev2__state">{lastStateLabel}</span>. How about now?
+                  Last time you were feeling{" "}
+                  <span className="homev2__state">{lastStateLabel}</span>. What's it like today?
                 </>
               ) : (
-                <>How about right now?</>
+                <>What's your energy like today?</>
               )}
             </p>
 
@@ -187,8 +187,8 @@ export default function Home() {
 
         {/* Main question (keep your Kivaw center vibe) */}
         <div className="homev2__header">
-          <h1 className="homev2__title">What would you like to do right now?</h1>
-          <p className="homev2__subtitle">We&apos;ll help you find something that fits your energy.</p>
+          <h1 className="homev2__title">What do you need right now?</h1>
+          <p className="homev2__subtitle">No judgment, just options that match where you're at.</p>
         </div>
 
         <Card className="homev2__card">
@@ -220,7 +220,7 @@ export default function Home() {
               type="button"
               onClick={() => nav("/explore")}
             >
-              ✨ Explore without choosing <span aria-hidden>→</span>
+              ✨ Or just browse around <span aria-hidden>→</span>
             </button>
           </div>
         </Card>
@@ -228,12 +228,12 @@ export default function Home() {
         <div className="homev2__subcards">
           <button className="homev2__subcard" type="button" onClick={() => nav("/waves")}>
             <div className="homev2__subcardTitle">🌊 What&apos;s working for others</div>
-            <div className="homev2__subcardMeta">Live, real-time favorites</div>
+            <div className="homev2__subcardMeta">See what's resonating right now</div>
           </button>
 
           <button className="homev2__subcard" type="button" onClick={() => nav("/explore")}>
             <div className="homev2__subcardTitle">🧭 Browse everything</div>
-            <div className="homev2__subcardMeta">Explore by category and vibe</div>
+            <div className="homev2__subcardMeta">Find something that fits your vibe</div>
           </button>
         </div>
       </div>

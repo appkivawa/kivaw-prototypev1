@@ -617,7 +617,7 @@ export default function Echo() {
       <div className="center-wrap echo-center">
         <div className="echo-hero">
           <h1 className="echo-h1">Echo</h1>
-          <p className="echo-sub">Your personal journal. Searchable, editable, private.</p>
+          <p className="echo-sub">Your private space to reflect. Search, edit, keep it yours.</p>
         </div>
 
         <Card className="echo-maincard">
@@ -625,8 +625,8 @@ export default function Echo() {
           <div className="echo-header-section">
             <div className="echo-header-icon">✨</div>
             <div className="echo-header-content">
-              <h3 className="echo-header-title">Capture a shift</h3>
-              <p className="echo-header-subtitle">Write full reflection, add personal tags, keep it private.</p>
+              <h3 className="echo-header-title">What's on your mind?</h3>
+              <p className="echo-header-subtitle">Write it out, tag it however makes sense to you, keep it just for you.</p>
               {linked && (
                 <div className="echo-linked-badge">
                   <span className="echo-linked-badge-icon">🔗</span>
@@ -850,13 +850,13 @@ export default function Echo() {
           ) : saved.length === 0 ? (
             <div className="echo-empty-state">
               <div className="echo-empty-icon">📖</div>
-              <p className="echo-empty-text">No saved echoes yet.</p>
-              <p className="echo-empty-hint">Start capturing your moments above.</p>
+              <p className="echo-empty-text">Your echoes will live here</p>
+              <p className="echo-empty-hint">Start writing above whenever something feels worth remembering.</p>
             </div>
           ) : filteredSaved.length === 0 ? (
             <div className="echo-empty-state">
               <div className="echo-empty-icon">🔍</div>
-              <p className="echo-empty-text">No echoes match your search.</p>
+              <p className="echo-empty-text">Nothing found for that search.</p>
               <button className="echo-search-clear-btn" type="button" onClick={() => setSearchQuery("")}>
                 Clear search
               </button>

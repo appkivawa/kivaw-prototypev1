@@ -60,7 +60,7 @@ export default function Saved() {
       const ordered = saved.map((id) => map.get(id)).filter(Boolean) as ContentItem[];
       setItems(ordered);
     } catch (e: any) {
-      setErr(e?.message || "Could not load saved.");
+      setErr(e?.message || "Couldn't load your saved items right now. Try refreshing?");
     } finally {
       setLoading(false);
     }
@@ -143,7 +143,7 @@ export default function Saved() {
           <Card className="center card-pad">
             <div>
               <p className="muted" style={{ marginBottom: 10 }}>
-                Sign in to view your saved items.
+                Sign in to see what you've saved.
               </p>
               <button
                 className="btn"

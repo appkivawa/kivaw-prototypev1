@@ -213,12 +213,12 @@ export default function Explore() {
           {/* Enhanced Search */}
           <div className="explore-search-wrapper">
             <div className="explore-search-icon">🔍</div>
-            <input
-              className="explore-search-input"
-              placeholder="Search activities..."
-              value={q}
-              onChange={(e) => setQ(e.target.value)}
-            />
+              <input
+                className="explore-search-input"
+                placeholder="What are you looking for?"
+                value={q}
+                onChange={(e) => setQ(e.target.value)}
+              />
             {q && (
               <button
                 className="explore-search-clear"
@@ -337,8 +337,8 @@ export default function Explore() {
           ) : filteredItems.length === 0 ? (
             <div className="explore-empty-state">
               <div className="explore-empty-icon">🔍</div>
-              <h3 className="explore-empty-title">No activities found</h3>
-              <p className="explore-empty-text">Try adjusting your filters or search terms</p>
+              <h3 className="explore-empty-title">Nothing here yet</h3>
+              <p className="explore-empty-text">Try different filters or search for something else</p>
               <button
                 className="explore-empty-btn"
                 type="button"
@@ -403,9 +403,9 @@ export default function Explore() {
         {!isAuthed && !loading && (
           <Card className="explore-signin-card">
             <div className="explore-signin-icon">💜</div>
-            <h3 className="explore-signin-title">Save your favorites</h3>
+            <h3 className="explore-signin-title">Keep track of what works</h3>
             <p className="explore-signin-text">
-              Sign in to build your personal collection and track what actually helps you
+              Sign in to save the things that actually help you and build your own collection
             </p>
             <div className="explore-signin-actions">
               <button
