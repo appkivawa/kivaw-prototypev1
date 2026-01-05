@@ -37,7 +37,11 @@ type EchoPattern = {
   };
 };
 
+import { useRoles } from "../../auth/useRoles";
+import { canManage } from "../permissions";
+
 export default function Analytics() {
+  const { roleKeys, isSuperAdmin } = useRoles();
   const [data, setData] = useState<AnalyticsData | null>(null);
   const [stateHealth, setStateHealth] = useState<StateHealth[]>([]);
   const [echoPatterns, setEchoPatterns] = useState<EchoPattern | null>(null);
@@ -46,6 +50,9 @@ export default function Analytics() {
   const [loadingEchoPatterns, setLoadingEchoPatterns] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [showExportMenu, setShowExportMenu] = useState(false);
+  
+  // Operations role can only view (read-only), cannot manage
+  const canManageAnalytics = canManage(roleKeys, isSuperAdmin || false, "analytics");
 
   async function loadAnalytics() {
     setLoading(true);
@@ -548,72 +555,84 @@ export default function Analytics() {
     <div className="admin-analytics">
       <div className="admin-section-header">
         <h3 className="admin-section-title">Analytics & Reporting</h3>
-        <div style={{ display: "flex", gap: 8, position: "relative" }}>
-          <div style={{ position: "relative" }} data-export-menu>
-            <button
-              className="btn"
-              type="button"
-              onClick={() => setShowExportMenu(!showExportMenu)}
-            >
-              📥 Export for Reflection
-            </button>
-            {showExportMenu && (
-              <div
-                style={{
-                  position: "absolute",
-                  top: "100%",
-                  right: 0,
-                  marginTop: 8,
-                  background: "var(--white)",
-                  border: "1px solid var(--border)",
-                  borderRadius: 8,
-                  boxShadow: "0 4px 12px rgba(0,0,0,0.15)",
-                  zIndex: 1000,
-                  minWidth: 180,
-                  padding: 8,
-                }}
+        <div style={{ display: "flex", gap: 8, position: "relative", alignItems: "center" }}>
+          {/* Export button - only visible if user can manage analytics */}
+          {canManageAnalytics && (
+            <div style={{ position: "relative" }} data-export-menu>
+              <button
+                className="btn"
+                type="button"
+                onClick={() => setShowExportMenu(!showExportMenu)}
               >
-                <button
-                  className="admin-action-btn"
-                  type="button"
-                  onClick={() => exportForReflection("json")}
+                📥 Export for Reflection
+              </button>
+              {showExportMenu && (
+                <div
                   style={{
-                    width: "100%",
-                    textAlign: "left",
-                    padding: "10px 14px",
-                    marginBottom: 4,
+                    position: "absolute",
+                    top: "100%",
+                    right: 0,
+                    marginTop: 8,
+                    background: "var(--white)",
+                    border: "1px solid var(--border)",
+                    borderRadius: 8,
+                    boxShadow: "0 4px 12px rgba(0,0,0,0.15)",
+                    zIndex: 1000,
+                    minWidth: 180,
+                    padding: 8,
                   }}
                 >
-                  📄 JSON
-                </button>
-                <button
-                  className="admin-action-btn"
-                  type="button"
-                  onClick={() => exportForReflection("csv")}
-                  style={{
-                    width: "100%",
-                    textAlign: "left",
-                    padding: "10px 14px",
-                    marginBottom: 4,
-                  }}
-                >
-                  📊 CSV
-                </button>
-                <button
-                  className="admin-action-btn"
-                  type="button"
-                  onClick={() => exportForReflection("xlsx")}
-                  style={{
-                    width: "100%",
-                    textAlign: "left",
-                    padding: "10px 14px",
-                  }}
-                >
-                  📈 XLSX
-                </button>
-              </div>
-            )}
-          </div>
+                  <button
+                    className="admin-action-btn"
+                    type="button"
+                    onClick={() => exportForReflection("json")}
+                    style={{
+                      width: "100%",
+                      textAlign: "left",
+                      padding: "10px 14px",
+                      marginBottom: 4,
+                    }}
+                  >
+                    📄 JSON
+                  </button>
+                  <button
+                    className="admin-action-btn"
+                    type="button"
+                    onClick={() => exportForReflection("csv")}
+                    style={{
+                      width: "100%",
+                      textAlign: "left",
+                      padding: "10px 14px",
+                      marginBottom: 4,
+                    }}
+                  >
+                    📊 CSV
+                  </button>
+                  <button
+                    className="admin-action-btn"
+                    type="button"
+                    onClick={() => exportForReflection("xlsx")}
+                    style={{
+                      width: "100%",
+                      textAlign: "left",
+                      padding: "10px 14px",
+                    }}
+                  >
+                    📈 XLSX
+                  </button>
+                </div>
+              )}
+            </div>
+          )}
+          
+          {!canManageAnalytics && (
+            <div style={{ padding: 12, background: "var(--surface-2)", borderRadius: 8 }}>
+              <p className="muted" style={{ fontSize: 13, margin: 0 }}>
+                📖 Read-only mode: You can view analytics but cannot export data.
+              </p>
+            </div>
+          )}
+          
           <button className="btn btn-ghost" type="button" onClick={loadAnalytics}>
             🔄 Refresh
           </button>

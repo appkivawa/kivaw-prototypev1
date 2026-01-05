@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import { supabase } from "../../lib/supabaseClient";
 import AdminNotes from "../components/AdminNotes";
+import RequireRole from "../../auth/RequireRole";
 
 type ContentItem = {
   id: string;
@@ -13,7 +14,7 @@ type ContentItem = {
   waves_count?: number;
 };
 
-export default function Content() {
+function ContentManagement() {
   const [contentItems, setContentItems] = useState<ContentItem[]>([]);
   const [loadingContent, setLoadingContent] = useState(false);
   const [err, setErr] = useState("");
@@ -217,6 +218,15 @@ export default function Content() {
         </div>
       )}
     </div>
+  );
+}
+
+// Export with role-based access control
+export default function Content() {
+  return (
+    <RequireRole allow={["admin", "social_media"]}>
+      <ContentManagement />
+    </RequireRole>
   );
 }
 

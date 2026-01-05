@@ -3,6 +3,7 @@ import { useNavigate } from "react-router-dom";
 
 import { listWavesFeed } from "../data/wavesApi";
 import type { WavesFeedItem } from "../data/wavesApi";
+import PageHeader from "../ui/PageHeader";
 
 import { getUserId } from "../data/savesApi";
 import { isPublicDiscoverableContentItem } from "../utils/contentFilters";
@@ -84,11 +85,11 @@ export default function Waves() {
 
   return (
     <div className="page">
-      <div className="waves-page-header">
-        <div className="waves-page-icon">🌊</div>
-        <h1>Waves</h1>
-        <p>See what's resonating with others. Maybe you'll find something new.</p>
-      </div>
+      <PageHeader 
+        title="Waves" 
+        subtitle="See what's resonating with others. Maybe you'll find something new." 
+        icon="🌊"
+      />
 
       <div className="center-wrap">
         {/* Time of Day Section */}

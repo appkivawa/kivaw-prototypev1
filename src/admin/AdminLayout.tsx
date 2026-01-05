@@ -2,10 +2,13 @@ import { NavLink, Outlet, useNavigate } from "react-router-dom";
 import Card from "../ui/Card";
 import { useEffect, useState } from "react";
 import { supabase } from "../lib/supabaseClient";
+import { useRoles } from "../auth/useRoles";
+import { canViewTab } from "./permissions";
 
 export default function AdminLayout() {
   const navigate = useNavigate();
   const [userEmail, setUserEmail] = useState<string>("");
+  const { roleKeys, isSuperAdmin } = useRoles();
 
   useEffect(() => {
     (async () => {
@@ -16,6 +19,26 @@ export default function AdminLayout() {
       }
     })();
   }, []);
+
+  // Define tabs with their permission requirements
+  const tabs = [
+    { path: "/admin", name: "overview", label: "Overview", icon: "📊" },
+    { path: "/admin/users", name: "users", label: "Users", icon: "👥" },
+    { path: "/admin/content", name: "content", label: "Content", icon: "📝" },
+    { path: "/admin/analytics", name: "analytics", label: "Analytics", icon: "📈" },
+    { path: "/admin/operations", name: "operations", label: "Operations", icon: "⚙️" },
+    { path: "/admin/settings", name: "settings", label: "Settings", icon: "🔧" },
+    { path: "/admin/support", name: "support", label: "Support", icon: "🎧" },
+    { path: "/admin/health", name: "health", label: "System Health", icon: "💚" },
+    { path: "/admin/security", name: "security", label: "Security", icon: "🔒" },
+    { path: "/admin/finance", name: "finance", label: "Finance", icon: "💰" },
+    { path: "/admin/experiments", name: "experiments", label: "Experiments", icon: "🧪" },
+  ];
+
+  // Filter tabs based on permissions
+  const visibleTabs = tabs.filter((tab) =>
+    canViewTab(roleKeys, isSuperAdmin || false, tab.name)
+  );
 
   async function handleSignOut() {
     try {
@@ -55,84 +78,17 @@ export default function AdminLayout() {
 
           {/* Tabs Navigation */}
           <div className="admin-tabs">
-            <NavLink
-              to="/admin"
-              end
-              className={({ isActive }) => `admin-tab ${isActive ? "admin-tab-active" : ""}`}
-            >
-              <span className="admin-tab-icon">📊</span>
-              Overview
-            </NavLink>
-            <NavLink
-              to="/admin/users"
-              className={({ isActive }) => `admin-tab ${isActive ? "admin-tab-active" : ""}`}
-            >
-              <span className="admin-tab-icon">👥</span>
-              Users
-            </NavLink>
-            <NavLink
-              to="/admin/content"
-              className={({ isActive }) => `admin-tab ${isActive ? "admin-tab-active" : ""}`}
-            >
-              <span className="admin-tab-icon">📝</span>
-              Content
-            </NavLink>
-            <NavLink
-              to="/admin/analytics"
-              className={({ isActive }) => `admin-tab ${isActive ? "admin-tab-active" : ""}`}
-            >
-              <span className="admin-tab-icon">📈</span>
-              Analytics
-            </NavLink>
-            <NavLink
-              to="/admin/operations"
-              className={({ isActive }) => `admin-tab ${isActive ? "admin-tab-active" : ""}`}
-            >
-              <span className="admin-tab-icon">⚙️</span>
-              Operations
-            </NavLink>
-            <NavLink
-              to="/admin/settings"
-              className={({ isActive }) => `admin-tab ${isActive ? "admin-tab-active" : ""}`}
-            >
-              <span className="admin-tab-icon">🔧</span>
-              Settings
-            </NavLink>
-            <NavLink
-              to="/admin/support"
-              className={({ isActive }) => `admin-tab ${isActive ? "admin-tab-active" : ""}`}
-            >
-              <span className="admin-tab-icon">🎧</span>
-              Support
-            </NavLink>
-            <NavLink
-              to="/admin/health"
-              className={({ isActive }) => `admin-tab ${isActive ? "admin-tab-active" : ""}`}
-            >
-              <span className="admin-tab-icon">💚</span>
-              System Health
-            </NavLink>
-            <NavLink
-              to="/admin/security"
-              className={({ isActive }) => `admin-tab ${isActive ? "admin-tab-active" : ""}`}
-            >
-              <span className="admin-tab-icon">🔒</span>
-              Security
-            </NavLink>
-            <NavLink
-              to="/admin/finance"
-              className={({ isActive }) => `admin-tab ${isActive ? "admin-tab-active" : ""}`}
-            >
-              <span className="admin-tab-icon">💰</span>
-              Finance
-            </NavLink>
-            <NavLink
-              to="/admin/experiments"
-              className={({ isActive }) => `admin-tab ${isActive ? "admin-tab-active" : ""}`}
-            >
-              <span className="admin-tab-icon">🧪</span>
-              Experiments
-            </NavLink>
+            {visibleTabs.map((tab) => (
+              <NavLink
+                key={tab.path}
+                to={tab.path}
+                end={tab.path === "/admin"}
+                className={({ isActive }) => `admin-tab ${isActive ? "admin-tab-active" : ""}`}
+              >
+                <span className="admin-tab-icon">{tab.icon}</span>
+                {tab.label}
+              </NavLink>
+            ))}
           </div>
 
           {/* Nested Route Content */}

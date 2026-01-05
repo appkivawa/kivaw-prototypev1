@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import Card from "../ui/Card";
 import ItemCard from "../ui/ItemCard";
+import PageHeader from "../ui/PageHeader";
 
 import { supabase } from "../lib/supabaseClient";
 import { fetchSavedIds, unsaveItem, getUserId } from "../data/savesApi";
@@ -133,10 +134,7 @@ export default function Saved() {
 
   return (
     <div className="page">
-      <div className="kivaw-pagehead">
-        <h1>Saved</h1>
-        <p>Your personal stash of "this actually helped."</p>
-      </div>
+      <PageHeader title="Saved" subtitle='Your personal stash of "this actually helped."' />
 
       <div className="center-wrap">
         {!isAuthed ? (

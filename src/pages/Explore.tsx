@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import Card from "../ui/Card";
 import ItemCard from "../ui/ItemCard";
+import PageHeader from "../ui/PageHeader";
 
 import { listContentItems, type ContentItem } from "../data/contentApi";
 import { fetchSavedIds, saveItem, unsaveItem, getUserId } from "../data/savesApi";
@@ -174,10 +175,7 @@ export default function Explore() {
 
   return (
     <div className="page">
-      <div className="kivaw-pagehead">
-        <h1>Explore</h1>
-        <p>Find something that matches your state.</p>
-      </div>
+      <PageHeader title="Explore" subtitle="Find something that matches your state." />
 
       <div className="center-wrap">
         {/* Suggested for You - Only show if there are items and user is browsing */}

@@ -135,9 +135,9 @@ export default function ItemDetail() {
     setWaveBusy(true);
 
     try {
-      // waves_events(content_item_id, usage_tag, created_at)
+      // waves_events(content_id, usage_tag, created_at)
       const { error } = await supabase.from("waves_events").insert([
-        { content_item_id: item.id, usage_tag: tag },
+        { content_id: item.id, usage_tag: tag },
       ]);
 
       if (error) throw error;

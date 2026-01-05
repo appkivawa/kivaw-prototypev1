@@ -1,6 +1,8 @@
 import { useEffect, useState } from "react";
 import Card from "../../ui/Card";
 import { supabase } from "../../lib/supabaseClient";
+import { useRoles } from "../../auth/useRoles";
+import { canViewApiSecrets } from "../permissions";
 
 type AuditLogEntry = {
   id: string;
@@ -20,6 +22,7 @@ type AuditLogFilters = {
 };
 
 export default function Security() {
+  const { roleKeys, isSuperAdmin } = useRoles();
   const [logs, setLogs] = useState<AuditLogEntry[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -29,6 +32,8 @@ export default function Security() {
     dateFrom: "",
     dateTo: "",
   });
+  
+  const canViewSecrets = canViewApiSecrets(roleKeys, isSuperAdmin || false);
 
   async function loadLogs() {
     setLoading(true);
@@ -332,6 +337,43 @@ export default function Security() {
           </div>
         )}
       </Card>
+
+      {/* API Secrets Section - Only visible to super admins */}
+      {canViewSecrets && (
+        <Card className="admin-section-card" style={{ marginTop: 24 }}>
+          <h4 className="admin-subsection-title">
+            <span className="admin-section-icon">🔑</span>
+            API Secrets & Credentials
+          </h4>
+          <div style={{ padding: 16, background: "var(--surface-2)", borderRadius: 8 }}>
+            <p className="muted" style={{ marginBottom: 12 }}>
+              Manage API keys, service tokens, and other sensitive credentials.
+            </p>
+            <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
+              <button className="btn btn-ghost" type="button" disabled>
+                View API Keys
+              </button>
+              <button className="btn btn-ghost" type="button" disabled>
+                Rotate Secrets
+              </button>
+              <button className="btn btn-ghost" type="button" disabled>
+                Service Tokens
+              </button>
+            </div>
+            <p className="muted" style={{ marginTop: 12, fontSize: 12 }}>
+              ⚠️ Only super admins can view and manage API secrets.
+            </p>
+          </div>
+        </Card>
+      )}
+
+      {!canViewSecrets && (
+        <Card className="admin-section-card" style={{ marginTop: 24, opacity: 0.6 }}>
+          <div style={{ padding: 16, textAlign: "center" }}>
+            <p className="muted">🔒 API Secrets section is only available to super admins.</p>
+          </div>
+        </Card>
+      )}
     </div>
   );
 }

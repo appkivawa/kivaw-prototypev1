@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState } from "react";
 import { useLocation } from "react-router-dom";
 import Card from "../ui/Card";
 import { supabase } from "../lib/supabaseClient";
+import PageHeader from "../ui/PageHeader";
 import {
   createEcho,
   deleteEcho,
@@ -616,8 +617,10 @@ export default function Echo() {
     <div className="page echo-page">
       <div className="center-wrap echo-center">
         <div className="echo-hero">
-          <h1 className="echo-h1">Echo</h1>
-          <p className="echo-sub">Your private space to reflect. Search, edit, keep it yours.</p>
+          <PageHeader 
+            title="Echo" 
+            subtitle="Your private space to reflect. Search, edit, keep it yours." 
+          />
         </div>
 
         <Card className="echo-maincard">

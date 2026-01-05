@@ -3,6 +3,7 @@ import { useNavigate } from "react-router-dom";
 import { getUserId } from "../data/savesApi";
 import { requireAuth } from "../auth/requireAuth";
 import { fetchAllEvents, type EventFilters, type Event } from "../data/eventsApi";
+import PageHeader from "../ui/PageHeader";
 
 type MoodFilter = "all" | "destructive" | "expansive" | "minimize" | "blank";
 
@@ -200,11 +201,11 @@ export default function Events() {
 
   return (
     <div className="page">
-      <div className="events-page-header">
-        <div className="events-page-icon">📅</div>
-        <h1>Events</h1>
-        <p>Find experiences that match your mood</p>
-      </div>
+      <PageHeader 
+        title="Events" 
+        subtitle="Find experiences that match your mood" 
+        icon="📅"
+      />
 
       <div className="center-wrap">
         {/* Recommended Section */}
