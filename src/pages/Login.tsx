@@ -1,51 +1,27 @@
-import { useEffect, useMemo, useState } from "react";
-import { useLocation, useNavigate } from "react-router-dom";
-import Card from "../ui/Card";
+import { useEffect, useState } from "react";
+import { useSearchParams } from "react-router-dom";
 import { supabase } from "../lib/supabaseClient";
 import { isValidEmail } from "../utils/security";
 
-type LocState = { from?: string };
-
-function buildAuthRedirect() {
-  const site =
-    (import.meta as any).env?.VITE_PUBLIC_SITE_URL?.trim?.() || window.location.origin;
-
-  const usesHashRouter =
-    window.location.href.includes("/#/") || window.location.hash.startsWith("#/");
-
-  return usesHashRouter ? `${site}/#/auth/callback` : `${site}/auth/callback`;
-}
-
 export default function Login() {
-  const navigate = useNavigate();
-  const location = useLocation();
-  const state = (location.state || {}) as LocState;
-
-  // Support both state.from and returnTo query parameter
-  const from = useMemo(() => {
-    if (state.from) return state.from;
-    const params = new URLSearchParams(location.search);
-    const returnTo = params.get("returnTo");
-    if (returnTo) return decodeURIComponent(returnTo);
-    return "/echo";
-  }, [state.from, location.search]);
+  const [searchParams] = useSearchParams();
+  const nextParam = searchParams.get("next");
+  
+  // Track whether user selected admin login
+  const [isAdminLogin, setIsAdminLogin] = useState(false);
 
   const [email, setEmail] = useState("");
   const [sent, setSent] = useState(false);
   const [busy, setBusy] = useState(false);
   const [err, setErr] = useState("");
 
+  // Check for error from callback redirect
   useEffect(() => {
-    supabase.auth.getSession().then(({ data }) => {
-      if (data.session) navigate(from, { replace: true });
-    });
-
-    const { data: sub } = supabase.auth.onAuthStateChange((_event, session) => {
-      if (session) navigate(from, { replace: true });
-    });
-
-    return () => sub?.subscription?.unsubscribe();
-  }, [from, navigate]);
+    const errorParam = searchParams.get("error");
+    if (errorParam) {
+      setErr(decodeURIComponent(errorParam));
+    }
+  }, [searchParams]);
 
   async function sendLink() {
     setErr("");
@@ -59,15 +35,14 @@ export default function Login() {
 
     setBusy(true);
     try {
-      // ✅ Remember where they were trying to go
-      localStorage.setItem("kivaw_post_auth_path", from);
-
-      // ✅ Redirect to the correct callback route (hash-safe)
-      const redirectTo = buildAuthRedirect();
-
+      // Determine redirect path: explicit next param > admin toggle > default team
+      const isAdmin = nextParam === "/admin" || isAdminLogin;
+      const nextPath = nextParam || (isAdmin ? "/admin" : "/team");
+      const emailRedirectTo = `${window.location.origin}/auth/callback?next=${nextPath}`;
+      
       const { error } = await supabase.auth.signInWithOtp({
         email: clean,
-        options: { emailRedirectTo: redirectTo },
+        options: { emailRedirectTo },
       });
 
       if (error) throw error;
@@ -80,53 +55,126 @@ export default function Login() {
   }
 
   return (
-    <div className="page login-page">
-      <div className="center-wrap">
-        <div className="login-shell">
-          <Card className="login-card">
-            {err ? (
-              <div className="login-error">
-                {err}
+    <div className="coral-page-content">
+      <div className="coral-section" style={{ maxWidth: "480px", margin: "0 auto", padding: "80px 20px" }}>
+        <div className="coral-card" style={{ padding: "48px 32px" }}>
+          {err ? (
+            <div style={{
+              padding: "12px 16px",
+              background: "rgba(255, 0, 0, 0.1)",
+              border: "1px solid rgba(255, 0, 0, 0.3)",
+              borderRadius: "8px",
+              color: "var(--coral-text-primary)",
+              marginBottom: "24px",
+              fontSize: "14px",
+            }}>
+              {err}
+            </div>
+          ) : null}
+
+          {!sent ? (
+            <>
+              <h1 className="page-title" style={{
+                fontSize: "28px",
+                margin: "0 0 8px",
+                textAlign: "center",
+              }}>
+                Sign in to continue
+              </h1>
+              <p style={{
+                fontSize: "16px",
+                color: "var(--coral-text-muted)",
+                margin: "0 0 32px",
+                textAlign: "center",
+              }}>
+                We'll send you a magic link to sign in.
+              </p>
+              
+              <div style={{ marginBottom: "16px" }}>
+                <input
+                  style={{
+                    width: "100%",
+                    padding: "12px 16px",
+                    background: "var(--coral-surface)",
+                    backdropFilter: "blur(10px)",
+                    border: "1px solid var(--coral-border)",
+                    borderRadius: "8px",
+                    color: "var(--coral-text-primary)",
+                    fontSize: "16px",
+                    fontFamily: "inherit",
+                  }}
+                  placeholder="you@email.com"
+                  value={email}
+                  onChange={(e) => setEmail(e.target.value)}
+                  autoComplete="email"
+                  type="email"
+                  onKeyDown={(e) => {
+                    if (e.key === "Enter" && !busy) {
+                      sendLink();
+                    }
+                  }}
+                />
               </div>
-            ) : null}
 
-            {!sent ? (
-              <>
-                <h1 className="login-header">Sign in to continue</h1>
-                <p className="login-description">We'll send you a magic link to sign in.</p>
-                
-                <div className="login-email-wrapper">
-                  <input
-                    className="login-email-input"
-                    placeholder="you@email.com"
-                    value={email}
-                    onChange={(e) => setEmail(e.target.value)}
-                    autoComplete="email"
-                    type="email"
-                  />
+              {/* Admin login toggle */}
+              {!nextParam && (
+                <div style={{ marginBottom: "24px" }}>
+                  <label style={{
+                    display: "flex",
+                    alignItems: "center",
+                    gap: 8,
+                    cursor: "pointer",
+                    fontSize: 14,
+                    color: "var(--coral-text-muted)",
+                  }}>
+                    <input
+                      type="checkbox"
+                      checked={isAdminLogin}
+                      onChange={(e) => setIsAdminLogin(e.target.checked)}
+                      style={{ cursor: "pointer" }}
+                    />
+                    <span>Admin login</span>
+                  </label>
                 </div>
+              )}
 
-                <button
-                  className="login-magic-btn"
-                  type="button"
-                  onClick={sendLink}
-                  disabled={busy}
-                >
-                  {busy ? "Sending…" : "Send magic link"}
-                </button>
-              </>
-            ) : (
-              <>
-                <div className="login-success">
-                  <h1 className="login-header">Check your email</h1>
-                  <p className="login-description">We sent a magic link to <strong>{email}</strong>. Click it to sign in.</p>
-                </div>
-                <button className="btn btn-ghost btn-wide" type="button" onClick={() => setSent(false)}>
-                  Use a different email
-                </button>
-              </>
-            )}
-          </Card>
+              <button
+                className="coral-btn"
+                type="button"
+                onClick={sendLink}
+                disabled={busy}
+                style={{ width: "100%" }}
+              >
+                {busy ? "Sending…" : "Send magic link"}
+              </button>
+            </>
+          ) : (
+            <>
+              <div style={{ textAlign: "center", marginBottom: "32px" }}>
+                <h1 className="page-title" style={{
+                  fontSize: "28px",
+                  margin: "0 0 8px",
+                }}>
+                  Check your email
+                </h1>
+                <p style={{
+                  fontSize: "16px",
+                  color: "var(--coral-text-muted)",
+                  margin: 0,
+                }}>
+                  We sent a magic link to <strong style={{ color: "var(--coral-text-primary)" }}>{email}</strong>. Click it to sign in.
+                </p>
+              </div>
+              <button
+                className="coral-btn-secondary"
+                type="button"
+                onClick={() => setSent(false)}
+                style={{ width: "100%" }}
+              >
+                Use a different email
+              </button>
+            </>
+          )}
         </div>
       </div>
     </div>

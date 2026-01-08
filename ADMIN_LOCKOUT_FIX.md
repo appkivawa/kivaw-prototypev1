@@ -132,3 +132,4 @@ SELECT id FROM auth.users WHERE email = 'kivawapp@proton.me';
 3. Remove temporary bypasses
 4. Remove DEV failsafe after confirming everything works
 
+

@@ -1,6 +1,10 @@
+[api]
+schemas = ["public"]
+extra_search_path = ["public"]
+max_rows = 1000
+
 [functions.admin-stats]
 enabled = true
 verify_jwt = false
 import_map = "./functions/admin-stats/deno.json"
 entrypoint = "./functions/admin-stats/index.ts"
-

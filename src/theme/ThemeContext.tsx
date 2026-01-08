@@ -14,7 +14,12 @@ const STORAGE_KEY = "kivaw_theme";
 export function ThemeProvider({ children }: { children: React.ReactNode }) {
   const [theme, setThemeState] = useState<Theme>(() => {
     const saved = localStorage.getItem(STORAGE_KEY);
-    return saved === "dark" || saved === "light" ? (saved as Theme) : "light";
+    const initialTheme = saved === "light" ? "light" : "dark";
+    // Set immediately to prevent flash of light mode
+    if (typeof document !== "undefined") {
+      document.documentElement.setAttribute("data-theme", initialTheme);
+    }
+    return initialTheme;
   });
 
   useEffect(() => {

@@ -111,3 +111,4 @@ This creates:
 - Safeguards only apply to super_admin status, not regular roles
 - Backend triggers are the final enforcement (frontend checks are UX)
 
+

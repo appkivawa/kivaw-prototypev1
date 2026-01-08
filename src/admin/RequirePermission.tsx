@@ -1,4 +1,4 @@
-import { useNavigate } from "react-router-dom";
+import { Navigate, useNavigate } from "react-router-dom";
 import { useSession } from "../auth/useSession";
 import { useRoles } from "../auth/useRoles";
 import Card from "../ui/Card";
@@ -52,11 +52,9 @@ export default function RequirePermission({
   // Not authenticated - redirect to login
   if (!isAuthed) {
     if (redirectTo) {
-      navigate(redirectTo, { replace: true });
-      return null;
+      return <Navigate to={redirectTo} replace />;
     }
-    navigate("/login", { replace: true });
-    return null;
+    return <Navigate to="/login" replace />;
   }
 
   // Check if user can view this tab
@@ -69,8 +67,7 @@ export default function RequirePermission({
     }
 
     if (redirectTo) {
-      navigate(redirectTo, { replace: true });
-      return null;
+      return <Navigate to={redirectTo} replace />;
     }
 
     // Show themed "No access" page

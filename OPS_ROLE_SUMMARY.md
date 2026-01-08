@@ -77,3 +77,4 @@
 - All restrictions enforced at route and UI level
 - Settings tab automatically blocked (no permission)
 
+

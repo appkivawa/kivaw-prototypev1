@@ -1,20 +1,18 @@
 /* ============================================================
    KIVAW THEME TOKENS (single source of truth) + SYSTEM UI FONT
-   Goal: calm, soft, lavender-and-ink vibe (light) + deep charcoal with purple hint (dark)
-   These tokens are used by both theme.css and ui.css
 ============================================================ */
 
 :root {
-  /* Font - Clean modern sans-serif */
+  /* Font */
   --font: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif, "Apple Color Emoji", "Segoe UI Emoji";
 
   /* ========== TEXT COLORS (Ink-based, no blue) ========== */
-  --ink: #2F3440;              /* primary text - calm dark grey */
-  --ink-muted: #5B6270;        /* secondary text - muted ink */
-  --ink-tertiary: #7C8596;     /* tertiary text - subtle ink */
-  --link: #2F3440;             /* link color (matches ink, not blue) */
-  
-  /* Legacy text vars (mapped to ink) */
+  --ink: #2F3440;
+  --ink-muted: #5B6270;
+  --ink-tertiary: #7C8596;
+  --link: #2F3440;
+
+  /* Legacy text vars */
   --text: var(--ink);
   --text2: var(--ink-muted);
   --muted: var(--ink-tertiary);
@@ -22,38 +20,46 @@
   --text-soft: rgba(47, 52, 64, 0.70);
 
   /* ========== BACKGROUNDS ========== */
-  --bg: #fafbfc;               /* page background - very light neutral */
-  --bg2: #f8f9fa;              /* secondary background */
-  --bg-glow: rgba(230, 225, 255, 0.03); /* very subtle lavender glow */
+  --bg: #EDE8E3;
+  --bg-gradient:
+    radial-gradient(ellipse 80% 50% at 50% 0%, rgba(255, 107, 157, 0.08) 0%, transparent 50%),
+    radial-gradient(ellipse 80% 50% at 50% 100%, rgba(255, 142, 83, 0.05) 0%, transparent 50%),
+    radial-gradient(ellipse 60% 50% at 0% 50%, rgba(192, 132, 252, 0.04) 0%, transparent 50%),
+    var(--bg);
 
-  /* ========== SURFACES (Cards, containers) ========== */
-  --surface: rgba(255, 255, 255, 0.95);      /* main cards */
-  --surface-2: rgba(250, 248, 255, 0.40);    /* nested cards */
-  --surface-3: rgba(230, 225, 255, 0.20);    /* hovered/selected surfaces */
-  
-  /* Legacy card vars */
+  /* Alias for older coral styles */
+  --coral-bg-gradient: var(--bg-gradient);
+
+  --bg2: #f8f9fa;
+  --bg-glow: rgba(230, 225, 255, 0.03);
+
+  /* ========== SURFACES ========== */
+  --surface: rgba(255, 255, 255, 0.95);
+  --surface-2: rgba(250, 248, 255, 0.40);
+  --surface-3: rgba(230, 225, 255, 0.20);
+
   --card: var(--surface);
   --cardSolid: #ffffff;
 
   /* ========== BORDERS ========== */
-  --border: rgba(0, 0, 0, 0.04);              /* default border */
-  --border-strong: rgba(0, 0, 0, 0.08);       /* focus/active border */
-  --border-gold: rgba(230, 225, 255, 0.20);   /* subtle lavender border */
+  --border: rgba(0, 0, 0, 0.04);
+  --border-strong: rgba(0, 0, 0, 0.08);
+  --border-gold: rgba(230, 225, 255, 0.20);
 
   /* ========== SHADOWS ========== */
-  --shadow: 0 2px 8px rgba(0, 0, 0, 0.04);    /* soft shadow */
-  --shadow-soft: 0 1px 4px rgba(0, 0, 0, 0.02); /* softer shadow */
-  --shadow2: 0 2px 6px rgba(0, 0, 0, 0.03);  /* slightly stronger */
+  --shadow: 0 2px 8px rgba(0, 0, 0, 0.04);
+  --shadow-soft: 0 1px 4px rgba(0, 0, 0, 0.02);
+  --shadow2: 0 2px 6px rgba(0, 0, 0, 0.03);
 
-  /* ========== BRAND ACCENTS (Lavender) ========== */
-  --accent: rgba(230, 225, 255, 0.40);        /* lavender tint for selected pills */
-  --accent-2: rgba(230, 225, 255, 0.60);      /* slightly stronger lavender */
-  --accent-ink: var(--ink);                    /* text on accent backgrounds */
-  
-  /* Legacy accent vars (golden from logo) */
+  /* ========== ACCENTS ========== */
+  --accent: rgba(230, 225, 255, 0.40);
+  --accent-2: rgba(230, 225, 255, 0.60);
+  --accent-ink: var(--ink);
+
   --gold: #e9c261;
   --gold-light: #f0d17a;
   --gold-dark: #d4a84f;
+
   --accentText: var(--ink);
   --accentTextDark: var(--ink);
 
@@ -61,16 +67,11 @@
   --pillBg: rgba(255, 255, 255, 0.72);
   --pillBorder: rgba(32, 45, 74, 0.12);
 
-  /* ========== STATES ========== */
-  --success: rgba(76, 175, 80, 0.15);         /* muted green */
-  --warning: rgba(255, 193, 7, 0.15);         /* muted yellow */
-  --danger: rgba(244, 67, 54, 0.15);          /* muted red */
+  /* ========== FOCUS ========== */
+  --focus: rgba(230, 225, 255, 0.30);
+  --focus-blue: rgba(230, 225, 255, 0.20);
 
-  /* ========== FOCUS RINGS ========== */
-  --focus: rgba(230, 225, 255, 0.30);         /* lavender focus */
-  --focus-blue: rgba(230, 225, 255, 0.20);    /* legacy name, lavender color */
-
-  /* ========== NAVIGATION ========== */
+  /* ========== NAV ========== */
   --nav-bg: rgba(255, 255, 255, 0.95);
   --nav-border: rgba(0, 0, 0, 0.04);
 
@@ -88,10 +89,9 @@
   --r-lg: 18px;
   --r-xl: 24px;
 
-  /* ========== MAX WIDTH ========== */
   --max: 1100px;
 
-  /* ========== WHITE/LIGHT SURFACES ========== */
+  /* whites */
   --white: rgba(255, 255, 255, 1);
   --white-90: rgba(255, 255, 255, 0.90);
   --white-85: rgba(255, 255, 255, 0.85);
@@ -107,80 +107,78 @@
 }
 
 /* ========== DARK MODE ========== */
-/* Deep charcoal with hint of purple - NOT bright blue, NOT pure black */
 :root[data-theme="dark"] {
-  /* ========== TEXT COLORS (Warm off-white, not stark) ========== */
-  --ink: #E8E6E1;              /* warm off-white primary text */
-  --ink-muted: #B8B5AD;        /* muted warm grey */
-  --ink-tertiary: #8B8880;     /* tertiary warm grey */
-  --link: #E8E6E1;             /* link color (matches ink) */
-  
-  /* Legacy text vars */
+  --ink: #E8E6E1;
+  --ink-muted: #B8B5AD;
+  --ink-tertiary: #8B8880;
+  --link: #E8E6E1;
+
   --text: var(--ink);
   --text2: var(--ink-muted);
   --muted: var(--ink-tertiary);
   --soft: rgba(232, 230, 225, 0.85);
   --text-soft: rgba(232, 230, 225, 0.80);
 
-  /* ========== BACKGROUNDS (Deep charcoal with purple hint) ========== */
-  --bg: #1A1B20;               /* deep charcoal with subtle purple */
-  --bg2: #1F2026;              /* slightly lighter charcoal */
-  --bg-glow: rgba(230, 225, 255, 0.05); /* subtle lavender glow */
+  /* ========== BACKGROUNDS (Dark mode overrides) ========== */
+  --bg: #0F0F12;
+  --bg-gradient:
+    radial-gradient(ellipse 80% 50% at 50% 0%, rgba(255, 107, 157, 0.15) 0%, transparent 50%),
+    radial-gradient(ellipse 80% 50% at 50% 100%, rgba(255, 142, 83, 0.10) 0%, transparent 50%),
+    radial-gradient(ellipse 60% 50% at 0% 50%, rgba(192, 132, 252, 0.08) 0%, transparent 50%),
+    var(--bg);
 
-  /* ========== SURFACES (Slightly lighter charcoal) ========== */
-  --surface: rgba(32, 33, 40, 0.95);         /* main cards - soft charcoal */
-  --surface-2: rgba(40, 41, 48, 0.60);       /* nested cards */
-  --surface-3: rgba(230, 225, 255, 0.12);   /* hovered/selected - muted lavender */
-  
-  /* Legacy card vars */
+  --coral-bg-gradient: var(--bg-gradient);
+
+  --bg2: #1F2026;
+  --bg-glow: rgba(230, 225, 255, 0.05);
+
+  /* ========== SURFACES (Dark mode overrides) ========== */
+  --surface: rgba(32, 33, 40, 0.95);
+  --surface-2: rgba(40, 41, 48, 0.60);
+  --surface-3: rgba(230, 225, 255, 0.12);
+
   --card: var(--surface);
   --cardSolid: rgba(32, 33, 40, 0.98);
 
-  /* ========== BORDERS (Subtle, not bright) ========== */
-  --border: rgba(232, 230, 225, 0.08);       /* subtle warm border */
-  --border-strong: rgba(232, 230, 225, 0.15); /* stronger border */
-  --border-gold: rgba(230, 225, 255, 0.25);  /* muted lavender border */
+  /* ========== BORDERS (Dark mode overrides) ========== */
+  --border: rgba(232, 230, 225, 0.08);
+  --border-strong: rgba(232, 230, 225, 0.15);
+  --border-gold: rgba(230, 225, 255, 0.25);
 
-  /* ========== SHADOWS (Soft, not harsh) ========== */
+  /* ========== SHADOWS (Dark mode overrides) ========== */
   --shadow: 0 4px 16px rgba(0, 0, 0, 0.30);
   --shadow-soft: 0 2px 8px rgba(0, 0, 0, 0.20);
   --shadow2: 0 6px 20px rgba(0, 0, 0, 0.35);
 
-  /* ========== BRAND ACCENTS (Muted + dusty lavender) ========== */
-  --accent: rgba(230, 225, 255, 0.25);       /* muted lavender for selected */
-  --accent-2: rgba(230, 225, 255, 0.35);     /* slightly stronger */
-  --accent-ink: var(--ink);                   /* text on accent backgrounds */
-  
-  /* Legacy accent vars */
+  /* ========== ACCENTS (Dark mode overrides) ========== */
+  --accent: rgba(230, 225, 255, 0.25);
+  --accent-2: rgba(230, 225, 255, 0.35);
+  --accent-ink: var(--ink);
+
   --accentText: var(--ink);
   --accentTextDark: var(--ink);
 
-  /* ========== PILLS/TAGS ========== */
+  /* ========== PILLS/TAGS (Dark mode overrides) ========== */
   --pillBg: rgba(32, 33, 40, 0.80);
   --pillBorder: rgba(232, 230, 225, 0.15);
 
-  /* ========== STATES (Muted, not neon) ========== */
-  --success: rgba(76, 175, 80, 0.20);
-  --warning: rgba(255, 193, 7, 0.20);
-  --danger: rgba(244, 67, 54, 0.20);
-
-  /* ========== FOCUS RINGS ========== */
+  /* ========== FOCUS (Dark mode overrides) ========== */
   --focus: rgba(230, 225, 255, 0.30);
   --focus-blue: rgba(230, 225, 255, 0.25);
 
-  /* ========== NAVIGATION ========== */
+  /* ========== NAV (Dark mode overrides) ========== */
   --nav-bg: rgba(26, 27, 32, 0.95);
   --nav-border: rgba(232, 230, 225, 0.10);
 
-  /* ========== CONTROLS ========== */
+  /* ========== CONTROLS (Dark mode overrides) ========== */
   --control-bg: rgba(32, 33, 40, 0.80);
   --control-ring: rgba(230, 225, 255, 0.25);
 
-  /* ========== BUTTONS ========== */
+  /* ========== BUTTONS (Dark mode overrides) ========== */
   --btn-shadow: 0 4px 16px rgba(0, 0, 0, 0.40);
   --btn-shadow-gold: 0 4px 16px rgba(230, 225, 255, 0.20);
 
-  /* ========== WHITE/LIGHT SURFACES (Dark mode = charcoal surfaces) ========== */
+  /* dark whites */
   --white: rgba(32, 33, 40, 0.95);
   --white-90: rgba(32, 33, 40, 0.90);
   --white-85: rgba(32, 33, 40, 0.85);
@@ -195,10 +193,65 @@
   --white-55: rgba(32, 33, 40, 0.55);
 }
 
+/* ========== GLOBAL FONTS ========== */
+html, body, #root {
+  font-family: var(--font);
+}
 
+button, input, textarea, select, a {
+  font-family: inherit;
+}
 
+/* ========== GLOBAL BACKGROUND ========== */
+html, body {
+  height: 100%;
+  min-height: 100vh;
+  background: var(--bg-gradient);
+}
 
+/* IMPORTANT: allow overlays to sit behind content */
+body {
+  position: relative;
+}
 
+/* ========== GRAIN OVERLAY (body::before - covers EVERYTHING) ========== */
+body::before {
+  content: "";
+  position: fixed;
+  inset: 0;
+  pointer-events: none;
+  z-index: 1;
 
+  background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 400 400' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='noiseFilter'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='1.2' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23noiseFilter)' opacity='0.8'/%3E%3C/svg%3E");
+  background-size: 200px 200px;
+  background-repeat: repeat;
 
+  opacity: 0.15;
+  mix-blend-mode: overlay;
+}
 
+:root[data-theme="light"] body::before {
+  opacity: 0.12;
+  mix-blend-mode: multiply;
+}
+
+/* ========== SUBTLE RED TINT OVERLAY (body::after - behind grain, lighter than before) ========== */
+body::after {
+  content: "";
+  position: fixed;
+  inset: 0;
+  pointer-events: none;
+  z-index: 0;
+  background: rgba(255, 107, 157, 0.02);
+  mix-blend-mode: multiply;
+}
+
+:root[data-theme="dark"] body::after {
+  background: rgba(255, 107, 157, 0.025);
+}
+
+/* ========== CONTENT LAYERING ========== */
+#root {
+  position: relative;
+  z-index: 5;
+}

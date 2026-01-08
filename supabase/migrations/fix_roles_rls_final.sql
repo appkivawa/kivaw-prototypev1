@@ -68,3 +68,4 @@ ORDER BY policyname;
 -- Test: Try to read roles (should work now)
 SELECT id, key, name FROM public.roles ORDER BY key;
 
+

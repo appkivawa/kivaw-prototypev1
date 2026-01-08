@@ -16,8 +16,8 @@ export default function PageHeader({ title, subtitle, icon, align = "center", ma
           {typeof icon === "string" ? <span>{icon}</span> : icon}
         </div>
       )}
-      <h1 className="page-header-title">{title}</h1>
-      {subtitle && <p className="page-header-subtitle">{subtitle}</p>}
+      <h1 className="page-header-title page-title">{title}</h1>
+      {subtitle && <p className="page-header-subtitle page-subtitle">{subtitle}</p>}
     </div>
   );
 }

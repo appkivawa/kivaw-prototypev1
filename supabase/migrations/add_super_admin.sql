@@ -112,3 +112,4 @@ WHERE u.email = 'kivawapp@proton.me';
 -- - But cannot manage super admins
 -- ============================================================
 
+

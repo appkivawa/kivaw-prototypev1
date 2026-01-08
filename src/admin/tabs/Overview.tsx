@@ -405,7 +405,7 @@ export default function Overview() {
         <button className="btn" type="button" onClick={refreshStats}>
           🔄 Refresh Stats
         </button>
-        <button className="btn btn-ghost" type="button" onClick={() => navigate("/")}>
+        <button className="btn btn-ghost" type="button" onClick={() => window.location.href = "/team"}>
           ← Back to Site
         </button>
       </div>

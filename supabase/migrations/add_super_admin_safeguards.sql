@@ -200,3 +200,4 @@ GRANT EXECUTE ON FUNCTION public.check_super_admin_safeguards(UUID, BOOLEAN) TO 
 -- before attempting the action.
 -- ============================================================
 
+

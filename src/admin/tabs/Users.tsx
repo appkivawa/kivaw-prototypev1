@@ -428,13 +428,19 @@ function InviteUserModal({
       // Continue anyway - might be first time assigning roles
     }
 
-    // Insert new roles
+    // Insert new roles - using upsert to prevent duplicates
     const roleAssignments = roles.map((role) => ({
       user_id: userId,
       role_id: role.id,
     }));
 
-    const { error: insertError } = await supabase.from("user_roles").insert(roleAssignments);
+    // Use upsert with ON CONFLICT DO NOTHING to safely handle duplicates
+    const { error: insertError } = await supabase
+      .from("user_roles")
+      .upsert(roleAssignments, {
+        onConflict: "user_id,role_id",
+        ignoreDuplicates: true,
+      });
 
     if (insertError) {
       throw new Error(`Failed to assign roles: ${insertError.message}`);
@@ -692,14 +698,20 @@ function EditRolesModal({
         throw new Error(`Failed to remove existing roles: ${deleteError.message}`);
       }
 
-      // Insert new roles (if any)
+      // Insert new roles (if any) - using upsert to prevent duplicates
       if (rolesData && rolesData.length > 0) {
         const roleAssignments = rolesData.map((role) => ({
           user_id: user.id,
           role_id: role.id,
         }));
 
-        const { error: insertError } = await supabase.from("user_roles").insert(roleAssignments);
+        // Use upsert with ON CONFLICT DO NOTHING to safely handle duplicates
+        const { error: insertError } = await supabase
+          .from("user_roles")
+          .upsert(roleAssignments, {
+            onConflict: "user_id,role_id",
+            ignoreDuplicates: true,
+          });
 
         if (insertError) {
           throw new Error(`Failed to assign roles: ${insertError.message}`);

@@ -5,7 +5,7 @@ import { supabase } from "../lib/supabaseClient";
 import type { ContentItem } from "../data/contentApi";
 import { saveItem, unsaveItem, getUserId } from "../data/savesApi";
 import { listWavesForItem } from "../data/wavesApi";
-import { requireAuth } from "../auth/requireAuth";
+import { requireAuth } from "../auth/authUtils";
 import { isInternalContentItem } from "../utils/contentFilters";
 
 function kindEmoji(kind?: string | null) {

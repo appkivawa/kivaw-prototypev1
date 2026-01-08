@@ -1,441 +1,302 @@
 import { useEffect, useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
-import Card from "../ui/Card";
-import ItemCard from "../ui/ItemCard";
-import PageHeader from "../ui/PageHeader";
 
 import { listContentItems, type ContentItem } from "../data/contentApi";
-import { fetchSavedIds, saveItem, unsaveItem, getUserId } from "../data/savesApi";
-import { requireAuth } from "../auth/requireAuth";
+import { fetchSavedIds, saveItem, unsaveItem } from "../data/savesApi";
+
 import { isPublicDiscoverableContentItem } from "../utils/contentFilters";
 
-function norm(s: string) {
-  return (s || "").trim().toLowerCase();
-}
-
-function stateLabel(tag: string) {
-  const t = norm(tag);
-  if (t === "all") return "All";
-  if (t === "reset") return "Reset";
-  if (t === "beauty") return "Beauty";
-  if (t === "logic") return "Logic";
-  if (t === "faith") return "Faith";
-  if (t === "reflect") return "Reflect";
-  if (t === "comfort") return "Comfort";
-  return tag;
-}
-
-const MOODS = ["all", "reset", "beauty", "logic", "faith", "reflect", "comfort"];
-
-const MOOD_CONFIG: Record<string, { emoji: string; label: string }> = {
-  all: { emoji: "✨", label: "All Moods" },
-  reset: { emoji: "🔄", label: "Reset" },
-  beauty: { emoji: "✨", label: "Beauty" },
-  logic: { emoji: "🧠", label: "Logic" },
-  faith: { emoji: "🙏", label: "Faith" },
-  reflect: { emoji: "💭", label: "Reflect" },
-  comfort: { emoji: "🛋️", label: "Comfort" },
-};
-
-type ViewMode = "grid" | "list";
-type SortBy = "recent" | "title" | "category";
+import { fetchActivities, getRecommendations } from "../lib/recommend";
+import type { RecommendationInput, RecommendationResult } from "../types/recommendations";
 
 export default function Explore() {
   const navigate = useNavigate();
 
+  // -----------------------------
+  // Explore feed state
+  // -----------------------------
   const [items, setItems] = useState<ContentItem[]>([]);
-  const [savedIds, setSavedIds] = useState<string[]>([]);
-  const [isAuthed, setIsAuthed] = useState(false);
-
-  const [selectedMood, setSelectedMood] = useState<string>("all");
-  const [selectedCategory, setSelectedCategory] = useState<string>("All");
-  const [q, setQ] = useState("");
-  const [viewMode, setViewMode] = useState<ViewMode>("grid");
-  const [sortBy, setSortBy] = useState<SortBy>("recent");
-
   const [loading, setLoading] = useState(true);
   const [err, setErr] = useState("");
-  const [busyId, setBusyId] = useState<string | null>(null);
 
+  const [savedIds, setSavedIds] = useState<Set<string>>(new Set());
+
+  // -----------------------------
+  // Recommendations state
+  // -----------------------------
+  const [recs, setRecs] = useState<RecommendationResult[]>([]);
+  const [recsLoading, setRecsLoading] = useState(false);
+  const [recsError, setRecsError] = useState("");
+
+  const [mood, setMood] = useState<RecommendationInput["mood"]>("minimize");
+  const [energy, setEnergy] = useState<RecommendationInput["energy"]>("low");
+  const [social, setSocial] = useState<RecommendationInput["social"]>("solo");
+  const [budget, setBudget] = useState<RecommendationInput["budget"]>("free");
+  const [timeAvailable, setTimeAvailable] = useState<number>(30);
+
+  const recInput = useMemo<RecommendationInput>(() => {
+    return { mood, energy, social, budget, timeAvailable };
+  }, [mood, energy, social, budget, timeAvailable]);
+
+  // -----------------------------
+  // Load Explore content (PUBLIC)
+  // -----------------------------
   useEffect(() => {
-    let cancelled = false;
+    let alive = true;
 
-    (async () => {
+    async function loadFeed() {
+      setLoading(true);
+      setErr("");
+
       try {
-        setErr("");
-        setLoading(true);
+        // Your contentApi expects an options object
+        const all = await listContentItems({
+          limit: 60,
+        });
 
-        const rows = await listContentItems({ limit: 120 });
-        if (cancelled) return;
+        const visible = all.filter(isPublicDiscoverableContentItem);
 
-        // ✅ One rule for internal items
-        const visible = (rows || []).filter((it) => isPublicDiscoverableContentItem(it));
+        if (!alive) return;
         setItems(visible);
 
-        const uid = await getUserId();
-        if (cancelled) return;
-
-        const authed = !!uid;
-        setIsAuthed(authed);
-
-        if (authed) {
+        // Saved items: only works when logged in.
+        // If not logged in, fetchSavedIds() may throw — we just ignore.
+        try {
           const ids = await fetchSavedIds();
-          if (!cancelled) setSavedIds(ids || []);
-        } else {
-          setSavedIds([]);
+          if (!alive) return;
+          setSavedIds(new Set(ids));
+        } catch {
+          if (!alive) return;
+          setSavedIds(new Set());
         }
       } catch (e: any) {
-        if (!cancelled) setErr(e?.message || "Could not load Explore.");
+        if (!alive) return;
+        setErr(e?.message ?? "Failed to load Explore feed.");
       } finally {
-        if (!cancelled) setLoading(false);
+        if (!alive) return;
+        setLoading(false);
       }
-    })();
+    }
 
+    loadFeed();
     return () => {
-      cancelled = true;
+      alive = false;
     };
   }, []);
 
-  // Get unique categories with counts
-  const categories = useMemo(() => {
-    const catMap = new Map<string, number>();
-    items.forEach((item) => {
-      const cat = item.kind || "Other";
-      catMap.set(cat, (catMap.get(cat) || 0) + 1);
-    });
-    const cats = Array.from(catMap.entries()).map(([name, count]) => ({
-      id: name,
-      name,
-      count,
-    }));
-    return [{ id: "All", name: "All", count: items.length }, ...cats];
-  }, [items]);
+  // -----------------------------
+  // Load + compute recommendations
+  // -----------------------------
+  useEffect(() => {
+    let alive = true;
 
-  const filteredItems = useMemo(() => {
-    const query = norm(q);
-    let filtered = items.filter((it) => {
-      if (query) {
-        const hay = `${it.title || ""} ${it.byline || ""} ${it.meta || ""}`.toLowerCase();
-        if (!hay.includes(query)) return false;
+    async function loadRecs() {
+      setRecsLoading(true);
+      setRecsError("");
+
+      try {
+        const activities = await fetchActivities();
+        if (!alive) return;
+
+        const scored = getRecommendations(activities, recInput);
+        setRecs(scored);
+      } catch (e: any) {
+        if (!alive) return;
+        setRecsError(e?.message ?? "Failed to load recommendations.");
+        setRecs([]);
+      } finally {
+        if (!alive) return;
+        setRecsLoading(false);
       }
-
-      if (selectedMood !== "all") {
-        const tags = (it.state_tags || []).map(norm);
-        if (!tags.includes(norm(selectedMood))) return false;
-      }
-
-      if (selectedCategory !== "All") {
-        if ((it.kind || "Other") !== selectedCategory) return false;
-      }
-
-      return true;
-    });
-
-    // Sort
-    if (sortBy === "title") {
-      filtered.sort((a, b) => (a.title || "").localeCompare(b.title || ""));
-    } else if (sortBy === "category") {
-      filtered.sort((a, b) => (a.kind || "").localeCompare(b.kind || ""));
     }
-    // "recent" is already sorted (newest first from API)
 
-    return filtered;
-  }, [items, q, selectedMood, selectedCategory, sortBy]);
+    loadRecs();
+    return () => {
+      alive = false;
+    };
+  }, [recInput]);
 
-  async function toggleSave(contentId: string, isSaved: boolean) {
-    const uid = await requireAuth(navigate, "/explore");
-    if (!uid) return;
-
-    if (busyId) return;
-    setBusyId(contentId);
-
-    // optimistic
-    setSavedIds((prev) => {
-      const set = new Set(prev);
-      if (isSaved) set.delete(contentId);
-      else set.add(contentId);
-      return Array.from(set);
-    });
+  // -----------------------------
+  // Save / unsave
+  // -----------------------------
+  async function toggleSave(itemId: string) {
+    const next = new Set(savedIds);
 
     try {
-      if (isSaved) await unsaveItem(contentId);
-      else await saveItem(contentId);
+      if (next.has(itemId)) {
+        await unsaveItem(itemId);
+        next.delete(itemId);
+      } else {
+        await saveItem(itemId);
+        next.add(itemId);
+      }
+      setSavedIds(next);
+    } catch (e: any) {
+      const msg = String(e?.message ?? e);
 
-      const updated = await fetchSavedIds();
-      setSavedIds(updated || []);
-    } catch {
-      try {
-        const updated = await fetchSavedIds();
-        setSavedIds(updated || []);
-      } catch {}
-    } finally {
-      setBusyId(null);
+      // If user isn't signed in, punt them to login
+      if (msg.toLowerCase().includes("not logged in") || msg.toLowerCase().includes("auth")) {
+        navigate("/login");
+        return;
+      }
+
+      console.error("Save toggle failed:", e);
     }
   }
 
   return (
-    <div className="page">
-      <PageHeader title="Explore" subtitle="Find something that matches your state." />
+    <div style={{ maxWidth: 1100, margin: "0 auto", padding: 20 }}>
+      {/* =============================
+          RECOMMENDATIONS
+         ============================= */}
+      <section style={{ marginBottom: 18 }}>
+        <div style={{ display: "flex", gap: 10, alignItems: "center", flexWrap: "wrap" }}>
+          <h2 style={{ margin: 0 }}>Recommended</h2>
 
-      <div className="center-wrap">
-        {/* Suggested for You - Only show if there are items and user is browsing */}
-        {filteredItems.length > 0 && !loading && filteredItems.length <= items.length * 0.5 && (
-          <Card className="explore-suggested">
-            <div className="explore-suggested-header">
-              <span className="explore-suggested-icon">✨</span>
-              <h3 className="explore-suggested-title">Perfect for you right now</h3>
-            </div>
-            <p className="explore-suggested-desc">Based on your patterns and current mood</p>
-            <div className="explore-suggested-grid">
-              {filteredItems.slice(0, 3).map((item) => (
-                <button
-                  key={item.id}
-                  className="explore-suggested-card"
-                  type="button"
-                  onClick={() => navigate(`/item/${item.id}`)}
-                >
-                  <div className="explore-suggested-emoji">
-                    {item.kind?.toLowerCase().includes("movement") ? "🚶" :
-                     item.kind?.toLowerCase().includes("prompt") ? "📝" :
-                     item.kind?.toLowerCase().includes("reflection") ? "🙏" : "✨"}
-                  </div>
-                  <h4 className="explore-suggested-card-title">{item.title}</h4>
-                  <p className="explore-suggested-card-meta">{item.kind || "Item"}</p>
-                </button>
-              ))}
-            </div>
-          </Card>
-        )}
+          <label style={{ display: "flex", gap: 6, alignItems: "center" }}>
+            <span style={{ opacity: 0.8 }}>mood</span>
+            <select value={mood} onChange={(e) => setMood(e.target.value as any)}>
+              <option value="destructive">destructive</option>
+              <option value="blank">blank</option>
+              <option value="expansive">expansive</option>
+              <option value="minimize">minimize</option>
+            </select>
+          </label>
 
-        <Card className="explore-filters-card">
-          <h3 className="explore-filters-heading">What are you looking for</h3>
-          
-          {/* Mood Selector */}
-          <div className="explore-mood-selector-wrapper">
-            <div className="explore-mood-selector">
-              {MOODS.map((m) => {
-                const config = MOOD_CONFIG[m] || { emoji: "✨", label: stateLabel(m) };
-                return (
-                  <button
-                    key={m}
-                    type="button"
-                    className={`explore-mood-btn ${selectedMood === m ? "explore-mood-btn-active" : ""}`}
-                    onClick={() => setSelectedMood(m)}
-                  >
-                    <span className="explore-mood-emoji">{config.emoji}</span>
-                    <span className="explore-mood-label">{config.label}</span>
-                  </button>
-                );
-              })}
-            </div>
-          </div>
+          <label style={{ display: "flex", gap: 6, alignItems: "center" }}>
+            <span style={{ opacity: 0.8 }}>energy</span>
+            <select value={energy} onChange={(e) => setEnergy(e.target.value as any)}>
+              <option value="low">low</option>
+              <option value="med">med</option>
+              <option value="high">high</option>
+            </select>
+          </label>
 
-          {/* Category Tabs */}
-          <div className="explore-categories-wrapper">
-            <div className="explore-categories">
-              {categories.map((cat) => (
-                <button
-                  key={cat.id}
-                  type="button"
-                  className={`explore-category-chip ${selectedCategory === cat.id ? "explore-category-chip-active" : ""}`}
-                  onClick={() => setSelectedCategory(cat.id)}
-                >
-                  <span>{cat.name}</span>
-                  {cat.count !== undefined && <span className="explore-category-count">({cat.count})</span>}
-                </button>
-              ))}
-            </div>
-          </div>
-        </Card>
+          <label style={{ display: "flex", gap: 6, alignItems: "center" }}>
+            <span style={{ opacity: 0.8 }}>social</span>
+            <select value={social} onChange={(e) => setSocial(e.target.value as any)}>
+              <option value="solo">solo</option>
+              <option value="social">social</option>
+              <option value="either">either</option>
+            </select>
+          </label>
 
-        <Card className="center card-pad">
+          <label style={{ display: "flex", gap: 6, alignItems: "center" }}>
+            <span style={{ opacity: 0.8 }}>budget</span>
+            <select value={budget} onChange={(e) => setBudget(e.target.value as any)}>
+              <option value="free">free</option>
+              <option value="low">low</option>
+              <option value="any">any</option>
+            </select>
+          </label>
 
-          {/* Controls Bar */}
-          <div className="explore-controls">
-            <div className="explore-controls-left">
-              <span className="explore-results-count">
-                {filteredItems.length} {filteredItems.length === 1 ? "activity" : "activities"}
-              </span>
-              {(selectedMood !== "all" || selectedCategory !== "All" || q) && (
-                <button
-                  className="explore-clear-filters"
-                  type="button"
-                  onClick={() => {
-                    setSelectedMood("all");
-                    setSelectedCategory("All");
-                    setQ("");
-                  }}
-                >
-                  Clear filters
-                </button>
-              )}
-            </div>
-            <div className="explore-controls-right">
-              <select
-                className="explore-sort-select"
-                value={sortBy}
-                onChange={(e) => setSortBy(e.target.value as SortBy)}
-              >
-                <option value="recent">Recently added</option>
-                <option value="title">Title</option>
-                <option value="category">Category</option>
-              </select>
-              <div className="explore-view-toggle">
-                <button
-                  className={`explore-view-btn ${viewMode === "grid" ? "explore-view-btn-active" : ""}`}
-                  type="button"
-                  onClick={() => setViewMode("grid")}
-                  aria-label="Grid view"
-                >
-                  ⬜
-                </button>
-                <button
-                  className={`explore-view-btn ${viewMode === "list" ? "explore-view-btn-active" : ""}`}
-                  type="button"
-                  onClick={() => setViewMode("list")}
-                  aria-label="List view"
-                >
-                  ☰
-                </button>
-              </div>
-            </div>
-          </div>
+          <label style={{ display: "flex", gap: 6, alignItems: "center" }}>
+            <span style={{ opacity: 0.8 }}>mins</span>
+            <input
+              type="number"
+              min={5}
+              max={240}
+              value={timeAvailable}
+              onChange={(e) => setTimeAvailable(Number(e.target.value))}
+              style={{ width: 80 }}
+            />
+          </label>
+        </div>
 
-          {!isAuthed ? (
-            <div className="kivaw-signinPrompt" style={{ marginTop: 12, marginBottom: 16 }}>
-              <p className="muted" style={{ margin: 0 }}>
-                Want to save items? Sign in to heart them.
-              </p>
-              <button className="btn btn-ghost" type="button" onClick={() => navigate("/login", { state: { from: "/explore" } })}>
-                Sign in →
-              </button>
-            </div>
+        {recsError ? (
+          <div style={{ marginTop: 10, padding: 10, border: "1px solid red" }}>{recsError}</div>
+        ) : null}
+
+        {recsLoading ? <div style={{ marginTop: 10, opacity: 0.7 }}>Loading…</div> : null}
+
+        <div style={{ display: "grid", gap: 10, marginTop: 12 }}>
+          {!recsLoading && !recsError && recs.length === 0 ? (
+            <div style={{ opacity: 0.7 }}>No recommendations yet.</div>
           ) : null}
 
-          {loading ? (
-            <p className="muted">Loading…</p>
-          ) : err ? (
-            <p className="muted">{err}</p>
-          ) : filteredItems.length === 0 ? (
-            <div className="explore-empty-state">
-              <div className="explore-empty-icon">🔍</div>
-              <h3 className="explore-empty-title">Nothing here yet</h3>
-              <p className="explore-empty-text">Try different filters or search for something else</p>
-              <button
-                className="explore-empty-btn"
-                type="button"
-                onClick={() => {
-                  setSelectedMood("all");
-                  setSelectedCategory("All");
-                  setQ("");
+          {recs.map((r) => (
+            <div
+              key={r.activity.id}
+              style={{
+                padding: 14,
+                borderRadius: 14,
+                border: "1px solid rgba(0,0,0,0.12)",
+              }}
+            >
+              <div style={{ display: "flex", gap: 10, flexWrap: "wrap" }}>
+                <b>{r.activity.title}</b>
+                <span style={{ opacity: 0.7 }}>• score {r.score}</span>
+                <span style={{ opacity: 0.7 }}>• {r.activity.duration_min} min</span>
+                <span style={{ opacity: 0.7 }}>• cost {r.activity.cost_level}</span>
+                <span style={{ opacity: 0.7 }}>• intensity {r.activity.intensity}</span>
+              </div>
+
+              <p style={{ marginTop: 8, marginBottom: 8, opacity: 0.9 }}>
+                {r.activity.description}
+              </p>
+
+              <ul style={{ margin: 0, paddingLeft: 18, opacity: 0.8 }}>
+                {r.reasons.slice(0, 2).map((x, idx) => (
+                  <li key={idx}>{x.reason}</li>
+                ))}
+              </ul>
+            </div>
+          ))}
+        </div>
+      </section>
+
+      {/* =============================
+          CONTENT FEED
+         ============================= */}
+      <section>
+        <h2 style={{ marginTop: 0 }}>Explore feed</h2>
+
+        {err ? (
+          <div style={{ padding: 12, border: "1px solid red", marginBottom: 16 }}>
+            <b>Error:</b> {err}
+          </div>
+        ) : null}
+
+        {loading ? <div style={{ opacity: 0.7 }}>Loading…</div> : null}
+
+        {!loading && !err && items.length === 0 ? <div style={{ opacity: 0.7 }}>No content yet.</div> : null}
+
+        <div style={{ display: "grid", gap: 12 }}>
+          {items.map((item) => {
+            const isSaved = savedIds.has(item.id);
+
+            return (
+              <div
+                key={item.id}
+                style={{
+                  padding: 14,
+                  borderRadius: 14,
+                  border: "1px solid rgba(0,0,0,0.12)",
                 }}
               >
-                Clear all filters
-              </button>
-            </div>
-          ) : (
-            <div className={viewMode === "grid" ? "kivaw-rec-grid" : "explore-list-view"}>
-              {filteredItems.map((item) => {
-                const isSaved = savedIds.includes(item.id);
-                const isBusy = busyId === item.id;
+                <div style={{ display: "flex", justifyContent: "space-between", gap: 12 }}>
+                  <div style={{ minWidth: 0 }}>
+                    <b style={{ display: "block" }}>{item.title}</b>
+                    {item.byline ? <div style={{ opacity: 0.75 }}>{item.byline}</div> : null}
+                    {item.url ? (
+                      <a href={item.url} target="_blank" rel="noreferrer" style={{ opacity: 0.8 }}>
+                        {item.url}
+                      </a>
+                    ) : null}
+                  </div>
 
-                return (
-                  <ItemCard
-                    key={item.id}
-                    item={item}
-                    onOpen={() => navigate(`/item/${item.id}`)}
-                    topMeta={
-                      <>
-                        <span className="kivaw-meta-pill">{item.kind || "Item"}</span>
-                        {item.byline ? (
-                          <>
-                            <span className="kivaw-meta-dot">•</span>
-                            <span className="kivaw-meta-soft">{item.byline}</span>
-                          </>
-                        ) : null}
-                      </>
-                    }
-                    action={
-                      <button
-                        className="kivaw-heart"
-                        type="button"
-                        aria-label={isSaved ? "Unsave" : "Save"}
-                        disabled={isBusy}
-                        onClick={(e) => {
-                          e.preventDefault();
-                          e.stopPropagation();
-                          toggleSave(item.id, isSaved);
-                        }}
-                        onKeyDown={(e) => {
-                          e.stopPropagation();
-                          if (e.key === " " || e.key === "Enter") e.preventDefault();
-                        }}
-                      >
-                        {isBusy ? "…" : isSaved ? "♥" : "♡"}
-                      </button>
-                    }
-                  />
-                );
-              })}
-            </div>
-          )}
-        </Card>
+                  <button onClick={() => toggleSave(item.id)}>{isSaved ? "Unsave" : "Save"}</button>
+                </div>
 
-        {/* Sign In Prompt at Bottom */}
-        {!isAuthed && !loading && (
-          <Card className="explore-signin-card">
-            <div className="explore-signin-icon">💜</div>
-            <h3 className="explore-signin-title">Keep track of what works</h3>
-            <p className="explore-signin-text">
-              Sign in to save the things that actually help you and build your own collection
-            </p>
-            <div className="explore-signin-actions">
-              <button
-                className="explore-signin-btn-secondary"
-                type="button"
-                onClick={() => navigate("/explore")}
-              >
-                Maybe later
-              </button>
-              <button
-                className="explore-signin-btn-primary"
-                type="button"
-                onClick={() => navigate("/login", { state: { from: "/explore" } })}
-              >
-                Sign in →
-              </button>
-            </div>
-          </Card>
-        )}
-      </div>
+                {item.meta ? <p style={{ marginTop: 10, marginBottom: 0, opacity: 0.9 }}>{item.meta}</p> : null}
+              </div>
+            );
+          })}
+        </div>
+      </section>
     </div>
   );
 }
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
 
 
 

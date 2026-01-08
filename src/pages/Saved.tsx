@@ -8,7 +8,7 @@ import { supabase } from "../lib/supabaseClient";
 import { fetchSavedIds, unsaveItem, getUserId } from "../data/savesApi";
 import type { ContentItem } from "../data/contentApi";
 import { isPublicDiscoverableContentItem } from "../utils/contentFilters";
-import { requireAuth } from "../auth/requireAuth";
+import { requireAuth } from "../auth/authUtils";
 
 type ViewMode = "grid" | "list";
 type SortBy = "recent" | "category" | "title";
@@ -133,7 +133,7 @@ export default function Saved() {
   }, [visibleItems]);
 
   return (
-    <div className="page">
+    <div className="page coral-page-content">
       <PageHeader title="Saved" subtitle='Your personal stash of "this actually helped."' />
 
       <div className="center-wrap">

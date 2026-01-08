@@ -46,3 +46,4 @@ Make sure these are set in Supabase Dashboard → Settings → Edge Functions �
 - ✅ Fixed role query: uses explicit foreign key join
 - ✅ All functions now self-contained
 
+

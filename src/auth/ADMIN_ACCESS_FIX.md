@@ -92,3 +92,4 @@ CREATE POLICY "Authenticated users can read roles" ON public.roles
 4. Verify RLS policies allow reading own roles
 5. Remove failsafe after confirming access works
 
+

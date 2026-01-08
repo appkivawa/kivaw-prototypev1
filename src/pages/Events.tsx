@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { getUserId } from "../data/savesApi";
-import { requireAuth } from "../auth/requireAuth";
+import { requireAuth } from "../auth/authUtils";
 import { fetchAllEvents, type EventFilters, type Event } from "../data/eventsApi";
 import PageHeader from "../ui/PageHeader";
 

@@ -5,6 +5,7 @@ import App from "./App";
 
 // global styles
 import "./styles/theme.css";
+import "./styles/coral.css";
 import "./ui/ui.css";
 import "./ui/polish.css";
 

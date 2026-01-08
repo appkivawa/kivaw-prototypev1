@@ -94,6 +94,7 @@ img, svg {
   min-height: 100vh;
   display: flex;
   flex-direction: column;
+  background: transparent; /* Allow global background + grain to show */
 }
 
 .main {
@@ -105,19 +106,11 @@ img, svg {
   max-width: var(--max);
   margin: 0 auto;
   padding: 32px 20px 80px;
+  background: transparent; /* Allow global background + grain to show */
 }
 
-/* Background wash - uses theme tokens */
-html {
-  background: var(--bg);
-  min-height: 100vh;
-  transition: background 0.3s ease;
-}
-
-body {
-  background: transparent;
-  min-height: 100vh;
-}
+/* Background is now in theme.css - html/body use --bg-gradient */
+/* Wrappers should be transparent to show global background + grain */
 
 .page {
   position: relative;

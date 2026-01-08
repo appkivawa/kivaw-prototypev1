@@ -240,3 +240,4 @@ CREATE POLICY "Admins can manage admin allowlist" ON public.admin_allowlist
 -- END OF MIGRATION
 -- ============================================================
 
+

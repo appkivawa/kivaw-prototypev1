@@ -35,3 +35,4 @@ ON CONFLICT (key) DO NOTHING;
 -- 5. Verify roles were inserted
 SELECT id, key, name FROM public.roles ORDER BY key;
 
+

@@ -65,3 +65,4 @@ supabase functions serve admin-list-users
 - User is not an admin (not in `admin_allowlist` or doesn't have `admin` role)
 - Verify `is_admin()` function works: `SELECT public.is_admin('user-id');`
 
+

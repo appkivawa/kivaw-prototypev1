@@ -4,7 +4,9 @@ import Card from "../../ui/Card";
 import type { ContentItem } from "../../data/contentApi";
 import { getDbRecommendationsV2 } from "../../data/recommendationsDb";
 import { fetchSavedIds, saveItem, unsaveItem } from "../../data/savesApi";
-import { requireAuth } from "../../auth/requireAuth";
+import { requireAuth } from "../../auth/authUtils";
+import { fetchMovies, fetchBooks } from "../../data/providers/externalProviders";
+import { externalToContentItem } from "../../data/providers/contentProviders";
 
 function titleCase(s: string) {
   if (!s) return "";
@@ -88,12 +90,33 @@ export default function QuizResult() {
         setErr("");
         setLoading(true);
 
-        const [recs, saved] = await Promise.all([
+        const focus = focusRaw.toLowerCase().trim();
+        const [dbRecs, saved] = await Promise.all([
           getDbRecommendationsV2(stateKey, focusRaw, 12),
           fetchSavedIds(),
         ]);
 
-        setItems(recs || []);
+        // Fetch external content if focus is "watch" or "read"
+        let externalItems: ContentItem[] = [];
+        try {
+          if (focus === "watch") {
+            // Get trending movies for "watch" focus
+            const movies = await fetchMovies({ limit: 6 });
+            externalItems = movies.map(externalToContentItem) as ContentItem[];
+          } else if (focus === "read") {
+            // Get suggested books for "read" focus (use state as subject hint)
+            const subject = stateKey === "blank" ? "self-help" : stateKey;
+            const books = await fetchBooks({ subject, limit: 6 });
+            externalItems = books.map(externalToContentItem) as ContentItem[];
+          }
+        } catch (extErr) {
+          // Silently fail external content - don't block UI if external providers are disabled
+          console.warn("[QuizResult] Could not fetch external content:", extErr);
+        }
+
+        // Combine DB recommendations with external content (prioritize DB items)
+        const allItems = [...(dbRecs || []), ...externalItems];
+        setItems(allItems);
         setSavedIds(saved || []);
       } catch (e: any) {
         setErr(e?.message || "Could not load results.");

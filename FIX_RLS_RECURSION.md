@@ -105,3 +105,4 @@ This prevents the recursion issue entirely. The `admin_allowlist` should be mana
 
 The `is_admin()` function can still check `admin_allowlist`, but the table itself won't have RLS policies that cause recursion.
 
+

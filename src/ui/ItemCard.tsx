@@ -1,5 +1,6 @@
 import type { ReactNode } from "react";
 import type { ContentItem } from "../data/contentApi";
+import RecommendationCover from "./RecommendationCover";
 
 function kindEmoji(kind?: string | null) {
   const k = (kind || "").toLowerCase();
@@ -10,6 +11,38 @@ function kindEmoji(kind?: string | null) {
   if (k.includes("prompt") || k.includes("reflection")) return "📝";
   if (k.includes("faith")) return "🙏";
   return "✦";
+}
+
+// Check if item is a public recommendation (external item from public_recommendations)
+function isPublicRecommendation(item: ContentItem): boolean {
+  // Public recommendations have isExternal flag and come from public_recommendations
+  // They have source like 'tmdb', 'open_library', etc.
+  return !!(item as any).isExternal && !!(item as any).source;
+}
+
+// Get type from item for RecommendationCover
+function getRecommendationType(item: ContentItem): "watch" | "read" | "event" | "listen" {
+  // Check focus_tags first (most reliable)
+  const focusTags = (item as any).focus_tags || [];
+  if (Array.isArray(focusTags)) {
+    if (focusTags.includes("watch")) return "watch";
+    if (focusTags.includes("read")) return "read";
+    if (focusTags.includes("event")) return "event";
+    if (focusTags.includes("listen")) return "listen";
+  }
+  
+  // Fallback to kind
+  const kind = (item.kind || "").toLowerCase();
+  if (kind === "watch") return "watch";
+  if (kind === "read") return "read";
+  if (kind === "event") return "event";
+  if (kind === "listen") return "listen";
+  
+  // Infer from kind content
+  if (kind.includes("movie") || kind.includes("film") || kind.includes("video")) return "watch";
+  if (kind.includes("book") || kind.includes("article")) return "read";
+  
+  return "watch"; // Default fallback
 }
 
 export default function ItemCard({
@@ -29,6 +62,7 @@ export default function ItemCard({
 }) {
   const emoji = kindEmoji(item.kind);
   const img = item.image_url || "";
+  const isRecommendation = isPublicRecommendation(item);
 
   return (
     <div
@@ -42,18 +76,31 @@ export default function ItemCard({
     >
       <div className="kivaw-rowCard">
         <div className="kivaw-thumb" aria-hidden="true">
-          <div className="kivaw-thumb__emoji">{emoji}</div>
-          {img ? (
-            <img
-              className="kivaw-thumb__img"
-              src={img}
-              alt=""
-              loading="lazy"
-              onError={(e) => {
-                (e.currentTarget as HTMLImageElement).style.display = "none";
-              }}
+          {isRecommendation ? (
+            <RecommendationCover
+              type={getRecommendationType(item)}
+              imageUrl={item.image_url}
+              title={item.title}
+              height="100%"
+              className="kivaw-thumb__cover"
+              showImage={!!item.image_url}
             />
-          ) : null}
+          ) : (
+            <>
+              <div className="kivaw-thumb__emoji">{emoji}</div>
+              {img ? (
+                <img
+                  className="kivaw-thumb__img"
+                  src={img}
+                  alt=""
+                  loading="lazy"
+                  onError={(e) => {
+                    (e.currentTarget as HTMLImageElement).style.display = "none";
+                  }}
+                />
+              ) : null}
+            </>
+          )}
         </div>
 
         <div className="kivaw-rowCard__content">

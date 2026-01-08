@@ -33,7 +33,10 @@ export type Permission =
   | "view_finance"
   | "manage_finance"
   | "view_experiments"
-  | "manage_experiments";
+  | "manage_experiments"
+  | "view_integrations"
+  | "manage_integrations"
+  | "view_recommendations_preview";
 
 /**
  * Permission map: defines what each role tier can do
@@ -65,6 +68,9 @@ const PERMISSIONS: Record<RoleTier, Permission[]> = {
     "manage_finance",
     "view_experiments",
     "manage_experiments",
+    "view_integrations",
+    "manage_integrations",
+    "view_recommendations_preview",
   ],
   admin: [
     // Admin sees most things, but NOT super_admins, security, or API secrets
@@ -87,6 +93,9 @@ const PERMISSIONS: Record<RoleTier, Permission[]> = {
     "manage_finance",
     "view_experiments",
     "manage_experiments",
+    "view_integrations",
+    "manage_integrations",
+    "view_recommendations_preview",
   ],
   operations: [
     // Operations: Limited access
@@ -153,6 +162,10 @@ export const TAB_PERMISSIONS: Record<string, Permission[]> = {
   security: ["view_security"],
   finance: ["view_finance"],
   experiments: ["view_experiments"],
+  creator_requests: ["view_content"], // Use content permission for creator requests
+  integrations: ["view_integrations"],
+  recommendations_preview: ["view_recommendations_preview"],
+  publish_to_explore: ["view_content", "manage_content"], // Requires content management permission
 };
 
 /**

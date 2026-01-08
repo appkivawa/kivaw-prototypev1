@@ -66,13 +66,11 @@ function getCurrentAppPath() {
 }
 
 /**
- * ✅ Stable auth redirect builder
- * - Prefer explicit deployed URL (set in Vercel as VITE_PUBLIC_SITE_URL="https://www.kivaw.com")
- * - Fall back to current origin for local dev
+ * ✅ Stable auth redirect builder for save-echo flow
  */
 function getAuthRedirectTo() {
-  const site = (import.meta as any).env?.VITE_PUBLIC_SITE_URL?.trim?.() || window.location.origin;
-  return new URL("/auth/callback", site).toString();
+  const origin = window.location.origin;
+  return `${origin}/auth/callback?next=/save-echo`;
 }
 
 function kindIcon(kind?: string | null) {
@@ -130,6 +128,10 @@ function SaveGateModal({
       localStorage.setItem(POST_AUTH_PATH_KEY, getCurrentAppPath());
 
       const redirectTo = getAuthRedirectTo();
+      
+      // TEMPORARY: Always log emailRedirectTo to verify it's being set
+      console.log("[Echo] emailRedirectTo BEFORE signInWithOtp:", redirectTo);
+      console.log("[Echo] Full options object:", { emailRedirectTo: redirectTo });
 
       const { error } = await supabase.auth.signInWithOtp({
         email: email.trim(),
@@ -614,7 +616,7 @@ export default function Echo() {
   const linkedMeta = linked ? linked.kind || "Item" : "Linking is optional.";
 
   return (
-    <div className="page echo-page">
+    <div className="page echo-page coral-page-content">
       <div className="center-wrap echo-center">
         <div className="echo-hero">
           <PageHeader 

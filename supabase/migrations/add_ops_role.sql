@@ -11,3 +11,4 @@ ON CONFLICT (key) DO NOTHING;
 -- Verify the role was inserted
 SELECT id, key, name FROM public.roles WHERE key = 'ops';
 
+

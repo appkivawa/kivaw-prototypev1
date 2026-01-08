@@ -45,3 +45,4 @@ CREATE POLICY "Admins can manage experiments" ON public.experiments
 CREATE INDEX IF NOT EXISTS idx_experiments_status ON public.experiments(status);
 CREATE INDEX IF NOT EXISTS idx_experiments_start_date ON public.experiments(start_date DESC);
 
+

@@ -84,7 +84,7 @@ export default function Waves() {
   }, [currentFeed]);
 
   return (
-    <div className="page">
+    <div className="page coral-page-content">
       <PageHeader 
         title="Waves" 
         subtitle="See what's resonating with others. Maybe you'll find something new." 
