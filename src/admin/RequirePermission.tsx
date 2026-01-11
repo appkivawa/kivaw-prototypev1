@@ -1,4 +1,5 @@
-import { Navigate, useNavigate } from "react-router-dom";
+import React from "react";
+import { Navigate, useLocation, useNavigate } from "react-router-dom";
 import { useSession } from "../auth/useSession";
 import { useRoles } from "../auth/useRoles";
 import Card from "../ui/Card";
@@ -8,22 +9,20 @@ type RequirePermissionProps = {
   children: React.ReactNode;
   tabName: string;
   fallback?: React.ReactNode;
+  /**
+   * Optional redirect when access is denied (NOT for unauth).
+   * We'll ignore /team to prevent accidental "yeet to team portal" behavior.
+   */
   redirectTo?: string;
 };
 
-/**
- * RequirePermission - Component that restricts access based on tab permissions
- * 
- * Props:
- * - tabName: Name of the tab (e.g., "users", "security", "content")
- * - fallback: Optional custom component to show if access denied
- * - redirectTo: Optional URL to redirect to if access denied
- * 
- * Behavior:
- * - If not logged in -> redirects to /login
- * - If user lacks permission -> shows themed "No access" page
- * - If user has permission -> renders children
- */
+function safeRedirect(to?: string) {
+  if (!to) return null;
+  // Hard block the Team portal from being an "oops redirect"
+  if (to.startsWith("/team")) return null;
+  return to;
+}
+
 export default function RequirePermission({
   children,
   tabName,
@@ -31,8 +30,14 @@ export default function RequirePermission({
   redirectTo,
 }: RequirePermissionProps) {
   const navigate = useNavigate();
+  const location = useLocation();
+
   const { loading: sessionLoading, isAuthed } = useSession();
-  const { roleKeys, isSuperAdmin, loading: rolesLoading } = useRoles();
+  const roles = useRoles() as any;
+
+  const roleKeys: string[] = roles?.roleKeys ?? [];
+  const isSuperAdmin: boolean = !!roles?.isSuperAdmin;
+  const rolesLoading: boolean = !!roles?.loading;
 
   const loading = sessionLoading || rolesLoading;
 
@@ -49,57 +54,53 @@ export default function RequirePermission({
     );
   }
 
-  // Not authenticated - redirect to login
+  // Not authenticated -> redirect to login with next=<current path>
   if (!isAuthed) {
-    if (redirectTo) {
-      return <Navigate to={redirectTo} replace />;
-    }
-    return <Navigate to="/login" replace />;
+    const next = encodeURIComponent(location.pathname + location.search);
+    return <Navigate to={`/login?next=${next}`} replace />;
   }
 
   // Check if user can view this tab
-  const hasAccess = canViewTab(roleKeys, isSuperAdmin || false, tabName);
+  const hasAccess = canViewTab(roleKeys, isSuperAdmin, tabName);
 
   // Access denied
   if (!hasAccess) {
-    if (fallback) {
-      return <>{fallback}</>;
-    }
+    if (fallback) return <>{fallback}</>;
 
-    if (redirectTo) {
-      return <Navigate to={redirectTo} replace />;
-    }
+    const safe = safeRedirect(redirectTo);
+    if (safe) return <Navigate to={safe} replace />;
 
-    // Show themed "No access" page
+    // Default deny UI (no auto-redirect loops)
     return (
       <div className="page">
         <div className="center-wrap">
           <Card className="center card-pad">
             <div style={{ textAlign: "center", padding: "60px 20px", maxWidth: "500px", margin: "0 auto" }}>
               <div style={{ fontSize: 64, marginBottom: 24, opacity: 0.6 }}>🚫</div>
-              <h1 style={{
-                fontSize: 32,
-                fontWeight: 800,
-                color: "var(--ink)",
-                marginBottom: 12,
-                lineHeight: 1.2
-              }}>
+              <h1
+                style={{
+                  fontSize: 32,
+                  fontWeight: 800,
+                  color: "var(--ink)",
+                  marginBottom: 12,
+                  lineHeight: 1.2,
+                }}
+              >
                 No Access
               </h1>
-              <p className="muted" style={{
-                fontSize: 17,
-                lineHeight: 1.6,
-                marginBottom: 32,
-                color: "var(--ink-muted)"
-              }}>
-                You don't have permission to access this page.
-              </p>
-              <button
-                className="btn"
-                type="button"
-                onClick={() => navigate("/admin")}
-                style={{ marginTop: 8 }}
+              <p
+                className="muted"
+                style={{
+                  fontSize: 17,
+                  lineHeight: 1.6,
+                  marginBottom: 32,
+                  color: "var(--ink-muted)",
+                }}
               >
+                You don’t have permission to access this page.
+              </p>
+
+              <button className="btn" type="button" onClick={() => navigate("/admin", { replace: true })}>
                 Go to Dashboard →
               </button>
             </div>
@@ -109,7 +110,7 @@ export default function RequirePermission({
     );
   }
 
-  // Access granted - render children
   return <>{children}</>;
 }
+
 

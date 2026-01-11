@@ -1,13 +1,14 @@
+// src/auth/RequireAuth.tsx
 import React from "react";
 import { useLocation } from "react-router-dom";
 import { useSession } from "./useSession";
 import AuthGate from "./AuthGate";
 
-export default function RequireAuth({ 
+export default function RequireAuth({
   children,
   title,
-  message 
-}: { 
+  message,
+}: {
   children: React.ReactNode;
   title?: string;
   message?: string;
@@ -28,26 +29,32 @@ export default function RequireAuth({
   }
 
   if (!isAuthed) {
-    // Use page-specific messages for Creator and Team portals
+    // ✅ Decide where login should land
+    let nextPath = loc.pathname;
+
+    // Creator portal should land on the social feed
+    if (loc.pathname === "/creator") nextPath = "/feed";
+
+    // Team portal should land on admin dashboard
+    if (loc.pathname === "/team") nextPath = "/admin";
+
+    // If you ever gate /feed itself, keep it /feed
+    if (loc.pathname === "/feed") nextPath = "/feed";
+
     let gateTitle = title || "Sign in to continue";
     let gateMessage = message;
-    
+
     if (loc.pathname === "/creator") {
       gateTitle = "Creator Portal";
-      gateMessage = "Log in or sign up to access the Creator portal.";
+      gateMessage = "Log in or sign up to continue.";
     } else if (loc.pathname === "/team") {
       gateTitle = "Team Portal";
-      gateMessage = "Log in to access the Team portal.";
-    } else if (!message) {
-      gateMessage = "You can browse as a guest, but saving Echoes requires an account.";
+      gateMessage = "Log in to access the team dashboard.";
+    } else if (!gateMessage) {
+      gateMessage = "You can browse as a guest, but saving requires an account.";
     }
 
-    return (
-      <AuthGate
-        title={gateTitle}
-        message={gateMessage || "Please sign in to continue."}
-      />
-    );
+    return <AuthGate title={gateTitle} message={gateMessage} nextPath={nextPath} />;
   }
 
   return <>{children}</>;

@@ -1,10 +1,10 @@
-import { useNavigate } from "react-router-dom";
-import Card from "../ui/Card";
+import { useNavigate, useLocation } from "react-router-dom";
 import { useEffect, useState } from "react";
 import { supabase } from "../lib/supabaseClient";
 import { useRoles } from "../auth/useRoles";
 import { canViewTab } from "./permissions";
 import TopNav from "../ui/TopNav";
+
 import Overview from "./tabs/Overview";
 import Users from "./tabs/Users";
 import Content from "./tabs/Content";
@@ -23,21 +23,27 @@ import PublishToExplore from "./tabs/PublishToExplore";
 
 export default function AdminLayout() {
   const navigate = useNavigate();
+  const location = useLocation();
+
   const [userEmail, setUserEmail] = useState<string>("");
   const { roleKeys, isSuperAdmin } = useRoles();
   const [activeTab, setActiveTab] = useState<string>("overview");
 
   useEffect(() => {
+    let alive = true;
+
     (async () => {
-      // Get user email
-      const { data: { session } } = await supabase.auth.getSession();
-      if (session?.user?.email) {
-        setUserEmail(session.user.email);
-      }
+      const { data } = await supabase.auth.getSession();
+      if (!alive) return;
+      const email = data.session?.user?.email || "";
+      setUserEmail(email);
     })();
+
+    return () => {
+      alive = false;
+    };
   }, []);
 
-  // Define tabs with their permission requirements
   const tabs = [
     { name: "overview", label: "Overview", icon: "📊" },
     { name: "users", label: "Users", icon: "👥" },
@@ -56,12 +62,10 @@ export default function AdminLayout() {
     { name: "publish_to_explore", label: "Publish to Explore", icon: "📤" },
   ];
 
-  // Filter tabs based on permissions
   const visibleTabs = tabs.filter((tab) =>
     canViewTab(roleKeys, isSuperAdmin || false, tab.name)
   );
 
-  // Render tab content based on activeTab
   function renderTabContent() {
     switch (activeTab) {
       case "overview":
@@ -102,21 +106,51 @@ export default function AdminLayout() {
   async function handleSignOut() {
     try {
       await supabase.auth.signOut();
-      navigate("/");
+      navigate("/", { replace: true });
     } catch (error) {
       console.error("Error signing out:", error);
     }
   }
 
+  const isOnFeed = location.pathname.startsWith("/feed");
+  const isOnHome = location.pathname === "/" || location.pathname === "/home";
+
   return (
     <div className="coral-page-content">
       <TopNav />
+
       <div className="coral-section" style={{ maxWidth: "1400px", margin: "0 auto" }}>
         <div className="admin-header">
           <div>
             <h1 className="admin-title">Admin Dashboard</h1>
             <p className="admin-subtitle">Manage your Kivaw platform</p>
+
+            {/* ✅ USER MODE BUTTONS (these will actually show) */}
+            <div style={{ marginTop: 12, display: "flex", gap: 10, flexWrap: "wrap" }}>
+              {!isOnFeed && (
+                <button
+                  className="coral-btn-secondary"
+                  type="button"
+                  onClick={() => navigate("/feed")}
+                  style={{ fontSize: 12, padding: "8px 16px" }}
+                >
+                  👤 Browse as User
+                </button>
+              )}
+
+              {!isOnHome && (
+                <button
+                  className="coral-btn-secondary"
+                  type="button"
+                  onClick={() => navigate("/")}
+                  style={{ fontSize: 12, padding: "8px 16px" }}
+                >
+                  🏠 Back to Site
+                </button>
+              )}
+            </div>
           </div>
+
           <div style={{ display: "flex", flexDirection: "column", alignItems: "flex-end", gap: 8 }}>
             {userEmail && (
               <div className="admin-user-info">
@@ -124,6 +158,7 @@ export default function AdminLayout() {
                 <div className="admin-user-id">{userEmail}</div>
               </div>
             )}
+
             <button
               className="coral-btn-secondary"
               type="button"
@@ -135,7 +170,6 @@ export default function AdminLayout() {
           </div>
         </div>
 
-        {/* Tabs Navigation */}
         <div className="admin-tabs">
           {visibleTabs.map((tab) => (
             <button
@@ -150,7 +184,6 @@ export default function AdminLayout() {
           ))}
         </div>
 
-        {/* Tab Content */}
         <div className="coral-card" style={{ padding: 32 }}>
           {renderTabContent()}
         </div>
@@ -158,3 +191,4 @@ export default function AdminLayout() {
     </div>
   );
 }
+

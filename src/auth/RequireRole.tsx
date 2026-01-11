@@ -2,30 +2,18 @@ import React from "react";
 import { Navigate, useLocation } from "react-router-dom";
 import { supabase } from "../lib/supabaseClient";
 
-/**
- * RequireRole
- * - Never calls navigate() during render
- * - Never sets state during render
- * - Waits for auth to initialize
- *
- * Assumptions:
- * - You store user role in a `profiles` table keyed by user_id (uuid)
- *   with a `role` column (e.g. "admin" | "employee" | "creator")
- * - If you don't have profiles yet, temporarily allow `adminEmails` fallback
- */
-type Role = "admin" | "employee" | "creator";
+export type RoleKey = "admin" | "employee" | "creator" | "super_admin" | "ops" | "it" | "social_media";
 
 const adminEmails = new Set<string>([
-  // TEMP: put your admin email here if you need a quick win
-  // "you@domain.com",
+  // "kivawapp@proton.me", // optional fallback
 ]);
 
 export default function RequireRole({
-  role,
+  allow,
   children,
-  redirectTo = "/team",
+  redirectTo = "/",
 }: {
-  role: Role;
+  allow: RoleKey[];
   children: React.ReactNode;
   redirectTo?: string;
 }) {
@@ -33,13 +21,15 @@ export default function RequireRole({
 
   const [loading, setLoading] = React.useState(true);
   const [authed, setAuthed] = React.useState(false);
-  const [hasRole, setHasRole] = React.useState(false);
+  const [hasAccess, setHasAccess] = React.useState(false);
 
   React.useEffect(() => {
     let alive = true;
 
     async function load() {
       try {
+        setLoading(true);
+
         // 1) Get session
         const { data: sessionData, error: sessionErr } = await supabase.auth.getSession();
         if (!alive) return;
@@ -47,25 +37,28 @@ export default function RequireRole({
         const session = sessionData.session;
         if (sessionErr || !session) {
           setAuthed(false);
-          setHasRole(false);
+          setHasAccess(false);
           setLoading(false);
           return;
         }
 
         setAuthed(true);
 
-        // 2) Resolve role
+        // 2) Email allowlist quick win
         const email = session.user.email ?? "";
-        if (role === "admin" && adminEmails.has(email)) {
-          setHasRole(true);
+        if (adminEmails.has(email) && allow.includes("admin")) {
+          setHasAccess(true);
           setLoading(false);
           return;
         }
 
-        // Preferred: profiles table
+        // 3) Pull role keys from profiles (single role OR array)
+        // Supports:
+        // - profiles.role = "admin"
+        // - profiles.role_keys = ["admin","ops"]
         const { data: profile, error: profErr } = await supabase
           .from("profiles")
-          .select("role")
+          .select("role, role_keys")
           .eq("user_id", session.user.id)
           .maybeSingle();
 
@@ -73,30 +66,37 @@ export default function RequireRole({
 
         if (profErr) {
           console.error("[RequireRole] profile fetch error:", profErr);
-          // If profile fetch fails, DO NOT redirect in a loop—fail closed.
-          setHasRole(false);
+          setHasAccess(false);
           setLoading(false);
           return;
         }
 
-        const userRole = (profile?.role ?? "employee") as Role;
-        setHasRole(userRole === role);
+        const role = (profile as any)?.role as string | undefined;
+        const roleKeys = ((profile as any)?.role_keys as string[] | undefined) ?? [];
+
+        const userRoleKeys = new Set<string>([
+          ...(role ? [role] : []),
+          ...roleKeys,
+        ]);
+
+        // super_admin implies admin
+        if (userRoleKeys.has("super_admin")) userRoleKeys.add("admin");
+
+        const ok = allow.some((r) => userRoleKeys.has(r));
+        setHasAccess(ok);
         setLoading(false);
       } catch (e) {
         console.error("[RequireRole] unexpected error:", e);
         if (!alive) return;
         setAuthed(false);
-        setHasRole(false);
+        setHasAccess(false);
         setLoading(false);
       }
     }
 
     load();
 
-    // Keep state in sync if auth changes
     const { data: sub } = supabase.auth.onAuthStateChange(() => {
-      // re-run init on auth change
-      setLoading(true);
       load();
     });
 
@@ -104,26 +104,24 @@ export default function RequireRole({
       alive = false;
       sub.subscription.unsubscribe();
     };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [role]);
+  }, [allow]);
 
-  // ✅ No redirects while loading
   if (loading) {
     return (
-      <div className="coral-page-content">
-        <div className="coral-section" style={{ maxWidth: "560px", margin: "0 auto", padding: "80px 20px" }}>
-          <div className="coral-card" style={{ padding: "48px 32px", textAlign: "center" }}>
-            <p style={{ color: "var(--coral-text-muted)" }}>Loading…</p>
+      <div className="page">
+        <div className="center-wrap">
+          <div className="coral-card" style={{ padding: 32, textAlign: "center" }}>
+            Loading…
           </div>
         </div>
       </div>
     );
   }
 
-  // ✅ Safe redirects using <Navigate /> (no navigate() in render)
   if (!authed) return <Navigate to="/login" replace state={{ from: location.pathname }} />;
 
-  if (!hasRole) return <Navigate to={redirectTo} replace />;
+  if (!hasAccess) return <Navigate to={redirectTo} replace />;
 
   return <>{children}</>;
 }
+

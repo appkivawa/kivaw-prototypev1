@@ -6,12 +6,7 @@ import Home from "./pages/Home";
 import HomePage from "./pages/HomePage";
 import Explore from "./pages/Explore";
 import ForYou from "./pages/ForYou";
-import Saved from "./pages/Saved";
-import SavedActivitiesPage from "./pages/SavedActivitiesPage";
 import MatchPage from "./pages/MatchPage";
-import Echo from "./pages/Echo";
-import Waves from "./pages/Waves";
-import Events from "./pages/Events";
 import ItemDetail from "./pages/ItemDetail";
 
 import QuizState from "./pages/quiz/QuizState";
@@ -27,11 +22,12 @@ import Creators from "./pages/Creators";
 import Team from "./pages/Team";
 import CreatorsApply from "./pages/CreatorsApply";
 import CreatorsDashboard from "./pages/CreatorsDashboard";
+
 import RequireAdmin from "./admin/RequireAdmin";
 import RequirePermission from "./admin/RequirePermission";
 import RequireCreator from "./auth/RequireCreator";
-import RequireEmployee from "./auth/RequireEmployee";
 import RequireAuth from "./auth/RequireAuth";
+
 import AdminLayout from "./admin/AdminLayout";
 import Overview from "./admin/tabs/Overview";
 import Users from "./admin/tabs/Users";
@@ -48,9 +44,11 @@ import CreatorRequests from "./admin/tabs/CreatorRequests";
 import Integrations from "./admin/tabs/Integrations";
 import RecommendationsPreview from "./admin/tabs/RecommendationsPreview";
 import PublishToExplore from "./admin/tabs/PublishToExplore";
+
 import RecommendationsPage from "./pages/RecommendationsPage";
-
-
+import Feed from "./pages/Feed";
+import Preferences from "./pages/preferences";
+import Saved from "./pages/Saved";
 
 function HashAuthRedirect() {
   const nav = useNavigate();
@@ -68,23 +66,24 @@ function HashAuthRedirect() {
 export default function App() {
   return (
     <Routes>
-      {/* --------- PUBLIC / STANDALONE ROUTES (NO LAYOUT) --------- */}
+      {/* --------- PUBLIC / STANDALONE ROUTES (NO SHELL) --------- */}
       <Route path="/login" element={<Login />} />
       <Route path="/auth/callback" element={<AuthCallback />} />
-      
-      {/* Public entry pages */}
-      <Route 
-        path="/creator" 
+
+      {/* Optional convenience route: logged-in landing */}
+      <Route path="/app" element={<Navigate to="/feed" replace />} />
+
+      {/* Creator pages */}
+      <Route
+        path="/creator"
         element={
           <RequireAuth title="Creator Portal" message="Please log in to continue">
             <Creator />
           </RequireAuth>
-        } 
+        }
       />
       <Route path="/creators" element={<Creators />} />
       <Route path="/creators/apply" element={<CreatorsApply />} />
-      
-      {/* Creator portal - requires creator or partner role */}
       <Route
         path="/creators/dashboard"
         element={
@@ -93,29 +92,27 @@ export default function App() {
           </RequireCreator>
         }
       />
-      
-      <Route 
-        path="/team" 
+
+      {/* Team */}
+      <Route
+        path="/team"
         element={
           <RequireAuth title="Team Portal" message="Please log in to continue">
             <Team />
           </RequireAuth>
-        } 
+        }
       />
-      {/* TEMPORARY: Admin debug page - remove after fixing admin access */}
-      {import.meta.env.DEV && (
-        <Route path="/admin-debug" element={<AdminDebug />} />
-      )}
 
-      {/* Employee portal (Admin routes) - requires ops, admin, or super_admin */}
+      {/* TEMP: admin debug */}
+      {import.meta.env.DEV && <Route path="/admin-debug" element={<AdminDebug />} />}
+
+      {/* ✅ Admin (FIX: removed RequireEmployee gate) */}
       <Route
         path="/admin"
         element={
-          <RequireEmployee>
-            <RequireAdmin>
-              <AdminLayout />
-            </RequireAdmin>
-          </RequireEmployee>
+          <RequireAdmin>
+            <AdminLayout />
+          </RequireAdmin>
         }
       >
         <Route
@@ -253,15 +250,45 @@ export default function App() {
         <Route index element={<HomePage />} />
         <Route path="home" element={<Home />} />
         <Route path="explore" element={<Explore />} />
+
+        {/* Social Feed (requires auth) */}
+        <Route
+          path="feed"
+          element={
+            <RequireAuth title="Your Feed" message="Please log in to view your feed">
+              <Feed />
+            </RequireAuth>
+          }
+        />
+
+        {/* Preferences (requires auth) */}
+        <Route
+          path="preferences"
+          element={
+            <RequireAuth title="Preferences" message="Please log in to edit preferences">
+              <Preferences />
+            </RequireAuth>
+          }
+        />
+
+        {/* Saved (requires auth) */}
+        <Route
+          path="saved"
+          element={
+            <RequireAuth title="Saved" message="Please log in to view saved items">
+              <Saved />
+            </RequireAuth>
+          }
+        />
+
         <Route path="for-you" element={<ForYou />} />
         <Route path="recs" element={<RecommendationsPage />} />
-        <Route path="waves" element={<Waves />} />
-        <Route path="echo" element={<Echo />} />
-        <Route path="save-echo" element={<Navigate to="/echo" replace />} />
-        <Route path="saved" element={<Saved />} />
-        <Route path="saved-activities" element={<SavedActivitiesPage />} />
+
+        <Route path="waves" element={<Navigate to="/explore" replace />} />
+        <Route path="echo" element={<Navigate to="/explore" replace />} />
+        <Route path="save-echo" element={<Navigate to="/explore" replace />} />
         <Route path="match" element={<MatchPage />} />
-        <Route path="events" element={<Events />} />
+        <Route path="events" element={<Navigate to="/explore" replace />} />
         <Route path="item/:id" element={<ItemDetail />} />
 
         <Route path="quiz/state" element={<QuizState />} />
@@ -270,13 +297,19 @@ export default function App() {
 
         <Route path="guide" element={<FAQPage />} />
 
+        {/* shell catch-all */}
         <Route path="*" element={<Navigate to="/" replace />} />
       </Route>
 
+      {/* global catch-all */}
       <Route path="*" element={<Navigate to="/" replace />} />
     </Routes>
   );
 }
+
+
+
+
 
 
 

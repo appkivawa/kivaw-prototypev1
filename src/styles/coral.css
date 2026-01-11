@@ -26,17 +26,42 @@ html:not([data-theme]) {
   --coral-surface-hover: rgba(255, 255, 255, 0.09);
   --coral-border: rgba(255, 255, 255, 0.12);
   --coral-border-hover: rgba(255, 255, 255, 0.18);
+  /* Button text color for dark mode - white for visibility */
+  --coral-btn-text: white;
+  /* Detail panel for dark mode */
+  --coral-detail-panel-bg: rgba(10, 10, 10, 0.98);
+  --coral-detail-card-bg: rgba(255, 255, 255, 0.05);
+  --coral-detail-card-hover: rgba(255, 255, 255, 0.08);
 }
 
 /* ========== LIGHT MODE ========== */
 html[data-theme="light"] {
-  --coral-text-primary: #151515;
-  --coral-text-muted: #3A3A3A;
-  --coral-text-tertiary: #5A5A5A;
+  --coral-text-primary: #1a1a1a;
+  --coral-text-muted: #4a4a4a;
+  --coral-text-tertiary: #6a6a6a;
   --coral-surface: rgba(255, 255, 255, 0.5);
   --coral-surface-hover: rgba(255, 255, 255, 0.65);
   --coral-border: rgba(0, 0, 0, 0.15);
   --coral-border-hover: rgba(0, 0, 0, 0.22);
+  /* Button text color for light mode - dark coral/maroon for visibility */
+  --coral-btn-text: #8B1A3D;
+  /* Detail panel for light mode */
+  --coral-detail-panel-bg: rgba(255, 255, 255, 0.98);
+  --coral-detail-card-bg: rgba(255, 255, 255, 0.6);
+  --coral-detail-card-hover: rgba(255, 255, 255, 0.8);
+}
+
+/* Link colors in light mode */
+html[data-theme="light"] a:not(.coral-nav-link):not(.coral-footer-link):not(.coral-btn) {
+  color: #1a1a1a;
+  text-decoration: underline;
+  text-decoration-color: rgba(255, 107, 157, 0.4);
+  transition: color 0.2s ease, text-decoration-color 0.2s ease;
+}
+
+html[data-theme="light"] a:not(.coral-nav-link):not(.coral-footer-link):not(.coral-btn):hover {
+  color: #ff6b9d;
+  text-decoration-color: #ff6b9d;
 }
 
 /* Typography base */
@@ -197,6 +222,20 @@ html[data-theme="light"] .coral-nav-link.active {
   box-shadow: 0 4px 12px rgba(0, 0, 0, 0.2);
 }
 
+/* Light mode: Continue button uses coral gradient */
+html[data-theme="light"] .coral-nav-cta {
+  background: var(--coral-gradient);
+  color: var(--coral-btn-text, #8B1A3D);
+  border: none;
+  box-shadow: 0 2px 8px rgba(255, 107, 157, 0.3);
+}
+
+html[data-theme="light"] .coral-nav-cta:hover {
+  background: linear-gradient(135deg, #ff7ba8 0%, #ff9a6a 100%);
+  box-shadow: 0 4px 12px rgba(255, 107, 157, 0.4);
+  transform: translateY(-2px);
+}
+
 .coral-theme-toggle {
   background: var(--coral-surface);
   backdrop-filter: blur(8px);
@@ -291,7 +330,7 @@ html[data-theme="light"] .coral-nav-link.active {
   border: none;
   border-radius: 24px;
   padding: 16px 32px;
-  color: white;
+  color: var(--coral-btn-text, white);
   font-weight: 700;
   font-size: 16px;
   cursor: pointer;

@@ -107,3 +107,6 @@ Make sure these are set in your deployment platform:
 - [ ] Test saved activities (`/saved-activities` route)
 - [ ] Verify Supabase connection works in production
 
+
+
+

@@ -1,17 +1,34 @@
+// src/pages/Saved.tsx
 import { useEffect, useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import Card from "../ui/Card";
 import ItemCard from "../ui/ItemCard";
 import PageHeader from "../ui/PageHeader";
-
 import { supabase } from "../lib/supabaseClient";
-import { fetchSavedIds, unsaveItem, getUserId } from "../data/savesApi";
+
 import type { ContentItem } from "../data/contentApi";
 import { isPublicDiscoverableContentItem } from "../utils/contentFilters";
 import { requireAuth } from "../auth/authUtils";
 
+import {
+  clearLocalSaved,
+  getLocalSaved,
+  getLocalSavedIds,
+  saveLocal,
+  unsaveLocal,
+} from "../data/savedLocal";
+
 type ViewMode = "grid" | "list";
 type SortBy = "recent" | "category" | "title";
+
+type SavedSource = "local" | "account";
+
+type SavedIdRow = { content_id: string; created_at: string };
+type SaveInsert = { user_id: string; content_id: string };
+
+function uniq<T>(arr: T[]) {
+  return Array.from(new Set(arr));
+}
 
 export default function Saved() {
   const navigate = useNavigate();
@@ -21,8 +38,33 @@ export default function Saved() {
   const [loading, setLoading] = useState(true);
   const [err, setErr] = useState("");
   const [busyId, setBusyId] = useState<string | null>(null);
+
   const [viewMode, setViewMode] = useState<ViewMode>("grid");
   const [sortBy, setSortBy] = useState<SortBy>("recent");
+
+  const [localIds, setLocalIds] = useState<string[]>(getLocalSavedIds());
+  const [accountIds, setAccountIds] = useState<string[]>([]);
+  const [lastLoadedSource, setLastLoadedSource] = useState<SavedSource>("local");
+
+  async function getUserId() {
+    const { data } = await supabase.auth.getUser();
+    return data.user?.id ?? null;
+  }
+
+  async function fetchAccountSavedIds(uid: string): Promise<string[]> {
+    // Assumes table "saved_items" with columns: user_id, content_id, created_at
+    // If your table name differs, change it here.
+    const { data, error } = await supabase
+      .from("saved_items")
+      .select("content_id, created_at")
+      .eq("user_id", uid)
+      .order("created_at", { ascending: false });
+
+    if (error) throw error;
+
+    const rows = (data ?? []) as SavedIdRow[];
+    return rows.map((r) => r.content_id);
+  }
 
   async function loadSaved() {
     setErr("");
@@ -33,32 +75,44 @@ export default function Saved() {
       const authed = !!uid;
       setIsAuthed(authed);
 
-      if (!authed) {
+      // 1) local first
+      const local = getLocalSaved();
+      const localOnlyIds = local.map((x) => x.id);
+      setLocalIds(localOnlyIds);
+
+      // 2) remote (optional)
+      let remoteIds: string[] = [];
+      if (authed && uid) {
+        remoteIds = await fetchAccountSavedIds(uid);
+        setAccountIds(remoteIds);
+      } else {
+        setAccountIds([]);
+      }
+
+      // 3) merge: account first (newest), then local newest-first
+      const merged = authed ? uniq([...remoteIds, ...localOnlyIds]) : localOnlyIds;
+      setLastLoadedSource(authed ? "account" : "local");
+
+      if (merged.length === 0) {
         setItems([]);
         return;
       }
 
-      const saved = await fetchSavedIds(); // newest-first
-
-      if (saved.length === 0) {
-        setItems([]);
-        return;
-      }
-
+      // 4) fetch content items
       const { data, error } = await supabase
         .from("content_items")
         .select(
           "id,external_id,kind,title,byline,meta,image_url,url,state_tags,focus_tags,usage_tags,source,created_at"
         )
-        .in("id", saved);
+        .in("id", merged);
 
       if (error) throw error;
 
-      // preserve saved order
+      // preserve merged order
       const map = new Map<string, ContentItem>();
       for (const it of (data || []) as ContentItem[]) map.set(it.id, it);
 
-      const ordered = saved.map((id) => map.get(id)).filter(Boolean) as ContentItem[];
+      const ordered = merged.map((id) => map.get(id)).filter(Boolean) as ContentItem[];
       setItems(ordered);
     } catch (e: any) {
       setErr(e?.message || "Couldn't load your saved items right now. Try refreshing?");
@@ -73,9 +127,6 @@ export default function Saved() {
   }, []);
 
   async function removeSaved(contentId: string) {
-    const uid = await requireAuth(navigate, "/saved");
-    if (!uid) return;
-
     if (busyId) return;
     setBusyId(contentId);
 
@@ -83,7 +134,17 @@ export default function Saved() {
     setItems((prev) => prev.filter((x) => x.id !== contentId));
 
     try {
-      await unsaveItem(contentId);
+      // always remove locally (Option B behavior)
+      unsaveLocal(contentId);
+      setLocalIds(getLocalSavedIds());
+
+      // if authed, also remove from account
+      const uid = await getUserId();
+      if (uid) {
+        // Assumes table "saved_items"
+        await supabase.from("saved_items").delete().eq("user_id", uid).eq("content_id", contentId);
+        setAccountIds((prev) => prev.filter((id) => id !== contentId));
+      }
     } catch (e) {
       console.error(e);
       await loadSaved();
@@ -93,37 +154,89 @@ export default function Saved() {
     }
   }
 
+  async function syncLocalToAccount() {
+    const uid = await requireAuth(navigate, "/saved");
+    if (!uid) return;
+
+    const local = getLocalSavedIds();
+    if (!local.length) return;
+
+    try {
+      // get latest remote
+      const remote = await fetchAccountSavedIds(uid);
+      const missing = local.filter((id) => !remote.includes(id));
+      if (!missing.length) {
+        alert("Nothing to sync — your account already has these saves.");
+        return;
+      }
+
+      const payload: SaveInsert[] = missing.map((id) => ({ user_id: uid, content_id: id }));
+
+      // Assumes you have a unique constraint on (user_id, content_id) OR you want duplicates avoided.
+      // If you DO have a unique constraint, use upsert.
+      const { error } = await supabase.from("saved_items").upsert(payload, {
+        onConflict: "user_id,content_id",
+      });
+
+      if (error) throw error;
+
+      alert(`Synced ${missing.length} saves to your account ✅`);
+      await loadSaved();
+    } catch (e: any) {
+      console.error(e);
+      alert(e?.message || "Couldn’t sync right now.");
+    }
+  }
+
+  function resetLocal() {
+    if (!confirm("Reset local saved items? This only affects this browser.")) return;
+    clearLocalSaved();
+    setLocalIds([]);
+    // keep account items intact
+    loadSaved();
+  }
+
+  async function clearAccount() {
+    const uid = await requireAuth(navigate, "/saved");
+    if (!uid) return;
+
+    if (!confirm("Clear ALL account saves? This is permanent (for your account).")) return;
+
+    try {
+      const { error } = await supabase.from("saved_items").delete().eq("user_id", uid);
+      if (error) throw error;
+      setAccountIds([]);
+      alert("Cleared account saves.");
+      await loadSaved();
+    } catch (e: any) {
+      console.error(e);
+      alert(e?.message || "Couldn’t clear account saves.");
+    }
+  }
+
   const visibleItems = useMemo(() => {
     return items.filter((it) => isPublicDiscoverableContentItem(it));
   }, [items]);
 
-  const internalCount = useMemo(() => {
-    return items.length - visibleItems.length;
-  }, [items.length, visibleItems.length]);
+  const internalCount = useMemo(() => items.length - visibleItems.length, [items.length, visibleItems.length]);
 
-  // Sort items
   const sortedItems = useMemo(() => {
     const sorted = [...visibleItems];
-    if (sortBy === "category") {
-      sorted.sort((a, b) => (a.kind || "").localeCompare(b.kind || ""));
-    } else if (sortBy === "title") {
-      sorted.sort((a, b) => (a.title || "").localeCompare(b.title || ""));
-    }
-    // "recent" is already sorted (newest first from API)
+    if (sortBy === "category") sorted.sort((a, b) => (a.kind || "").localeCompare(b.kind || ""));
+    else if (sortBy === "title") sorted.sort((a, b) => (a.title || "").localeCompare(b.title || ""));
     return sorted;
   }, [visibleItems, sortBy]);
 
-  // Get most common category
   const mostCommonCategory = useMemo(() => {
     if (visibleItems.length === 0) return null;
-    const categoryCounts = new Map<string, number>();
+    const counts = new Map<string, number>();
     visibleItems.forEach((item) => {
       const cat = item.kind || "Other";
-      categoryCounts.set(cat, (categoryCounts.get(cat) || 0) + 1);
+      counts.set(cat, (counts.get(cat) || 0) + 1);
     });
     let maxCount = 0;
     let maxCat = "";
-    categoryCounts.forEach((count, cat) => {
+    counts.forEach((count, cat) => {
       if (count > maxCount) {
         maxCount = count;
         maxCat = cat;
@@ -132,27 +245,63 @@ export default function Saved() {
     return maxCat;
   }, [visibleItems]);
 
+  const localCount = localIds.length;
+  const accountCount = accountIds.length;
+
+  const canSync = isAuthed && localIds.some((id) => !accountIds.includes(id));
+
   return (
     <div className="page coral-page-content">
-      <PageHeader title="Saved" subtitle='Your personal stash of "this actually helped."' />
+      <PageHeader title="Saved" subtitle='Your stash of "this matters".' />
 
       <div className="center-wrap">
-        {!isAuthed ? (
-          <Card className="center card-pad">
-            <div>
-              <p className="muted" style={{ marginBottom: 10 }}>
-                Sign in to see what you've saved.
-              </p>
-              <button
-                className="btn"
-                type="button"
-                onClick={() => navigate("/login", { state: { from: "/saved" } })}
-              >
-                Continue →
+        {/* Top actions */}
+        <Card className="center card-pad" style={{ marginBottom: 14 }}>
+          <div style={{ display: "flex", justifyContent: "space-between", gap: 12, flexWrap: "wrap" }}>
+            <div style={{ display: "flex", gap: 10, flexWrap: "wrap" }}>
+              <span className="muted" style={{ fontWeight: 800 }}>
+                Local: {localCount}
+              </span>
+              <span className="muted" style={{ fontWeight: 800 }}>
+                Account: {isAuthed ? accountCount : "—"}
+              </span>
+              <span className="muted" style={{ opacity: 0.7 }}>
+                Source: {lastLoadedSource}
+              </span>
+            </div>
+
+            <div style={{ display: "flex", gap: 10, flexWrap: "wrap" }}>
+              {!isAuthed ? (
+                <button
+                  className="btn"
+                  type="button"
+                  onClick={() => navigate("/login", { state: { from: "/saved" } })}
+                >
+                  Sign in to sync →
+                </button>
+              ) : (
+                <>
+                  <button className="btn" type="button" onClick={syncLocalToAccount} disabled={!canSync}>
+                    {canSync ? "Sync local → account" : "Synced"}
+                  </button>
+                  <button className="btn" type="button" onClick={clearAccount}>
+                    Clear account
+                  </button>
+                </>
+              )}
+
+              <button className="btn" type="button" onClick={resetLocal}>
+                Reset local
+              </button>
+
+              <button className="btn" type="button" onClick={loadSaved}>
+                Refresh
               </button>
             </div>
-          </Card>
-        ) : loading ? (
+          </div>
+        </Card>
+
+        {loading ? (
           <Card className="center card-pad">
             <p className="muted">Loading…</p>
           </Card>
@@ -163,53 +312,39 @@ export default function Saved() {
         ) : visibleItems.length === 0 ? (
           <div className="saved-empty-state">
             <div className="saved-empty-icon">💜</div>
-            <h2 className="saved-empty-title">Your collection starts here</h2>
+            <h2 className="saved-empty-title">Nothing saved yet</h2>
             <p className="saved-empty-text">
-              Save activities that resonate with you. Build a personalized toolkit for different moods and moments.
+              Save anything you like — it’ll live here (even if you’re not signed in).
             </p>
-            <div className="saved-empty-preview">
-              <p className="saved-empty-preview-label">Here's what a collection looks like:</p>
-              <div className="saved-empty-preview-grid">
-                {[
-                  { emoji: "🚶", title: "Hard Reset Walk", tag: "Movement" },
-                  { emoji: "📝", title: "Big Idea Dump", tag: "Prompt" },
-                  { emoji: "🙏", title: "Faith & Vision", tag: "Reflection" },
-                ].map((item, index) => (
-                  <div key={index} className="saved-empty-preview-item">
-                    <div className="saved-empty-preview-emoji">{item.emoji}</div>
-                    <p className="saved-empty-preview-title">{item.title}</p>
-                    <p className="saved-empty-preview-tag">{item.tag}</p>
-                  </div>
-                ))}
-              </div>
-            </div>
             <button className="saved-empty-cta" type="button" onClick={() => navigate("/explore")}>
-              Explore activities →
+              Explore →
             </button>
           </div>
         ) : (
           <>
-            {/* Stats Overview */}
+            {/* Stats */}
             <div className="saved-stats">
               <Card className="saved-stat-card saved-stat-red">
                 <div className="saved-stat-icon">♥</div>
                 <div className="saved-stat-content">
                   <div className="saved-stat-value">{visibleItems.length}</div>
-                  <div className="saved-stat-label">Saved activities</div>
+                  <div className="saved-stat-label">Saved items</div>
                 </div>
               </Card>
-              <Card className="saved-stat-card saved-stat-green">
-                <div className="saved-stat-icon">✓</div>
-                <div className="saved-stat-content">
-                  <div className="saved-stat-value">{visibleItems.length}</div>
-                  <div className="saved-stat-label">In your collection</div>
-                </div>
-              </Card>
+
               <Card className="saved-stat-card saved-stat-blue">
-                <div className="saved-stat-icon">📈</div>
+                <div className="saved-stat-icon">🏷️</div>
                 <div className="saved-stat-content">
                   <div className="saved-stat-value">{mostCommonCategory || "—"}</div>
-                  <div className="saved-stat-label">Most saved category</div>
+                  <div className="saved-stat-label">Top category</div>
+                </div>
+              </Card>
+
+              <Card className="saved-stat-card saved-stat-green">
+                <div className="saved-stat-icon">🧠</div>
+                <div className="saved-stat-content">
+                  <div className="saved-stat-value">{isAuthed ? "Syncable" : "Local-first"}</div>
+                  <div className="saved-stat-label">{isAuthed ? "Account connected" : "Sign in to sync"}</div>
                 </div>
               </Card>
             </div>
@@ -234,6 +369,7 @@ export default function Saved() {
                   ☰
                 </button>
               </div>
+
               <div className="saved-toolbar-right">
                 <span className="saved-sort-label">Sort by:</span>
                 <select
@@ -248,7 +384,7 @@ export default function Saved() {
               </div>
             </Card>
 
-            {/* Saved Items */}
+            {/* Items */}
             <Card className="center card-pad">
               {internalCount > 0 ? (
                 <div className="echo-empty" style={{ marginBottom: 12 }}>
@@ -292,97 +428,15 @@ export default function Saved() {
                           </button>
                         }
                       />
-                      <div className="saved-item-share">
-                        <button className="saved-share-btn" type="button" aria-label="Share to Google">
-                          <span>G</span>
-                        </button>
-                        <button className="saved-share-btn" type="button" aria-label="Share to Facebook">
-                          <span>f</span>
-                        </button>
-                        <button className="saved-share-btn" type="button" aria-label="Share to Twitter">
-                          <span>🐦</span>
-                        </button>
-                        <button className="saved-share-btn" type="button" aria-label="Share to Instagram">
-                          <span>📷</span>
-                        </button>
-                        <button className="saved-share-btn" type="button" aria-label="Share">
-                          <span>↗</span>
-                        </button>
-                      </div>
                     </div>
                   );
                 })}
               </div>
             </Card>
-
-            {/* Recommendations */}
-            {visibleItems.length > 0 && (
-              <Card className="saved-recommendations">
-                <h3 className="saved-recommendations-title">
-                  <span className="saved-recommendations-icon">✨</span>
-                  You might also like
-                </h3>
-                <p className="saved-recommendations-desc">Based on your saved activities</p>
-                <div className="saved-recommendations-grid">
-                  {[
-                    { emoji: "✍️", title: "Write the Truth", category: "Prompt" },
-                    { emoji: "🎨", title: "Raw Expression", category: "Creative" },
-                    { emoji: "🏃", title: "Power Movement", category: "Movement" },
-                  ].map((item, index) => (
-                    <button
-                      key={index}
-                      className="saved-recommendation-card"
-                      type="button"
-                      onClick={() => navigate("/explore")}
-                    >
-                      <div className="saved-recommendation-emoji">{item.emoji}</div>
-                      <h4 className="saved-recommendation-title">{item.title}</h4>
-                      <span className="saved-recommendation-category">{item.category}</span>
-                    </button>
-                  ))}
-                </div>
-              </Card>
-            )}
-
-            {/* Usage Analytics */}
-            {visibleItems.length > 0 && (
-              <Card className="saved-analytics">
-                <div className="saved-analytics-header">
-                  <span className="saved-analytics-icon">📊</span>
-                  <h3 className="saved-analytics-title">Your journey</h3>
-                </div>
-                <div className="saved-analytics-grid">
-                  <div className="saved-analytics-item">
-                    <div className="saved-analytics-value">{visibleItems.length}</div>
-                    <div className="saved-analytics-label">Items in your collection</div>
-                  </div>
-                  <div className="saved-analytics-item">
-                    <div className="saved-analytics-value">{mostCommonCategory || "—"}</div>
-                    <div className="saved-analytics-label">Most saved category</div>
-                  </div>
-                  <div className="saved-analytics-item">
-                    <div className="saved-analytics-value">Growing</div>
-                    <div className="saved-analytics-label">Keep building your toolkit</div>
-                  </div>
-                </div>
-              </Card>
-            )}
           </>
         )}
       </div>
     </div>
   );
 }
-
-
-
-
-
-
-
-
-
-
-
-
 

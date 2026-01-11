@@ -10,21 +10,17 @@ export default function TopNav() {
   const [isSignedIn, setIsSignedIn] = useState(false);
 
   useEffect(() => {
-    // Check initial session
     supabase.auth.getSession().then(({ data }) => {
       setIsSignedIn(!!data.session);
     });
 
-    // Listen for auth changes
     const {
       data: { subscription },
     } = supabase.auth.onAuthStateChange((_event, session) => {
       setIsSignedIn(!!session);
     });
 
-    return () => {
-      subscription.unsubscribe();
-    };
+    return () => subscription.unsubscribe();
   }, []);
 
   async function handleSignOut() {
@@ -40,7 +36,6 @@ export default function TopNav() {
     if (isSignedIn) {
       handleSignOut();
     } else {
-      // Always prompt login when not signed in
       nav("/login", { state: { from: location.pathname } });
     }
   }
@@ -48,11 +43,7 @@ export default function TopNav() {
   return (
     <header className="topnav coral-header">
       <div className="topnav__inner coral-nav">
-        <button
-          className="brand coral-brand"
-          onClick={() => nav("/")}
-          aria-label="Go home"
-        >
+        <button className="brand coral-brand" onClick={() => nav("/")} aria-label="Go home">
           KIVAW
         </button>
 
@@ -61,78 +52,32 @@ export default function TopNav() {
           <NavLink
             to="/"
             end
-            className={({ isActive }) =>
-              `navlink coral-nav-link ${isActive ? "active" : ""}`
-            }
+            className={({ isActive }) => `navlink coral-nav-link ${isActive ? "active" : ""}`}
           >
             Home
           </NavLink>
 
           <NavLink
             to="/explore"
-            className={({ isActive }) =>
-              `navlink coral-nav-link ${isActive ? "active" : ""}`
-            }
+            className={({ isActive }) => `navlink coral-nav-link ${isActive ? "active" : ""}`}
           >
             Explore
           </NavLink>
 
-          {/* Hide these unless signed in */}
-          {isSignedIn && (
-            <>
-              <NavLink
-                to="/waves"
-                className={({ isActive }) =>
-                  `navlink coral-nav-link ${isActive ? "active" : ""}`
-                }
-              >
-                Waves
-              </NavLink>
-
-              <NavLink
-                to="/echo"
-                className={({ isActive }) =>
-                  `navlink coral-nav-link ${isActive ? "active" : ""}`
-                }
-              >
-                Echo
-              </NavLink>
-
-              <NavLink
-                to="/events"
-                className={({ isActive }) =>
-                  `navlink coral-nav-link ${isActive ? "active" : ""}`
-                }
-              >
-                Events
-              </NavLink>
-
-              <NavLink
-                to="/saved"
-                className={({ isActive }) =>
-                  `navlink coral-nav-link ${isActive ? "active" : ""}`
-                }
-              >
-                Saved
-              </NavLink>
-            </>
-          )}
+          <NavLink
+            to="/saved"
+            className={({ isActive }) => `navlink coral-nav-link ${isActive ? "active" : ""}`}
+          >
+            Saved
+          </NavLink>
         </nav>
 
         <div className="topnav__right">
-          <button
-            className="nav-cta-btn coral-nav-cta"
-            onClick={handleAuthClick}
-            type="button"
-          >
+          <button className="nav-cta-btn coral-nav-cta" onClick={handleAuthClick} type="button">
             {isSignedIn ? "Sign out" : "Continue"}
           </button>
 
-          <button
-            className="moon coral-theme-toggle"
-            onClick={toggle}
-            aria-label="Toggle theme"
-          >
+          <button className="moon coral-theme-toggle" onClick={toggle} aria-label="Toggle theme">
             {theme === "dark" ? "☀️" : "🌙"}
           </button>
         </div>
@@ -154,40 +99,16 @@ export default function TopNav() {
           </NavLink>
         </div>
 
-        {/* Hide these unless signed in */}
-        {isSignedIn && (
-          <>
-            <div className="tabbar__item">
-              <NavLink to="/waves" className="tabbar__btn">
-                <span className="tabbar__icon">🌊</span>
-                <span className="tabbar__label">Waves</span>
-              </NavLink>
-            </div>
-
-            <div className="tabbar__item">
-              <NavLink to="/echo" className="tabbar__btn">
-                <span className="tabbar__icon">💬</span>
-                <span className="tabbar__label">Echo</span>
-              </NavLink>
-            </div>
-
-            <div className="tabbar__item">
-              <NavLink to="/events" className="tabbar__btn">
-                <span className="tabbar__icon">📅</span>
-                <span className="tabbar__label">Events</span>
-              </NavLink>
-            </div>
-
-            <div className="tabbar__item">
-              <NavLink to="/saved" className="tabbar__btn">
-                <span className="tabbar__icon">♥</span>
-                <span className="tabbar__label">Saved</span>
-              </NavLink>
-            </div>
-          </>
-        )}
+        <div className="tabbar__item">
+          <NavLink to="/saved" className="tabbar__btn">
+            <span className="tabbar__icon">💾</span>
+            <span className="tabbar__label">Saved</span>
+          </NavLink>
+        </div>
       </nav>
     </header>
   );
 }
+
+
 

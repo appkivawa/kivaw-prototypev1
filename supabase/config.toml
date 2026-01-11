@@ -8,3 +8,10 @@ enabled = true
 verify_jwt = false
 import_map = "./functions/admin-stats/deno.json"
 entrypoint = "./functions/admin-stats/index.ts"
+
+[auth]
+site_url = "http://localhost:5173"
+additional_redirect_urls = [
+  "http://localhost:5173/**",
+  "http://127.0.0.1:5173/**"
+]

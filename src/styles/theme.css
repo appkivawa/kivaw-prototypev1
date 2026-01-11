@@ -7,10 +7,10 @@
   --font: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif, "Apple Color Emoji", "Segoe UI Emoji";
 
   /* ========== TEXT COLORS (Ink-based, no blue) ========== */
-  --ink: #2F3440;
-  --ink-muted: #5B6270;
-  --ink-tertiary: #7C8596;
-  --link: #2F3440;
+  --ink: #1a1a1a;
+  --ink-muted: #4a4a4a;
+  --ink-tertiary: #6a6a6a;
+  --link: #1a1a1a;
 
   /* Legacy text vars */
   --text: var(--ink);

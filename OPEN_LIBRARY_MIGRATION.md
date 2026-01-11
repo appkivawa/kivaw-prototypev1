@@ -118,3 +118,6 @@ The edge function includes all required CORS headers:
 
 
 
+
+
+

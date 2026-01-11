@@ -1,296 +1,186 @@
+// supabase/functions/fetch-google-books/index.ts
 import { serve } from "https://deno.land/std@0.224.0/http/server.ts";
-import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
-
-// ============================================================
-// CORS Headers
-// ============================================================
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
   "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
-  "Access-Control-Allow-Methods": "POST, OPTIONS",
+  "Access-Control-Allow-Methods": "GET, POST, OPTIONS",
 };
 
-function jsonResponse(body: unknown, status = 200): Response {
+function json(body: unknown, status = 200) {
   return new Response(JSON.stringify(body), {
     status,
     headers: { ...corsHeaders, "Content-Type": "application/json" },
   });
 }
 
-// ============================================================
-// Types
-// ============================================================
+function handleCors(req: Request) {
+  if (req.method === "OPTIONS") return new Response("ok", { headers: corsHeaders });
+  return null;
+}
 
-type GoogleBooksRequest = {
-  query?: string;
-  subject?: string;
-  limit?: number;
-};
+function cleanText(s?: string | null) {
+  return (s ?? "").replace(/\s+/g, " ").trim();
+}
 
-type GoogleBooksVolume = {
+function withTimeout(ms: number) {
+  const ac = new AbortController();
+  const t = setTimeout(() => ac.abort(), ms);
+  return { ac, done: () => clearTimeout(t) };
+}
+
+function pickCover(volumeInfo: any): string | null {
+  const links = volumeInfo?.imageLinks;
+  if (!links) return null;
+
+  // prefer larger first, then fallback
+  return (
+    links.extraLarge ||
+    links.large ||
+    links.medium ||
+    links.small ||
+    links.thumbnail ||
+    links.smallThumbnail ||
+    null
+  );
+}
+
+type GoogleBookCard = {
   id: string;
-  volumeInfo: {
-    title: string;
-    subtitle?: string;
-    description?: string;
-    authors?: string[];
-    publishedDate?: string;
-    imageLinks?: {
-      thumbnail?: string;
-      smallThumbnail?: string;
-      medium?: string;
-      large?: string;
-    };
-    canonicalVolumeLink?: string;
-    previewLink?: string;
-    infoLink?: string;
-    categories?: string[];
-    [key: string]: unknown;
-  };
-  [key: string]: unknown;
-};
-
-type GoogleBooksResponse = {
-  items?: GoogleBooksVolume[];
-  totalItems: number;
-  kind: string;
-};
-
-type NormalizedContent = {
-  provider: string;
-  provider_id: string;
-  type: "watch" | "read" | "listen" | "event";
+  kind: "book";
   title: string;
-  description: string | null;
-  image_url: string | null;
-  url: string | null;
-  raw: Record<string, unknown>;
+  byline?: string | null;
+  meta?: string | null;
+  image_url?: string | null;
+  url?: string | null;
+  source: "googlebooks";
+  tags?: string[] | null;
+
+  headline?: string | null;
+  story?: string | null;
+  prompts?: string[] | null;
+  opener?: string | null;
+  bio?: string | null;
 };
-
-// ============================================================
-// Google Books API Integration
-// ============================================================
-
-async function fetchGoogleBooks(
-  query?: string,
-  subject?: string,
-  limit = 20,
-  apiKey?: string
-): Promise<GoogleBooksVolume[]> {
-  // Google Books v1 API base URL
-  const baseUrl = "https://www.googleapis.com/books/v1/volumes";
-  const params = new URLSearchParams();
-  
-  // Build query: if both query and subject provided, combine them
-  let searchQuery = "";
-  if (query && subject) {
-    searchQuery = `${query} subject:${subject}`;
-  } else if (query) {
-    searchQuery = query;
-  } else if (subject) {
-    searchQuery = `subject:${subject}`;
-  } else {
-    searchQuery = "bestseller";
-  }
-  
-  params.append("q", searchQuery);
-  params.append("maxResults", String(Math.min(limit, 40))); // Google Books max is 40
-  params.append("orderBy", "relevance");
-
-  // Add API key if provided (optional - for higher rate limits)
-  if (apiKey && apiKey.trim()) {
-    params.append("key", apiKey.trim());
-  }
-
-  const url = `${baseUrl}?${params.toString()}`;
-  
-  // DEV-only debug logging
-  if (Deno.env.get("ENVIRONMENT") === "development" || Deno.env.get("DENO_ENV") === "development") {
-    console.log("[DEV] Google Books API URL (key redacted):", url.replace(/key=[^&]+/, "key=***"));
-  }
-
-  const response = await fetch(url, {
-    method: "GET",
-    headers: {
-      "Accept": "application/json",
-    },
-  });
-  
-  if (!response.ok) {
-    const errorText = await response.text().catch(() => "");
-    console.error(`Google Books API error: ${response.status} ${response.statusText}`, errorText);
-    throw new Error(`Google Books API error: ${response.status} ${response.statusText}. ${errorText}`);
-  }
-
-  const data: GoogleBooksResponse = await response.json();
-  return data.items || [];
-}
-
-function normalizeGoogleBook(book: GoogleBooksVolume): NormalizedContent {
-  const volumeInfo = book.volumeInfo;
-  
-  // Use title (with subtitle if available)
-  const title = volumeInfo.subtitle
-    ? `${volumeInfo.title}: ${volumeInfo.subtitle}`
-    : volumeInfo.title;
-  
-  // Use thumbnail (force https)
-  const imageUrl = volumeInfo.imageLinks?.thumbnail || null;
-  const safeImageUrl = imageUrl ? imageUrl.replace(/^http:/, "https:") : null;
-  
-  // Use infoLink (force https)
-  const url = volumeInfo.infoLink || null;
-  const safeUrl = url ? url.replace(/^http:/, "https:") : null;
-
-  return {
-    provider: "google_books",
-    provider_id: book.id,
-    type: "read",
-    title: title,
-    description: volumeInfo.description ?? null,
-    image_url: safeImageUrl,
-    url: safeUrl,
-    raw: book as Record<string, unknown>,
-  };
-}
-
-// ============================================================
-// Tagging Logic (shared module)
-// ============================================================
-
-import {
-  computeTagsForContent,
-  storeTagsForCache,
-} from "../_shared/tagging.ts";
-
-// ============================================================
-// Main Handler
-// ============================================================
 
 serve(async (req) => {
-  // Handle OPTIONS preflight
-  if (req.method === "OPTIONS") return new Response("ok", { headers: corsHeaders });
+  const cors = handleCors(req);
+  if (cors) return cors;
 
   try {
-    // Get Supabase client
-    const supabaseUrl = Deno.env.get("SUPABASE_URL")!;
-    const supabaseServiceKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
-    const supabase = createClient(supabaseUrl, supabaseServiceKey);
+    // Support GET with query params too (handy for testing)
+    let q = "";
+    let maxResults = 20;
+    let lang = "en";
+    let printType: "books" | "all" = "books";
 
-    // Parse request body
-    const body: GoogleBooksRequest = await req.json().catch(() => ({}));
-    const query = body.query;
-    const subject = body.subject;
-    const limit = body.limit || 20;
-
-    // Check if Google Books provider is enabled
-    const { data: providerSettings, error: settingsError } = await supabase
-      .from("provider_settings")
-      .select("enabled")
-      .eq("provider", "google_books")
-      .maybeSingle();
-
-    if (settingsError) {
-      console.error("Error checking provider settings:", settingsError);
-      return jsonResponse({ error: "Failed to check provider settings" }, 500);
+    if (req.method === "GET") {
+      const url = new URL(req.url);
+      q = cleanText(url.searchParams.get("q"));
+      maxResults = Number(url.searchParams.get("maxResults") ?? "20");
+      lang = cleanText(url.searchParams.get("lang")) || "en";
+      const pt = cleanText(url.searchParams.get("printType")) || "books";
+      printType = pt === "all" ? "all" : "books";
+    } else if (req.method === "POST") {
+      const body = await req.json().catch(() => ({}));
+      q = cleanText(body?.q);
+      maxResults = Number(body?.maxResults ?? 20);
+      lang = cleanText(body?.lang) || "en";
+      const pt = cleanText(body?.printType) || "books";
+      printType = pt === "all" ? "all" : "books";
+    } else {
+      return json({ error: "Method not allowed" }, 405);
     }
 
-    if (!providerSettings || !providerSettings.enabled) {
-      return jsonResponse({ disabled: true, items: [] }, 200);
-    }
+    if (!q) return json({ error: "Missing `q` (search query)" }, 400);
 
-    // Get Google Books API key from secrets (optional - API works without it)
-    const GOOGLE_BOOKS_API_KEY = Deno.env.get("GOOGLE_BOOKS_API_KEY");
-    
-    // DEV-only debug logging (never log the key value)
-    if (Deno.env.get("ENVIRONMENT") === "development" || Deno.env.get("DENO_ENV") === "development") {
-      console.log("[DEV] GOOGLE_BOOKS_API_KEY exists:", !!GOOGLE_BOOKS_API_KEY);
-    }
-    
-    // API key is optional - Google Books API works without it (with lower rate limits)
-    const googleBooksApiKey = GOOGLE_BOOKS_API_KEY?.trim() || undefined;
+    maxResults = Number.isFinite(maxResults) ? Math.max(1, Math.min(40, maxResults)) : 20;
 
-    // Fetch books from Google Books
-    const books = await fetchGoogleBooks(query, subject, limit, googleBooksApiKey);
-
-    // Normalize and upsert to cache
-    const normalizedContent = books.map(normalizeGoogleBook);
-    
-    const cacheInserts = normalizedContent.map((content) => ({
-      provider: content.provider,
-      provider_id: content.provider_id,
-      type: content.type,
-      title: content.title,
-      description: content.description,
-      image_url: content.image_url,
-      url: content.url,
-      raw: content.raw,
-    }));
-
-    // Upsert to external_content_cache and get cache IDs
-    const { data: cachedData, error: upsertError } = await supabase
-      .from("external_content_cache")
-      .upsert(cacheInserts, {
-        onConflict: "provider,provider_id",
-        ignoreDuplicates: false,
-      })
-      .select("id, provider, provider_id");
-
-    if (upsertError) {
-      console.error("Error upserting to cache:", upsertError);
-      // Continue anyway - return results even if cache update fails
-    }
-
-    // Compute and store tags for each cached item
-    if (cachedData && cachedData.length > 0) {
-      for (const cachedItem of cachedData) {
-        try {
-          const content = normalizedContent.find(
-            (c) => c.provider === cachedItem.provider && c.provider_id === cachedItem.provider_id
-          );
-          
-          if (content) {
-            // Extract categories from raw Google Books data
-            const categories: string[] = [];
-            if (content.raw?.volumeInfo?.categories && Array.isArray(content.raw.volumeInfo.categories)) {
-              categories.push(...content.raw.volumeInfo.categories.map(String));
-            }
-
-            // Compute tags (auto-tags + overrides merged)
-            const tags = await computeTagsForContent(
-              supabase,
-              content.provider,
-              content.provider_id,
-              content.type,
-              content.title,
-              content.description,
-              [], // No genres for books
-              categories // Google Books categories
-            );
-            
-            // Store tags in content_tags table
-            await storeTagsForCache(supabase, cachedItem.id, tags);
-          }
-        } catch (tagError) {
-          console.error(`Error tagging content ${cachedItem.id}:`, tagError);
-          // Continue with other items even if one fails
-        }
-      }
-    }
-
-    // Return normalized content
-    return jsonResponse({
-      items: normalizedContent,
+    const apiKey = Deno.env.get("GOOGLE_BOOKS_API_KEY") ?? "";
+    // API key is optional for low-volume usage, but recommended
+    const params = new URLSearchParams({
+      q,
+      maxResults: String(maxResults),
+      langRestrict: lang,
+      printType,
+      orderBy: "relevance",
     });
-  } catch (error) {
-    console.error("Error in fetch-google-books:", error);
-    return jsonResponse(
-      {
-        error: error instanceof Error ? error.message : "Unknown error",
-      },
-      500
-    );
+
+    if (apiKey) params.set("key", apiKey);
+
+    const endpoint = `https://www.googleapis.com/books/v1/volumes?${params.toString()}`;
+
+    const { ac, done } = withTimeout(9000);
+    const res = await fetch(endpoint, {
+      signal: ac.signal,
+      headers: { "User-Agent": "kivaw/1.0" },
+    }).finally(done);
+
+    if (!res.ok) {
+      const text = await res.text().catch(() => "");
+      return json(
+        {
+          error: `Google Books request failed: ${res.status} ${res.statusText}`,
+          details: text?.slice(0, 400) || null,
+        },
+        502
+      );
+    }
+
+    const data = await res.json().catch(() => null);
+    const items: any[] = Array.isArray(data?.items) ? data.items : [];
+
+    const feed: GoogleBookCard[] = items
+      .map((it) => {
+        const id = cleanText(it?.id);
+        const v = it?.volumeInfo ?? {};
+        const title = cleanText(v?.title);
+        if (!id || !title) return null;
+
+        const authors: string[] = Array.isArray(v?.authors) ? v.authors.map(cleanText).filter(Boolean) : [];
+        const byline = authors.length ? authors.join(", ") : null;
+
+        const publishedDate = cleanText(v?.publishedDate);
+        const meta = publishedDate ? (publishedDate.length === 4 ? `Published: ${publishedDate}` : `Published: ${publishedDate}`) : null;
+
+        const image_url = pickCover(v);
+        const url = cleanText(v?.infoLink || v?.canonicalVolumeLink || it?.selfLink) || null;
+
+        const categories: string[] = Array.isArray(v?.categories) ? v.categories.map(cleanText).filter(Boolean) : [];
+        const tags = categories.length ? categories.slice(0, 8) : null;
+
+        const description = cleanText(v?.description);
+        const bio = description ? (description.length > 380 ? description.slice(0, 380).trimEnd() + "…" : description) : null;
+
+        return {
+          id: `gb_${id}`,
+          kind: "book",
+          title,
+          byline,
+          meta,
+          image_url,
+          url,
+          source: "googlebooks",
+          tags,
+          bio,
+        } as GoogleBookCard;
+      })
+      .filter(Boolean) as GoogleBookCard[];
+
+    return json({ feed, debug: { q, returned: feed.length, totalItems: data?.totalItems ?? null } });
+  } catch (e) {
+    const msg = e instanceof Error ? e.message : String(e);
+    // AbortError is common on timeouts
+    return json({ error: msg }, 500);
   }
 });
+
+
+
+
+
+
+
+
+
 

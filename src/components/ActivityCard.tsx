@@ -2,9 +2,9 @@
 // Activity Card Component
 // ============================================================
 
-import { useState, useEffect } from 'react';
+import { useState } from 'react';
 import type { RecommendationResult } from '../types/recommendations';
-import { saveActivity, unsaveActivity, recordFeedback, isActivitySaved } from '../lib/activityApi';
+import { recordFeedback } from '../lib/activityApi';
 
 interface ActivityCardProps {
   recommendation: RecommendationResult;
@@ -13,32 +13,8 @@ interface ActivityCardProps {
 
 export default function ActivityCard({ recommendation, onShuffle }: ActivityCardProps) {
   const { activity, reasons } = recommendation;
-  const [isSaved, setIsSaved] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
   const [showReasons, setShowReasons] = useState(false);
-
-  // Check if saved on mount
-  useEffect(() => {
-    isActivitySaved(activity.id).then(setIsSaved);
-  }, [activity.id]);
-
-  async function handleSave() {
-    if (isLoading) return;
-    setIsLoading(true);
-    try {
-      if (isSaved) {
-        await unsaveActivity(activity.id);
-        setIsSaved(false);
-      } else {
-        await saveActivity(activity.id);
-        setIsSaved(true);
-      }
-    } catch (error) {
-      console.error('Error toggling save:', error);
-    } finally {
-      setIsLoading(false);
-    }
-  }
 
   async function handleFeedback(type: 'like' | 'skip' | 'complete' | 'dismiss') {
     if (isLoading) return;
@@ -93,17 +69,6 @@ export default function ActivityCard({ recommendation, onShuffle }: ActivityCard
       )}
 
       <div style={actionsStyle}>
-        <button
-          type="button"
-          onClick={handleSave}
-          disabled={isLoading}
-          style={{
-            ...buttonStyle,
-            ...(isSaved ? savedButtonStyle : {}),
-          }}
-        >
-          {isSaved ? '✓ Saved' : 'Save'}
-        </button>
         <button
           type="button"
           onClick={() => handleFeedback('like')}
@@ -244,12 +209,6 @@ const buttonStyle: React.CSSProperties = {
   cursor: 'pointer',
   transition: 'all 0.2s ease',
   fontFamily: 'inherit',
-};
-
-const savedButtonStyle: React.CSSProperties = {
-  background: 'var(--coral-gradient)',
-  color: 'white',
-  border: 'none',
 };
 
 const toggleReasonsStyle: React.CSSProperties = {
