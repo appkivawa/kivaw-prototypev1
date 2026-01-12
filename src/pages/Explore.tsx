@@ -1,6 +1,7 @@
 import React, { useEffect, useMemo, useRef, useState } from "react";
-import { supabase, SUPABASE_URL } from "../lib/supabaseClient";
+import { supabase } from "../lib/supabaseClient";
 import { saveLocal, unsaveLocal, isLocallySaved } from "../data/savedLocal";
+import EchoComposer from "../components/echo/EchoComposer";
 
 // ============================================================
 // Types
@@ -488,6 +489,8 @@ export default function Explore() {
   const [passCount, setPassCount] = useState(getPassCount());
 
   const [resetting, setResetting] = useState(false);
+  const [showEchoComposer, setShowEchoComposer] = useState(false);
+  const [echoContentId, setEchoContentId] = useState<string | null>(null);
 
   const safeMode = false;
   const loadingRef = useRef(false);
@@ -950,15 +953,24 @@ export default function Explore() {
                 style={{
                   width: 240,
                   flex: "0 0 auto",
-                  borderRadius: 18,
-                  border: "1px solid rgba(0,0,0,0.10)",
+                  borderRadius: "8px",
+                  border: "1px solid rgba(0,0,0,0.08)",
                   overflow: "hidden",
-                  background: "rgba(255,255,255,0.65)",
-                  boxShadow: "0 10px 26px rgba(0,0,0,0.08)",
+                  background: "rgba(255,255,255,0.9)",
+                  boxShadow: "0 1px 3px rgba(0,0,0,0.05)",
                   cursor: "pointer",
                   textAlign: "left",
                   scrollSnapAlign: "start",
                   outline: "none",
+                  transition: "all 0.2s",
+                }}
+                onMouseEnter={(e) => {
+                  e.currentTarget.style.boxShadow = "0 4px 12px rgba(0,0,0,0.1)";
+                  e.currentTarget.style.transform = "translateY(-2px)";
+                }}
+                onMouseLeave={(e) => {
+                  e.currentTarget.style.boxShadow = "0 1px 3px rgba(0,0,0,0.05)";
+                  e.currentTarget.style.transform = "translateY(0)";
                 }}
                 title="Open in Swipe mode"
               >
@@ -1042,11 +1054,28 @@ export default function Explore() {
   // UI
   // ============================================================
   return (
-    <div style={{ maxWidth: 1180, margin: "0 auto", padding: 20 }}>
+    <div
+      style={{
+        minHeight: "100vh",
+        backgroundColor: "rgba(250, 248, 245, 0.5)",
+        padding: "24px 16px",
+      }}
+    >
+      <div style={{ maxWidth: 1180, margin: "0 auto" }}>
       {/* Header */}
-      <div style={{ display: "flex", justifyContent: "space-between", gap: 16, flexWrap: "wrap" }}>
+      <div style={{ display: "flex", justifyContent: "space-between", gap: 16, flexWrap: "wrap", marginBottom: "32px" }}>
         <div>
-          <h2 style={{ margin: 0 }}>Explore</h2>
+          <h1
+            style={{
+              fontSize: "clamp(24px, 4vw, 32px)",
+              fontWeight: 700,
+              margin: 0,
+              marginBottom: "8px",
+              color: "rgba(0,0,0,0.9)",
+            }}
+          >
+            Explore
+          </h1>
           <div style={{ marginTop: 6, display: "flex", gap: 8, alignItems: "center", flexWrap: "wrap" }}>
             <span
               style={{
@@ -1246,15 +1275,27 @@ export default function Explore() {
           style={{
             marginTop: 18,
             display: "grid",
-            gridTemplateColumns: "1fr minmax(360px, 520px) 1fr",
-            gap: 18,
+            gridTemplateColumns: "minmax(0, 1fr) minmax(360px, 680px) minmax(0, 1fr)",
+            gap: 24,
             alignItems: "start",
+            maxWidth: "1400px",
+            margin: "0 auto",
           }}
         >
           {/* Left rail */}
           <div style={{ display: "flex", flexDirection: "column", gap: 10, position: "sticky", top: 18, alignSelf: "start" }}>
-            <div style={{ padding: 14, borderRadius: 18, border: "1px solid rgba(0,0,0,0.10)", background: "rgba(255,255,255,0.65)" }}>
-              <div style={{ fontSize: 12, fontWeight: 900, letterSpacing: "0.6px", opacity: 0.6 }}>UP NEXT</div>
+            <div
+              style={{
+                padding: "16px",
+                borderRadius: "8px",
+                border: "1px solid rgba(0,0,0,0.08)",
+                background: "rgba(255,255,255,0.9)",
+                boxShadow: "0 1px 3px rgba(0,0,0,0.05)",
+              }}
+            >
+              <div style={{ fontSize: "12px", fontWeight: 600, letterSpacing: "0.5px", opacity: 0.7, marginBottom: "12px" }}>
+                UP NEXT
+              </div>
 
               <div style={{ marginTop: 10, display: "flex", flexDirection: "column", gap: 10 }}>
                 {nextUp.length ? (
@@ -1270,12 +1311,21 @@ export default function Explore() {
                         display: "flex",
                         gap: 10,
                         alignItems: "center",
-                        padding: 10,
-                        borderRadius: 14,
+                        padding: "10px",
+                        borderRadius: "8px",
                         border: "1px solid rgba(0,0,0,0.08)",
-                        background: "rgba(255,255,255,0.70)",
+                        background: "rgba(255,255,255,0.9)",
                         cursor: "pointer",
                         textAlign: "left",
+                        transition: "all 0.2s",
+                      }}
+                      onMouseEnter={(e) => {
+                        e.currentTarget.style.backgroundColor = "rgba(255,255,255,1)";
+                        e.currentTarget.style.borderColor = "rgba(0,0,0,0.12)";
+                      }}
+                      onMouseLeave={(e) => {
+                        e.currentTarget.style.backgroundColor = "rgba(255,255,255,0.9)";
+                        e.currentTarget.style.borderColor = "rgba(0,0,0,0.08)";
                       }}
                       title="Jump to this card"
                     >
@@ -1342,11 +1392,11 @@ export default function Explore() {
           <div style={{ display: "grid", placeItems: "center" }}>
             <div
               style={{
-                width: "min(520px, 92vw)",
-                borderRadius: 22,
+                width: "min(680px, 92vw)",
+                borderRadius: "8px",
                 overflow: "hidden",
-                border: "1px solid rgba(0,0,0,0.12)",
-                background: "rgba(255,255,255,0.55)",
+                border: "1px solid rgba(0,0,0,0.08)",
+                background: "rgba(255,255,255,0.9)",
                 cursor: isDragging ? "grabbing" : "grab",
                 userSelect: "none",
                 touchAction: "pan-y pinch-zoom",
@@ -1355,8 +1405,7 @@ export default function Explore() {
                 opacity: isAnimating ? 0 : opacity,
                 transition,
                 position: "relative",
-                boxShadow: "0 14px 40px rgba(0,0,0,0.10)",
-                backdropFilter: "blur(6px)",
+                boxShadow: "0 1px 3px rgba(0,0,0,0.05)",
               }}
               onMouseDown={handleDragStart}
               onTouchStart={handleDragStart}
@@ -1384,7 +1433,14 @@ export default function Explore() {
               ) : null}
 
               {/* Cohesive image block */}
-              <div style={{ height: 320, background: "rgba(0,0,0,0.06)", position: "relative" }}>
+              <div
+                style={{
+                  height: "400px",
+                  background: "rgba(0,0,0,0.04)",
+                  position: "relative",
+                  overflow: "hidden",
+                }}
+              >
                 {current.image_url ? (
                   <img src={current.image_url} alt={current.title} style={{ width: "100%", height: "100%", objectFit: "cover", display: "block" }} />
                 ) : (
@@ -1424,8 +1480,19 @@ export default function Explore() {
               </div>
 
               {/* Content */}
-              <div style={{ padding: 18 }}>
-                <h3 style={{ fontSize: 18, fontWeight: 950, margin: 0, lineHeight: 1.25 }}>{current.title}</h3>
+              <div style={{ padding: "20px" }}>
+                <h2
+                  style={{
+                    fontSize: "clamp(18px, 2vw, 22px)",
+                    fontWeight: 600,
+                    margin: 0,
+                    marginBottom: "12px",
+                    lineHeight: 1.4,
+                    color: "rgba(0,0,0,0.9)",
+                  }}
+                >
+                  {current.title}
+                </h2>
 
                 <div style={{ marginTop: 8, fontSize: 14, color: "rgba(0,0,0,0.72)" }}>
                   {current.byline ? <span style={{ fontWeight: 800 }}>{cleanText(current.byline)}</span> : null}
@@ -1434,9 +1501,21 @@ export default function Explore() {
                 </div>
 
                 {shortDesc ? (
-                  <div style={{ marginTop: 12, fontSize: 14, lineHeight: 1.55, color: "rgba(0,0,0,0.82)" }}>{shortDesc}</div>
+                  <div
+                    style={{
+                      marginTop: "12px",
+                      fontSize: "15px",
+                      lineHeight: 1.6,
+                      color: "rgba(0,0,0,0.75)",
+                      marginBottom: "12px",
+                    }}
+                  >
+                    {shortDesc}
+                  </div>
                 ) : (
-                  <div style={{ marginTop: 12, fontSize: 13, opacity: 0.65 }}>No description yet.</div>
+                  <div style={{ marginTop: "12px", fontSize: "14px", opacity: 0.6, marginBottom: "12px" }}>
+                    No description yet.
+                  </div>
                 )}
 
                 {(current.tags ?? []).length ? (
@@ -1460,105 +1539,158 @@ export default function Explore() {
                 ) : null}
 
                 {current.url ? (
-                  <div style={{ marginTop: 14 }}>
-                    <a
-                      href={current.url}
-                      target="_blank"
-                      rel="noreferrer"
+                  <a
+                    href={current.url}
+                    target="_blank"
+                    rel="noreferrer"
+                    style={{
+                      display: "block",
+                      marginTop: "16px",
+                      padding: "12px",
+                      borderRadius: "6px",
+                      border: "1px solid rgba(0,0,0,0.1)",
+                      backgroundColor: "rgba(0,0,0,0.02)",
+                      textDecoration: "none",
+                      transition: "background-color 0.2s, border-color 0.2s",
+                    }}
+                    onMouseEnter={(e) => {
+                      e.currentTarget.style.backgroundColor = "rgba(0,0,0,0.04)";
+                      e.currentTarget.style.borderColor = "rgba(0,0,0,0.15)";
+                    }}
+                    onMouseLeave={(e) => {
+                      e.currentTarget.style.backgroundColor = "rgba(0,0,0,0.02)";
+                      e.currentTarget.style.borderColor = "rgba(0,0,0,0.1)";
+                    }}
+                  >
+                    <div
                       style={{
-                        display: "inline-block",
-                        fontSize: 12,
-                        color: "rgba(0,0,0,0.70)",
-                        textDecoration: "none",
-                        opacity: 0.85,
-                        fontWeight: 900,
+                        display: "flex",
+                        justifyContent: "space-between",
+                        alignItems: "center",
                       }}
                     >
-                      Open details ↗
-                    </a>
-                  </div>
+                      <span
+                        style={{
+                          fontSize: "13px",
+                          color: "rgba(0,0,0,0.6)",
+                          fontWeight: 500,
+                        }}
+                      >
+                        {current.url.replace(/^https?:\/\/(www\.)?/, "").split("/")[0]}
+                      </span>
+                      <span
+                        style={{
+                          fontSize: "13px",
+                          color: "rgba(0,0,0,0.5)",
+                        }}
+                      >
+                        Open ↗
+                      </span>
+                    </div>
+                  </a>
                 ) : null}
               </div>
-            </div>
 
-            {/* Actions */}
-            <div style={{ display: "flex", justifyContent: "center", gap: 16, marginTop: 16 }}>
-              <div style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 6 }}>
-                <button
-                  onClick={handlePass}
-                  title="Pass (←)"
-                  style={{
-                    width: 58,
-                    height: 58,
-                    borderRadius: 999,
-                    border: "1px solid rgba(0,0,0,0.12)",
-                    cursor: "pointer",
-                    background: "rgba(255,255,255,0.75)",
-                    fontWeight: 950,
-                  }}
-                >
-                  ✕
-                </button>
-                <span style={{ fontSize: 12, opacity: 0.65, color: "rgba(0,0,0,0.65)" }}>Not my vibe</span>
-              </div>
+              {/* Actions */}
+              <div style={{ display: "flex", justifyContent: "center", gap: 16, marginTop: 16, padding: "0 20px 20px" }}>
+                <div style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 6 }}>
+                  <button
+                    onClick={handlePass}
+                    title="Pass (←)"
+                    style={{
+                      width: 58,
+                      height: 58,
+                      borderRadius: 999,
+                      border: "1px solid rgba(0,0,0,0.12)",
+                      cursor: "pointer",
+                      background: "rgba(255,255,255,0.9)",
+                      fontWeight: 950,
+                      fontSize: "20px",
+                    }}
+                  >
+                    ✕
+                  </button>
+                  <span style={{ fontSize: 12, opacity: 0.65, color: "rgba(0,0,0,0.65)" }}>Not my vibe</span>
+                </div>
 
-              <div style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 6 }}>
-                <button
-                  onClick={handleMatch}
-                  title="Match (→)"
-                  style={{
-                    width: 58,
-                    height: 58,
-                    borderRadius: 999,
-                    border: "1px solid rgba(0,0,0,0.12)",
-                    cursor: "pointer",
-                    background: "rgba(255,255,255,0.75)",
-                    fontWeight: 950,
-                  }}
-                >
-                  ♥
-                </button>
-                <span style={{ fontSize: 12, opacity: 0.65, color: "rgba(0,0,0,0.65)" }}>This feels like a yes</span>
+                <div style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 6 }}>
+                  <button
+                    onClick={() => {
+                      setEchoContentId(current.id);
+                      setShowEchoComposer(true);
+                    }}
+                    title="Echo"
+                    style={{
+                      width: 58,
+                      height: 58,
+                      borderRadius: 999,
+                      border: "1px solid rgba(0,0,0,0.12)",
+                      cursor: "pointer",
+                      background: "rgba(255,255,255,0.9)",
+                      fontWeight: 950,
+                      fontSize: "20px",
+                    }}
+                  >
+                    💭
+                  </button>
+                  <span style={{ fontSize: 12, opacity: 0.65, color: "rgba(0,0,0,0.65)" }}>Echo</span>
+                </div>
+
+                <div style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 6 }}>
+                  <button
+                    onClick={handleMatch}
+                    title="Match (→)"
+                    style={{
+                      width: 58,
+                      height: 58,
+                      borderRadius: 999,
+                      border: "1px solid rgba(0,0,0,0.12)",
+                      cursor: "pointer",
+                      background: "rgba(255,255,255,0.9)",
+                      fontWeight: 950,
+                      fontSize: "20px",
+                    }}
+                  >
+                    ♥
+                  </button>
+                  <span style={{ fontSize: 12, opacity: 0.65, color: "rgba(0,0,0,0.65)" }}>This feels like a yes</span>
+                </div>
               </div>
             </div>
           </div>
 
           {/* Right rail */}
-          <div style={{ position: "sticky", top: 18, alignSelf: "start" }}>
-            <div style={{ padding: 14, borderRadius: 18, border: "1px solid rgba(0,0,0,0.10)", background: "rgba(255,255,255,0.65)" }}>
-              <div style={{ fontSize: 12, fontWeight: 900, letterSpacing: "0.6px", opacity: 0.6 }}>QUICK JUMPS</div>
-
-              <div style={{ marginTop: 10, display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10 }}>
-                {filtered.slice(cursor, cursor + 6).map((c) => (
-                  <button
-                    key={c.id}
-                    type="button"
-                    onClick={() => {
-                      const idx = filtered.findIndex((x) => x.id === c.id);
-                      if (idx >= 0) setCursor(idx);
-                    }}
-                    style={{
-                      padding: 10,
-                      borderRadius: 14,
-                      border: "1px solid rgba(0,0,0,0.08)",
-                      background: "rgba(255,255,255,0.70)",
-                      cursor: "pointer",
-                      textAlign: "left",
-                    }}
-                    title="Jump to this card"
-                  >
-                    <div style={{ fontSize: 12, fontWeight: 950, lineHeight: 1.2 }}>
-                      {kindEmoji(c.kind)} {cleanText(c.title).slice(0, 34)}
-                      {cleanText(c.title).length > 34 ? "…" : ""}
-                    </div>
-                    <div style={{ marginTop: 4, fontSize: 11, opacity: 0.65 }}>{c.byline ? cleanText(c.byline).slice(0, 30) : c.source}</div>
-                  </button>
-                ))}
+          <div style={{ display: "flex", flexDirection: "column", gap: 10, position: "sticky", top: 18, alignSelf: "start" }}>
+            <div
+              style={{
+                padding: "16px",
+                borderRadius: "8px",
+                border: "1px solid rgba(0,0,0,0.08)",
+                background: "rgba(255,255,255,0.9)",
+                boxShadow: "0 1px 3px rgba(0,0,0,0.05)",
+              }}
+            >
+              <div style={{ fontSize: "12px", fontWeight: 600, letterSpacing: "0.5px", opacity: 0.7, marginBottom: "12px" }}>
+                QUICK PICKS
               </div>
+              <div style={{ fontSize: "12px", color: "rgba(0,0,0,0.5)" }}>Coming soon</div>
             </div>
           </div>
         </div>
       ) : null}
+
+      {/* Close wrapper div */}
+      </div>
+
+      {showEchoComposer && (
+        <EchoComposer
+          contentId={echoContentId}
+          onClose={() => {
+            setShowEchoComposer(false);
+            setEchoContentId(null);
+          }}
+        />
+      )}
     </div>
   );
 }

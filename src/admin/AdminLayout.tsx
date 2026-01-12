@@ -154,9 +154,6 @@ export default function AdminLayout() {
     }
   }
 
-  const isOnFeed = location.pathname.startsWith("/feed");
-  const isOnHome = location.pathname === "/" || location.pathname === "/home";
-
   return (
     <div className="coral-page-content">
       <TopNav />
@@ -165,31 +162,42 @@ export default function AdminLayout() {
         <div className="admin-header">
           <div>
             <h1 className="admin-title">Admin Dashboard</h1>
-            <p className="admin-subtitle">Manage your Kivaw platform</p>
+            <p className="admin-subtitle">Manage content, users, and platform settings</p>
 
-            {/* ✅ USER MODE BUTTONS (these will actually show) */}
+            {/* Quick navigation buttons */}
             <div style={{ marginTop: 12, display: "flex", gap: 10, flexWrap: "wrap" }}>
-              {!isOnFeed && (
-                <button
-                  className="coral-btn-secondary"
-                  type="button"
-                  onClick={() => navigate("/feed")}
-                  style={{ fontSize: 12, padding: "8px 16px" }}
-                >
-                  👤 Browse as User
-                </button>
-              )}
-
-              {!isOnHome && (
-                <button
-                  className="coral-btn-secondary"
-                  type="button"
-                  onClick={() => navigate("/")}
-                  style={{ fontSize: 12, padding: "8px 16px" }}
-                >
-                  🏠 Back to Site
-                </button>
-              )}
+              <button
+                className="coral-btn-secondary"
+                type="button"
+                onClick={() => navigate("/")}
+                style={{ fontSize: 12, padding: "8px 16px" }}
+              >
+                🏠 Home
+              </button>
+              <button
+                className="coral-btn-secondary"
+                type="button"
+                onClick={() => navigate("/feed")}
+                style={{ fontSize: 12, padding: "8px 16px" }}
+              >
+                🔍 Discover
+              </button>
+              <button
+                className="coral-btn-secondary"
+                type="button"
+                onClick={() => navigate("/timeline")}
+                style={{ fontSize: 12, padding: "8px 16px" }}
+              >
+                💭 Timeline
+              </button>
+              <button
+                className="coral-btn-secondary"
+                type="button"
+                onClick={() => navigate("/waves")}
+                style={{ fontSize: 12, padding: "8px 16px" }}
+              >
+                🌊 Waves
+              </button>
             </div>
           </div>
 

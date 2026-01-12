@@ -58,17 +58,24 @@ export default function TopNav() {
           </NavLink>
 
           <NavLink
-            to="/explore"
+            to="/feed"
             className={({ isActive }) => `navlink coral-nav-link ${isActive ? "active" : ""}`}
           >
-            Explore
+            Discover
           </NavLink>
 
           <NavLink
-            to="/saved"
+            to="/timeline"
             className={({ isActive }) => `navlink coral-nav-link ${isActive ? "active" : ""}`}
           >
-            Saved
+            Timeline
+          </NavLink>
+
+          <NavLink
+            to="/waves"
+            className={({ isActive }) => `navlink coral-nav-link ${isActive ? "active" : ""}`}
+          >
+            Waves
           </NavLink>
         </nav>
 
@@ -93,16 +100,23 @@ export default function TopNav() {
         </div>
 
         <div className="tabbar__item">
-          <NavLink to="/explore" className="tabbar__btn">
-            <span className="tabbar__icon">🧭</span>
-            <span className="tabbar__label">Explore</span>
+          <NavLink to="/feed" className="tabbar__btn">
+            <span className="tabbar__icon">🔍</span>
+            <span className="tabbar__label">Discover</span>
           </NavLink>
         </div>
 
         <div className="tabbar__item">
-          <NavLink to="/saved" className="tabbar__btn">
-            <span className="tabbar__icon">💾</span>
-            <span className="tabbar__label">Saved</span>
+          <NavLink to="/timeline" className="tabbar__btn">
+            <span className="tabbar__icon">💭</span>
+            <span className="tabbar__label">Timeline</span>
+          </NavLink>
+        </div>
+
+        <div className="tabbar__item">
+          <NavLink to="/waves" className="tabbar__btn">
+            <span className="tabbar__icon">🌊</span>
+            <span className="tabbar__label">Waves</span>
           </NavLink>
         </div>
       </nav>

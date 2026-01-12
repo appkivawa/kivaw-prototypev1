@@ -22,6 +22,13 @@ export type EchoWithContent = EchoRow & {
   content_items: ContentItemLite | null;
 };
 
+export type WaveEcho = EchoWithContent & {
+  profiles: {
+    username: string | null;
+    avatar_url: string | null;
+  } | null;
+};
+
 export async function getUserId(): Promise<string | null> {
   const { data } = await supabase.auth.getSession();
   return data.session?.user?.id ?? null;
@@ -68,17 +75,17 @@ export async function getContentItemLiteById(contentId: string) {
 
 export async function createEcho(input: {
   contentId: string | null; // ✅ allow null
-  usageTag: string;
-  note?: string;
-  shareToWaves?: boolean;
+  note: string; // Required - this is the reflection text
+  usageTag?: string; // Optional - legacy support
+  shareToWaves?: boolean; // Visibility toggle
 }) {
   const uid = await getUserId();
   if (!uid) throw new Error("Auth session missing!");
 
-  // Validate and sanitize inputs
-  const usageTag = sanitizeTag(input.usageTag);
-  if (!usageTag) {
-    throw new Error("Usage tag is required");
+  // Validate note (required)
+  const note = input.note ? sanitizeTextContent(input.note.trim()) : null;
+  if (!note || note.length === 0) {
+    throw new Error("Reflection text is required");
   }
 
   // Validate contentId if provided
@@ -86,12 +93,13 @@ export async function createEcho(input: {
     throw new Error("Invalid content ID format");
   }
 
-  const note = input.note ? sanitizeTextContent(input.note) : null;
+  // Optional usage tag (sanitize if provided)
+  const usageTag = input.usageTag ? sanitizeTag(input.usageTag) : null;
 
   const payload = {
     user_id: uid,
-    content_id: input.contentId ?? null, // ✅
-    usage_tag: usageTag,
+    content_id: input.contentId ?? null,
+    usage_tag: usageTag || "", // Default to empty string if not provided
     note: note,
     shared_to_waves: !!input.shareToWaves,
   };
@@ -137,6 +145,41 @@ export async function deleteEcho(echoId: string) {
   const { error } = await supabase.from("echoes").delete().eq("id", echoId).eq("user_id", uid);
 
   if (error) throw error;
+}
+
+/**
+ * List all Echoes that are shared as Waves (public reflections)
+ */
+export async function listWaves(limit = 100) {
+  const { data, error } = await supabase
+    .from("echoes")
+    .select(
+      `
+      id,
+      user_id,
+      content_id,
+      note,
+      shared_to_waves,
+      created_at,
+      content_items(id,kind,title,image_url),
+      profiles(username,avatar_url)
+    `
+    )
+    .eq("shared_to_waves", true)
+    .not("note", "is", null)
+    .order("created_at", { ascending: false })
+    .limit(limit);
+
+  if (error) throw error;
+
+  // Normalize content_items and profiles
+  const rows = (data || []).map((r: any) => ({
+    ...r,
+    content_items: Array.isArray(r.content_items) ? r.content_items[0] ?? null : r.content_items ?? null,
+    profiles: Array.isArray(r.profiles) ? r.profiles[0] ?? null : r.profiles ?? null,
+  }));
+
+  return rows as WaveEcho[];
 }
 
 

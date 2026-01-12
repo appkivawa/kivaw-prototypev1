@@ -4,7 +4,7 @@ import AppShell from "./layout/AppShell";
 
 import Home from "./pages/Home";
 import HomePage from "./pages/HomePage";
-import Explore from "./pages/Explore";
+import ExploreFeed from "./pages/ExploreFeed";
 import ForYou from "./pages/ForYou";
 import MatchPage from "./pages/MatchPage";
 import ItemDetail from "./pages/ItemDetail";
@@ -46,8 +46,9 @@ import RecommendationsPreview from "./admin/tabs/RecommendationsPreview";
 import PublishToExplore from "./admin/tabs/PublishToExplore";
 
 import RecommendationsPage from "./pages/RecommendationsPage";
-import Feed from "./pages/Feed";
 import Preferences from "./pages/preferences";
+import Timeline from "./pages/Timeline";
+import Waves from "./pages/Waves";
 import Saved from "./pages/Saved";
 
 function HashAuthRedirect() {
@@ -249,17 +250,8 @@ export default function App() {
       >
         <Route index element={<HomePage />} />
         <Route path="home" element={<Home />} />
-        <Route path="explore" element={<Explore />} />
-
-        {/* Social Feed (requires auth) */}
-        <Route
-          path="feed"
-          element={
-            <RequireAuth title="Your Feed" message="Please log in to view your feed">
-              <Feed />
-            </RequireAuth>
-          }
-        />
+        <Route path="explore" element={<ExploreFeed />} />
+        <Route path="feed" element={<ExploreFeed />} />
 
         {/* Preferences (requires auth) */}
         <Route
@@ -284,9 +276,10 @@ export default function App() {
         <Route path="for-you" element={<ForYou />} />
         <Route path="recs" element={<RecommendationsPage />} />
 
-        <Route path="waves" element={<Navigate to="/explore" replace />} />
-        <Route path="echo" element={<Navigate to="/explore" replace />} />
-        <Route path="save-echo" element={<Navigate to="/explore" replace />} />
+        <Route path="waves" element={<Waves />} />
+        <Route path="timeline" element={<Timeline />} />
+        <Route path="echo" element={<Navigate to="/timeline" replace />} />
+        <Route path="save-echo" element={<Navigate to="/timeline" replace />} />
         <Route path="match" element={<MatchPage />} />
         <Route path="events" element={<Navigate to="/explore" replace />} />
         <Route path="item/:id" element={<ItemDetail />} />
