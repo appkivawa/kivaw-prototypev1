@@ -12,39 +12,20 @@ CREATE TABLE IF NOT EXISTS public.admin_audit_log (
 ALTER TABLE public.admin_audit_log ENABLE ROW LEVEL SECURITY;
 
 -- Policy: Only admins can read audit logs
+-- Use is_admin() function which checks admin_allowlist, roles/user_roles, and admin_users
+DROP POLICY IF EXISTS "Admins can read admin_audit_log" ON public.admin_audit_log;
 CREATE POLICY "Admins can read admin_audit_log" ON public.admin_audit_log
   FOR SELECT USING (
-    EXISTS (
-      SELECT 1 FROM public.admin_roles ar
-      WHERE ar.user_id = auth.uid() AND (ar.role = 'owner' OR ar.role = 'admin')
-    )
-    OR EXISTS (
-      SELECT 1 FROM public.admin_users au
-      WHERE au.user_id = auth.uid()
-    )
-    OR EXISTS (
-      SELECT 1 FROM public.profiles p
-      WHERE p.id = auth.uid() AND p.is_admin = true
-    )
+    public.is_admin(auth.uid())
   );
 
 -- Policy: System can insert audit logs (via service role or admin users)
 -- Note: In practice, audit logs should be inserted via edge functions or triggers
 -- This policy allows authenticated admins to insert logs
+DROP POLICY IF EXISTS "Admins can insert admin_audit_log" ON public.admin_audit_log;
 CREATE POLICY "Admins can insert admin_audit_log" ON public.admin_audit_log
   FOR INSERT WITH CHECK (
-    EXISTS (
-      SELECT 1 FROM public.admin_roles ar
-      WHERE ar.user_id = auth.uid() AND (ar.role = 'owner' OR ar.role = 'admin')
-    )
-    OR EXISTS (
-      SELECT 1 FROM public.admin_users au
-      WHERE au.user_id = auth.uid()
-    )
-    OR EXISTS (
-      SELECT 1 FROM public.profiles p
-      WHERE p.id = auth.uid() AND p.is_admin = true
-    )
+    public.is_admin(auth.uid())
   );
 
 -- Create indexes for faster queries

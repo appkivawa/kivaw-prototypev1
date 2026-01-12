@@ -121,9 +121,11 @@ CREATE POLICY "Authenticated users can read cache" ON public.external_content_ca
 -- Policy: Only service role can write (enforced via service role key, not RLS)
 -- Note: RLS policies don't apply to service role, so we don't need a write policy
 -- But we'll add one that blocks client writes explicitly
+-- For INSERT policies, must use WITH CHECK, not USING
+DROP POLICY IF EXISTS "Service role can write cache" ON public.external_content_cache;
 CREATE POLICY "Service role can write cache" ON public.external_content_cache
   FOR INSERT
-  USING (false); -- Block all client inserts (service role bypasses RLS)
+  WITH CHECK (false); -- Block all client inserts (service role bypasses RLS)
 
 CREATE POLICY "Service role can update cache" ON public.external_content_cache
   FOR UPDATE
@@ -143,9 +145,10 @@ CREATE POLICY "Authenticated users can read content tags" ON public.content_tags
   USING (auth.role() = 'authenticated');
 
 -- Policy: Block client writes (service role bypasses RLS)
+-- For INSERT policies, must use WITH CHECK, not USING
 CREATE POLICY "Service role can write content tags" ON public.content_tags
   FOR INSERT
-  USING (false); -- Block all client inserts
+  WITH CHECK (false); -- Block all client inserts
 
 CREATE POLICY "Service role can update content tags" ON public.content_tags
   FOR UPDATE

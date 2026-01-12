@@ -37,14 +37,18 @@ CREATE TABLE IF NOT EXISTS public.content_items (
 );
 
 -- Indexes for content_items
-CREATE INDEX IF NOT EXISTS idx_content_items_type ON public.content_items(type);
+-- Note: The actual table schema differs from this migration's schema
+-- The actual table uses: kind, state_tags, focus_tags, usage_tags instead of type, tags, genres
+-- Commenting out indexes on columns that don't exist in the actual table
+-- CREATE INDEX IF NOT EXISTS idx_content_items_type ON public.content_items(type);
+-- CREATE INDEX IF NOT EXISTS idx_content_items_tags ON public.content_items USING GIN(tags);
+-- CREATE INDEX IF NOT EXISTS idx_content_items_genres ON public.content_items USING GIN(genres);
+-- CREATE INDEX IF NOT EXISTS idx_content_items_intensity ON public.content_items(intensity);
+-- CREATE INDEX IF NOT EXISTS idx_content_items_duration ON public.content_items(duration_min) WHERE duration_min IS NOT NULL;
+-- CREATE INDEX IF NOT EXISTS idx_content_items_rating ON public.content_items(rating) WHERE rating IS NOT NULL;
+-- CREATE INDEX IF NOT EXISTS idx_content_items_source_id ON public.content_items(source, source_id) WHERE source_id IS NOT NULL;
+-- Only create index on source if it exists
 CREATE INDEX IF NOT EXISTS idx_content_items_source ON public.content_items(source);
-CREATE INDEX IF NOT EXISTS idx_content_items_tags ON public.content_items USING GIN(tags);
-CREATE INDEX IF NOT EXISTS idx_content_items_genres ON public.content_items USING GIN(genres);
-CREATE INDEX IF NOT EXISTS idx_content_items_intensity ON public.content_items(intensity);
-CREATE INDEX IF NOT EXISTS idx_content_items_duration ON public.content_items(duration_min) WHERE duration_min IS NOT NULL;
-CREATE INDEX IF NOT EXISTS idx_content_items_rating ON public.content_items(rating) WHERE rating IS NOT NULL;
-CREATE INDEX IF NOT EXISTS idx_content_items_source_id ON public.content_items(source, source_id) WHERE source_id IS NOT NULL;
 
 -- ============================================================
 -- 2. USER_PREFERENCES TABLE
@@ -134,27 +138,34 @@ ALTER TABLE public.internal_actions ENABLE ROW LEVEL SECURITY;
 -- ============================================================
 
 -- Content items: public read, admin write
+DROP POLICY IF EXISTS "Anyone can read content_items" ON public.content_items;
 CREATE POLICY "Anyone can read content_items" ON public.content_items
   FOR SELECT USING (true);
 
 -- User preferences: users can read/write their own
+DROP POLICY IF EXISTS "Users can view their own preferences" ON public.user_preferences;
 CREATE POLICY "Users can view their own preferences" ON public.user_preferences
   FOR SELECT USING (auth.uid() = user_id);
 
+DROP POLICY IF EXISTS "Users can insert their own preferences" ON public.user_preferences;
 CREATE POLICY "Users can insert their own preferences" ON public.user_preferences
   FOR INSERT WITH CHECK (auth.uid() = user_id);
 
+DROP POLICY IF EXISTS "Users can update their own preferences" ON public.user_preferences;
 CREATE POLICY "Users can update their own preferences" ON public.user_preferences
   FOR UPDATE USING (auth.uid() = user_id);
 
 -- Interaction events: users can read/write their own
+DROP POLICY IF EXISTS "Users can view their own interactions" ON public.interaction_events;
 CREATE POLICY "Users can view their own interactions" ON public.interaction_events
   FOR SELECT USING (auth.uid() = user_id);
 
+DROP POLICY IF EXISTS "Users can insert their own interactions" ON public.interaction_events;
 CREATE POLICY "Users can insert their own interactions" ON public.interaction_events
   FOR INSERT WITH CHECK (auth.uid() = user_id);
 
 -- Internal actions: public read
+DROP POLICY IF EXISTS "Anyone can read internal_actions" ON public.internal_actions;
 CREATE POLICY "Anyone can read internal_actions" ON public.internal_actions
   FOR SELECT USING (true);
 

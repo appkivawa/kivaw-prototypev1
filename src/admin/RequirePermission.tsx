@@ -33,11 +33,7 @@ export default function RequirePermission({
   const location = useLocation();
 
   const { loading: sessionLoading, isAuthed } = useSession();
-  const roles = useRoles() as any;
-
-  const roleKeys: string[] = roles?.roleKeys ?? [];
-  const isSuperAdmin: boolean = !!roles?.isSuperAdmin;
-  const rolesLoading: boolean = !!roles?.loading;
+  const { roleKeys, isSuperAdmin, loading: rolesLoading } = useRoles();
 
   const loading = sessionLoading || rolesLoading;
 
@@ -47,7 +43,7 @@ export default function RequirePermission({
       <div className="page">
         <div className="center-wrap">
           <Card className="center card-pad">
-            <p className="muted">Loading…</p>
+            <p className="muted">Loading permissions…</p>
           </Card>
         </div>
       </div>

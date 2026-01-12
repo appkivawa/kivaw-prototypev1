@@ -28,9 +28,16 @@ export const supabase = createClient(supabaseUrl, supabaseAnonKey, {
 });
 
 /* -----------------------------
-   DEV warnings (safe + helpful)
+   DEV: Expose client on window for debugging
 ------------------------------ */
 if (import.meta.env.DEV) {
+  // Expose Supabase client on window for browser console access
+  // Usage in DevTools:
+  //   - Access client: window.supabase
+  //   - Get access token: (await window.supabase.auth.getSession()).data.session?.access_token
+  //   - Call Edge Function: window.supabase.functions.invoke('function-name', { body: {...} })
+  (window as any).supabase = supabase;
+
   const isLocalhost =
     supabaseUrl.includes("localhost") ||
     supabaseUrl.includes("127.0.0.1");

@@ -81,6 +81,7 @@ ALTER TABLE saved_activities ENABLE ROW LEVEL SECURITY;
 ALTER TABLE feedback_events ENABLE ROW LEVEL SECURITY;
 
 -- Activities: Public read access
+DROP POLICY IF EXISTS "Activities are viewable by everyone" ON activities;
 CREATE POLICY "Activities are viewable by everyone"
   ON activities FOR SELECT
   USING (true);
@@ -88,6 +89,7 @@ CREATE POLICY "Activities are viewable by everyone"
 -- Saved Activities: Users can only see their own saves
 -- Note: For anonymous users, we'll filter by session_id in the application code
 -- RLS will handle authenticated users, and we'll allow session_id-based access
+DROP POLICY IF EXISTS "Users can view their own saved activities" ON saved_activities;
 CREATE POLICY "Users can view their own saved activities"
   ON saved_activities FOR SELECT
   USING (
@@ -95,6 +97,7 @@ CREATE POLICY "Users can view their own saved activities"
     (session_id IS NOT NULL)
   );
 
+DROP POLICY IF EXISTS "Users can insert their own saved activities" ON saved_activities;
 CREATE POLICY "Users can insert their own saved activities"
   ON saved_activities FOR INSERT
   WITH CHECK (
@@ -102,6 +105,7 @@ CREATE POLICY "Users can insert their own saved activities"
     (session_id IS NOT NULL)
   );
 
+DROP POLICY IF EXISTS "Users can delete their own saved activities" ON saved_activities;
 CREATE POLICY "Users can delete their own saved activities"
   ON saved_activities FOR DELETE
   USING (
@@ -110,6 +114,7 @@ CREATE POLICY "Users can delete their own saved activities"
   );
 
 -- Feedback Events: Users can only insert their own feedback
+DROP POLICY IF EXISTS "Users can insert their own feedback" ON feedback_events;
 CREATE POLICY "Users can insert their own feedback"
   ON feedback_events FOR INSERT
   WITH CHECK (
@@ -117,6 +122,7 @@ CREATE POLICY "Users can insert their own feedback"
     (session_id IS NOT NULL)
   );
 
+DROP POLICY IF EXISTS "Users can view their own feedback" ON feedback_events;
 CREATE POLICY "Users can view their own feedback"
   ON feedback_events FOR SELECT
   USING (

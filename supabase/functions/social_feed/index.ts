@@ -1,6 +1,9 @@
 import { serve } from "https://deno.land/std@0.224.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 
+// ============================================================
+// CORS
+// ============================================================
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
   "Access-Control-Allow-Headers":
@@ -23,6 +26,9 @@ function jsonResponse(body: unknown, status = 200): Response {
   });
 }
 
+// ============================================================
+// Types
+// ============================================================
 type Source = "rss" | "youtube" | "reddit" | "podcast" | "eventbrite" | "spotify";
 
 type FeedItem = {
@@ -48,6 +54,9 @@ type Prefs = {
   length_pref?: "short" | "medium" | "long";
 };
 
+// ============================================================
+// Helpers
+// ============================================================
 function cleanText(s?: string | null) {
   return (s ?? "").replace(/\s+/g, " ").trim();
 }
@@ -104,6 +113,12 @@ function sourceWeight(it: FeedItem, prefs: Prefs) {
   return clamp(w, 0, 3);
 }
 
+// ============================================================
+// Config
+// ============================================================
+// Prefer published_at for recency filtering. 21 days default.
+const DEFAULT_DAYS = 21;
+
 serve(async (req) => {
   const cors = handleCors(req);
   if (cors) return cors;
@@ -116,67 +131,126 @@ serve(async (req) => {
   try {
     const SUPABASE_URL = Deno.env.get("SUPABASE_URL")!;
     const SUPABASE_ANON_KEY = Deno.env.get("SUPABASE_ANON_KEY")!;
+
+    // IMPORTANT:
+    // - Pass through Authorization header so supabase.auth.getUser() works.
+    // - Also pass apikey for completeness.
+    const authHeader = req.headers.get("Authorization") ?? "";
     const supabase = createClient(SUPABASE_URL, SUPABASE_ANON_KEY, {
-      global: { headers: { Authorization: req.headers.get("Authorization") ?? "" } },
+      global: {
+        headers: {
+          Authorization: authHeader,
+          apikey: SUPABASE_ANON_KEY,
+        },
+      },
     });
 
-    const { data: userData, error: userErr } = await supabase.auth.getUser();
-    if (userErr) return jsonResponse({ error: userErr.message }, 401);
-    const user = userData.user;
-    if (!user) return jsonResponse({ error: "Not authenticated" }, 401);
-
+    // Parse body
     const body = req.method === "POST" ? await req.json().catch(() => ({})) : {};
     const limit = typeof body.limit === "number" ? Math.min(Math.max(body.limit, 10), 120) : 60;
 
     const types: Source[] = Array.isArray(body.types) ? body.types : [];
     const query = cleanText(body.query ?? "");
 
-    const { data: prefRow } = await supabase
-      .from("user_preferences")
-      .select("prefs")
-      .eq("user_id", user.id)
-      .maybeSingle();
+    const days = typeof body.days === "number" ? Math.min(Math.max(body.days, 1), 365) : DEFAULT_DAYS;
+    const sinceIso = new Date(Date.now() - 1000 * 60 * 60 * 24 * days).toISOString();
 
-    const prefs: Prefs = (prefRow?.prefs as Prefs) ?? {
+    // Auth (optional - never return 401 for logged-out users)
+    let userId: string | null = null;
+    const { data: userData, error: userErr } = await supabase.auth.getUser();
+
+    // Only set userId if we have a valid user session
+    if (!userErr && userData?.user) {
+      userId = userData.user.id;
+    }
+
+    // Defaults for logged-out users OR fallback for missing prefs row
+    let prefs: Prefs = {
       sources: { youtube: 1.2, reddit: 1.0, rss: 1.0, spotify: 0.9, eventbrite: 0.9, podcast: 0.8 },
       topics: [],
       blocked_topics: [],
       length_pref: "medium",
     };
 
-    const { data: follows } = await supabase
-      .from("user_sources")
-      .select("source_type, handle, is_enabled")
-      .eq("user_id", user.id)
-      .eq("is_enabled", true);
-
-    const followKeys = new Set((follows ?? []).map((f) => `${String(f.source_type)}:${String(f.handle)}`));
-
-    const { data: actions } = await supabase
-      .from("user_item_actions")
-      .select("item_id, action")
-      .eq("user_id", user.id);
-
+    // User-based data (only fetch if logged in)
+    let followKeys = new Set<string>();
     const actionMap = new Map<string, string[]>();
-    for (const a of actions ?? []) {
-      const id = String(a.item_id);
-      const arr = actionMap.get(id) ?? [];
-      arr.push(String(a.action));
-      actionMap.set(id, arr);
-    }
 
-    const sinceIso = new Date(Date.now() - 1000 * 60 * 60 * 24 * 21).toISOString();
+    if (userId) {
+      // Fetch user preferences, followed sources, and item actions
+      const [{ data: prefRow }, { data: follows }, { data: actions }] = await Promise.all([
+        supabase
+          .from("user_preferences")
+          .select("prefs")
+          .eq("user_id", userId)
+          .maybeSingle(),
+        supabase
+          .from("user_sources")
+          .select("source_type, handle, is_enabled")
+          .eq("user_id", userId)
+          .eq("is_enabled", true),
+        supabase
+          .from("user_item_actions")
+          .select("item_id, action")
+          .eq("user_id", userId),
+      ]);
+
+      // Use user prefs if available, otherwise keep defaults
+      prefs = (prefRow?.prefs as Prefs) ?? prefs;
+
+      // Build set of followed source handles
+      followKeys = new Set((follows ?? []).map((f) => `${String(f.source_type)}:${String(f.handle)}`));
+
+      // Build map of item actions for scoring
+      for (const a of actions ?? []) {
+        const id = String((a as any).item_id);
+        const arr = actionMap.get(id) ?? [];
+        arr.push(String((a as any).action));
+        actionMap.set(id, arr);
+      }
+    }
+    // If userId is null (logged out), skip user queries and use defaults above
+
+    // ============================================================
+    // Fetch candidate rows
+    // ============================================================
+    // ✅ Fix: use published_at for time filtering.
+    // If published_at is null, we'll still allow the row through if created_at is recent (via OR).
     let qx = supabase
       .from("feed_items")
-      .select("id,source,external_id,url,title,summary,author,image_url,published_at,tags,topics,metadata")
-      .gte("created_at", sinceIso)
+      .select("id,source,external_id,url,title,summary,author,image_url,published_at,tags,topics,metadata,created_at")
+      .or(`published_at.gte.${sinceIso},and(published_at.is.null,created_at.gte.${sinceIso})`)
       .order("published_at", { ascending: false, nullsFirst: false })
       .limit(400);
 
     if (types.length) qx = qx.in("source", types);
 
     const { data: rows, error: rowsErr } = await qx;
-    if (rowsErr) return jsonResponse({ error: rowsErr.message }, 500);
+    if (rowsErr) {
+      console.error("[social_feed] Query error:", rowsErr);
+      // If table doesn't exist, return empty feed with helpful error
+      if (rowsErr.code === "42P01" || rowsErr.message?.includes("does not exist")) {
+        return jsonResponse({ 
+          feed: [], 
+          error: "feed_items table does not exist. Please run the migration: supabase/migrations/create_feed_items.sql",
+          debug: {
+            authed: Boolean(userId),
+            candidates: 0,
+            returned: 0,
+            error: rowsErr.message,
+          }
+        }, 200);
+      }
+      return jsonResponse({ 
+        error: `Database query failed: ${rowsErr.message}`, 
+        code: rowsErr.code,
+        debug: {
+          authed: Boolean(userId),
+          candidates: 0,
+          returned: 0,
+        }
+      }, 500);
+    }
 
     let items: FeedItem[] = (rows ?? []).map((r: any) => ({
       id: r.id,
@@ -187,19 +261,32 @@ serve(async (req) => {
       summary: r.summary,
       author: r.author,
       image_url: r.image_url,
-      published_at: r.published_at,
+      published_at: r.published_at ?? r.created_at ?? null,
       tags: r.tags,
       topics: r.topics,
       metadata: r.metadata ?? {},
     }));
 
+    // Search filter
     if (query) {
       const qq = normalizeKey(query);
       items = items.filter((it) => blob(it).includes(qq));
     }
 
+    // ============================================================
+    // Score + sort
+    // ============================================================
     const scored = items
       .map((it) => {
+        // For logged-out users, only use recency + default source weight
+        if (!userId) {
+          const r = recencyScore(it.published_at);
+          const s = sourceWeight(it, prefs);
+          const score = (r * 1.8) + (s * 0.9);
+          return { ...it, score: Number(score.toFixed(4)) };
+        }
+
+        // For logged-in users, use full personalization
         const acts = actionMap.get(it.id) ?? [];
         const acted = actionWeights(acts);
         if (acted <= -5) return { ...it, score: -999 };
@@ -222,6 +309,9 @@ serve(async (req) => {
     return jsonResponse({
       feed: scored,
       debug: {
+        authed: Boolean(userId),
+        days,
+        sinceIso,
         limit,
         types,
         query: query ? true : false,
@@ -230,7 +320,13 @@ serve(async (req) => {
       },
     });
   } catch (e: any) {
-    return jsonResponse({ error: e?.message ?? String(e) }, 500);
+    console.error("[social_feed] Unhandled error:", e);
+    return jsonResponse({ 
+      error: e?.message ?? String(e),
+      debug: {
+        errorType: e?.constructor?.name ?? "Unknown",
+        stack: import.meta.env.DEV ? e?.stack : undefined,
+      }
+    }, 500);
   }
 });
-

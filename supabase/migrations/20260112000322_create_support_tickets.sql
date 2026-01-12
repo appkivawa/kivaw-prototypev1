@@ -13,45 +13,31 @@ CREATE TABLE IF NOT EXISTS public.support_tickets (
 ALTER TABLE public.support_tickets ENABLE ROW LEVEL SECURITY;
 
 -- Policy: Users can create their own tickets
+DROP POLICY IF EXISTS "Users can create support_tickets" ON public.support_tickets;
 CREATE POLICY "Users can create support_tickets" ON public.support_tickets
   FOR INSERT WITH CHECK (auth.uid() = user_id);
 
 -- Policy: Users can view their own tickets
+DROP POLICY IF EXISTS "Users can view own support_tickets" ON public.support_tickets;
 CREATE POLICY "Users can view own support_tickets" ON public.support_tickets
   FOR SELECT USING (auth.uid() = user_id);
 
 -- Policy: Admins can view all tickets
+-- Use is_admin() function which checks admin_allowlist and roles/user_roles
+-- For support role, we check has_role() directly
+DROP POLICY IF EXISTS "Admins can view all support_tickets" ON public.support_tickets;
 CREATE POLICY "Admins can view all support_tickets" ON public.support_tickets
   FOR SELECT USING (
-    EXISTS (
-      SELECT 1 FROM public.admin_roles ar
-      WHERE ar.user_id = auth.uid() AND (ar.role = 'owner' OR ar.role = 'admin' OR ar.role = 'support')
-    )
-    OR EXISTS (
-      SELECT 1 FROM public.admin_users au
-      WHERE au.user_id = auth.uid()
-    )
-    OR EXISTS (
-      SELECT 1 FROM public.profiles p
-      WHERE p.id = auth.uid() AND p.is_admin = true
-    )
+    public.is_admin(auth.uid())
+    OR public.has_role(auth.uid(), 'support')
   );
 
 -- Policy: Admins can update all tickets
+DROP POLICY IF EXISTS "Admins can update support_tickets" ON public.support_tickets;
 CREATE POLICY "Admins can update support_tickets" ON public.support_tickets
   FOR UPDATE USING (
-    EXISTS (
-      SELECT 1 FROM public.admin_roles ar
-      WHERE ar.user_id = auth.uid() AND (ar.role = 'owner' OR ar.role = 'admin' OR ar.role = 'support')
-    )
-    OR EXISTS (
-      SELECT 1 FROM public.admin_users au
-      WHERE au.user_id = auth.uid()
-    )
-    OR EXISTS (
-      SELECT 1 FROM public.profiles p
-      WHERE p.id = auth.uid() AND p.is_admin = true
-    )
+    public.is_admin(auth.uid())
+    OR public.has_role(auth.uid(), 'support')
   );
 
 -- Create function to update updated_at timestamp
@@ -64,6 +50,7 @@ END;
 $$ LANGUAGE plpgsql;
 
 -- Create trigger to auto-update updated_at
+DROP TRIGGER IF EXISTS update_support_tickets_updated_at ON public.support_tickets;
 CREATE TRIGGER update_support_tickets_updated_at
   BEFORE UPDATE ON public.support_tickets
   FOR EACH ROW

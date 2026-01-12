@@ -1,4 +1,4 @@
-import { useNavigate, useLocation } from "react-router-dom";
+import { useNavigate, useLocation, Outlet } from "react-router-dom";
 import { useEffect, useState } from "react";
 import { supabase } from "../lib/supabaseClient";
 import { useRoles } from "../auth/useRoles";
@@ -26,9 +26,9 @@ export default function AdminLayout() {
   const location = useLocation();
 
   const [userEmail, setUserEmail] = useState<string>("");
-  const { roleKeys, isSuperAdmin } = useRoles();
-  const [activeTab, setActiveTab] = useState<string>("overview");
+  const { roleKeys, isSuperAdmin, loading: rolesLoading } = useRoles();
 
+  // Sync activeTab with current route
   useEffect(() => {
     let alive = true;
 
@@ -43,6 +43,41 @@ export default function AdminLayout() {
       alive = false;
     };
   }, []);
+
+  // Determine active tab from current location
+  // Converts route paths (hyphens) back to tab names (underscores)
+  const activeTab = (() => {
+    const path = location.pathname;
+    if (path === "/admin" || path === "/admin/") return "overview";
+    const segments = path.split("/").filter(Boolean);
+    if (segments.length >= 2 && segments[0] === "admin") {
+      const routePath = segments[1];
+      // Map route paths back to tab names
+      const tabMap: Record<string, string> = {
+        "creator-requests": "creator_requests",
+        "recommendations-preview": "recommendations_preview",
+        "publish-to-explore": "publish_to_explore",
+      };
+      return tabMap[routePath] || routePath;
+    }
+    return "overview";
+  })();
+
+  // Helper to get path for a tab
+  // Converts tab names (underscores) to route paths (hyphens where needed)
+  function getTabPath(tabName: string): string {
+    if (tabName === "overview") return "/admin";
+    
+    // Map tab names to route paths (some use hyphens in URLs)
+    const pathMap: Record<string, string> = {
+      creator_requests: "creator-requests",
+      recommendations_preview: "recommendations-preview",
+      publish_to_explore: "publish-to-explore",
+    };
+    
+    const path = pathMap[tabName] || tabName;
+    return `/admin/${path}`;
+  }
 
   const tabs = [
     { name: "overview", label: "Overview", icon: "📊" },
@@ -62,10 +97,17 @@ export default function AdminLayout() {
     { name: "publish_to_explore", label: "Publish to Explore", icon: "📤" },
   ];
 
-  const visibleTabs = tabs.filter((tab) =>
-    canViewTab(roleKeys, isSuperAdmin || false, tab.name)
-  );
+  // Wait for roles to load before filtering tabs to avoid race condition
+  const visibleTabs = (() => {
+    if (rolesLoading) {
+      return []; // Don't show tabs until roles are loaded
+    }
+    
+    return tabs.filter((tab) => canViewTab(roleKeys, isSuperAdmin || false, tab.name));
+  })();
 
+  // This function is no longer needed since we're using React Router nested routes
+  // But keeping it as fallback in case routes don't render correctly
   function renderTabContent() {
     switch (activeTab) {
       case "overview":
@@ -171,21 +213,60 @@ export default function AdminLayout() {
         </div>
 
         <div className="admin-tabs">
-          {visibleTabs.map((tab) => (
-            <button
-              key={tab.name}
-              type="button"
-              onClick={() => setActiveTab(tab.name)}
-              className={`admin-tab ${activeTab === tab.name ? "admin-tab-active" : ""}`}
-            >
-              <span className="admin-tab-icon">{tab.icon}</span>
-              {tab.label}
-            </button>
-          ))}
+          {rolesLoading ? (
+            <div style={{ padding: 20, textAlign: "center", color: "var(--coral-text-muted)" }}>
+              Loading tabs...
+            </div>
+          ) : visibleTabs.length === 0 ? (
+            <div style={{ padding: 20, textAlign: "center", color: "var(--coral-text-muted)" }}>
+              No tabs available. Please check your permissions.
+            </div>
+          ) : (
+            visibleTabs.map((tab) => {
+              const tabPath = getTabPath(tab.name);
+              const isActive = activeTab === tab.name;
+              
+              return (
+                <button
+                  key={tab.name}
+                  type="button"
+                  onClick={(e) => {
+                    e.preventDefault();
+                    navigate(tabPath);
+                  }}
+                  className={`admin-tab ${isActive ? "admin-tab-active" : ""}`}
+                >
+                  <span className="admin-tab-icon">{tab.icon}</span>
+                  {tab.label}
+                </button>
+              );
+            })
+          )}
         </div>
 
+        {/* Content is rendered by React Router nested routes */}
         <div className="coral-card" style={{ padding: 32 }}>
-          {renderTabContent()}
+          {/* Show loading state if roles are still loading */}
+          {rolesLoading ? (
+            <div style={{ padding: 40, textAlign: "center" }}>
+              <p style={{ color: "var(--coral-text-muted)" }}>Loading permissions...</p>
+            </div>
+          ) : (
+            /* Render content - try Outlet first, fallback to direct rendering if needed */
+            (() => {
+              // If we're on an admin route, try Outlet first
+              if (location.pathname.startsWith("/admin")) {
+                // Check if Outlet rendered anything by checking if we're still on an admin route after a brief moment
+                return <Outlet />;
+              }
+              return (
+                <div style={{ padding: 20, textAlign: "center" }}>
+                  <p>Route mismatch: {location.pathname}</p>
+                  <button onClick={() => navigate("/admin")}>Go to Admin Overview</button>
+                </div>
+              );
+            })()
+          )}
         </div>
       </div>
     </div>

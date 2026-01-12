@@ -1,127 +1,66 @@
+// src/auth/RequireRole.tsx
 import React from "react";
 import { Navigate, useLocation } from "react-router-dom";
-import { supabase } from "../lib/supabaseClient";
+import { useSession } from "./useSession";
+import { useRoles } from "./useRoles";
 
-export type RoleKey = "admin" | "employee" | "creator" | "super_admin" | "ops" | "it" | "social_media";
-
-const adminEmails = new Set<string>([
-  // "kivawapp@proton.me", // optional fallback
-]);
+type RequireRoleProps = {
+  allow: string[];              // e.g. ["admin"] or ["admin","ops"]
+  children: React.ReactNode;
+  redirectTo?: string;          // where to send authed-but-not-allowed users
+};
 
 export default function RequireRole({
   allow,
   children,
   redirectTo = "/",
-}: {
-  allow: RoleKey[];
-  children: React.ReactNode;
-  redirectTo?: string;
-}) {
+}: RequireRoleProps) {
   const location = useLocation();
+  const { loading: sessionLoading, isAuthed } = useSession();
+  const { loading: rolesLoading, roleKeys, isSuperAdmin } = useRoles();
 
-  const [loading, setLoading] = React.useState(true);
-  const [authed, setAuthed] = React.useState(false);
-  const [hasAccess, setHasAccess] = React.useState(false);
-
-  React.useEffect(() => {
-    let alive = true;
-
-    async function load() {
-      try {
-        setLoading(true);
-
-        // 1) Get session
-        const { data: sessionData, error: sessionErr } = await supabase.auth.getSession();
-        if (!alive) return;
-
-        const session = sessionData.session;
-        if (sessionErr || !session) {
-          setAuthed(false);
-          setHasAccess(false);
-          setLoading(false);
-          return;
-        }
-
-        setAuthed(true);
-
-        // 2) Email allowlist quick win
-        const email = session.user.email ?? "";
-        if (adminEmails.has(email) && allow.includes("admin")) {
-          setHasAccess(true);
-          setLoading(false);
-          return;
-        }
-
-        // 3) Pull role keys from profiles (single role OR array)
-        // Supports:
-        // - profiles.role = "admin"
-        // - profiles.role_keys = ["admin","ops"]
-        const { data: profile, error: profErr } = await supabase
-          .from("profiles")
-          .select("role, role_keys")
-          .eq("user_id", session.user.id)
-          .maybeSingle();
-
-        if (!alive) return;
-
-        if (profErr) {
-          console.error("[RequireRole] profile fetch error:", profErr);
-          setHasAccess(false);
-          setLoading(false);
-          return;
-        }
-
-        const role = (profile as any)?.role as string | undefined;
-        const roleKeys = ((profile as any)?.role_keys as string[] | undefined) ?? [];
-
-        const userRoleKeys = new Set<string>([
-          ...(role ? [role] : []),
-          ...roleKeys,
-        ]);
-
-        // super_admin implies admin
-        if (userRoleKeys.has("super_admin")) userRoleKeys.add("admin");
-
-        const ok = allow.some((r) => userRoleKeys.has(r));
-        setHasAccess(ok);
-        setLoading(false);
-      } catch (e) {
-        console.error("[RequireRole] unexpected error:", e);
-        if (!alive) return;
-        setAuthed(false);
-        setHasAccess(false);
-        setLoading(false);
-      }
-    }
-
-    load();
-
-    const { data: sub } = supabase.auth.onAuthStateChange(() => {
-      load();
-    });
-
-    return () => {
-      alive = false;
-      sub.subscription.unsubscribe();
-    };
-  }, [allow]);
+  const loading = sessionLoading || rolesLoading;
 
   if (loading) {
     return (
-      <div className="page">
-        <div className="center-wrap">
-          <div className="coral-card" style={{ padding: 32, textAlign: "center" }}>
-            Loading…
+      <div className="coral-page-content">
+        <div className="coral-section" style={{ maxWidth: 560, margin: "0 auto", padding: "80px 20px" }}>
+          <div className="coral-card" style={{ padding: "48px 32px", textAlign: "center" }}>
+            <p style={{ color: "var(--coral-text-muted)" }}>Loading permissions…</p>
           </div>
         </div>
       </div>
     );
   }
 
-  if (!authed) return <Navigate to="/login" replace state={{ from: location.pathname }} />;
+  if (!isAuthed) {
+    return <Navigate to="/login" replace state={{ from: location.pathname }} />;
+  }
 
-  if (!hasAccess) return <Navigate to={redirectTo} replace />;
+  // super admins can do anything
+  if (isSuperAdmin) return <>{children}</>;
+
+  const allowSet = new Set((allow || []).map(String));
+  const hasAny = (roleKeys || []).some((rk) => allowSet.has(rk));
+
+  if (!hasAny) {
+    // CRITICAL: If we're on an admin route but roles are empty, 
+    // it might be a race condition - show error instead of redirecting
+    if (location.pathname.startsWith("/admin") && (!roleKeys || roleKeys.length === 0)) {
+      return (
+        <div className="coral-page-content">
+          <div className="coral-section" style={{ maxWidth: 560, margin: "0 auto", padding: "80px 20px" }}>
+            <div className="coral-card" style={{ padding: "48px 32px", textAlign: "center" }}>
+              <p style={{ color: "var(--coral-text-muted)" }}>Loading roles... Please wait.</p>
+            </div>
+          </div>
+        </div>
+      );
+    }
+    return <Navigate to={redirectTo} replace />;
+  }
 
   return <>{children}</>;
 }
+
 

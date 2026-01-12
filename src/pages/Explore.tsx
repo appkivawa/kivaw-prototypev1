@@ -1,5 +1,5 @@
 import React, { useEffect, useMemo, useRef, useState } from "react";
-import { supabase } from "../lib/supabaseClient";
+import { supabase, SUPABASE_URL } from "../lib/supabaseClient";
 import { saveLocal, unsaveLocal, isLocallySaved } from "../data/savedLocal";
 
 // ============================================================
@@ -214,6 +214,22 @@ function topNStrings(arr: string[], n: number) {
   }
   const sorted = [...counts.entries()].sort((a, b) => b[1] - a[1]).map((x) => x[0]);
   return sorted.slice(0, n);
+}
+
+// ============================================================
+// ✅ AUTH TOKEN RETRY (Fix B)
+// ============================================================
+async function getAccessTokenWithRetry(opts?: { tries?: number; delayMs?: number }) {
+  const tries = opts?.tries ?? 10;
+  const delayMs = opts?.delayMs ?? 120;
+
+  for (let i = 0; i < tries; i++) {
+    const { data } = await supabase.auth.getSession();
+    const token = data.session?.access_token;
+    if (token) return token;
+    await new Promise((r) => setTimeout(r, delayMs));
+  }
+  return null;
 }
 
 // ============================================================
@@ -484,12 +500,53 @@ export default function Explore() {
     setErr("");
 
     try {
+      // Try to get auth token, but don't require it (feed function should work without auth)
+      let token: string | null = null;
+      try {
+        token = await getAccessTokenWithRetry({ tries: 2, delayMs: 50 });
+      } catch {
+        // No session available - that's ok for the feed function
+        token = null;
+      }
+
+      // Prepare headers - include auth if available, but don't require it
+      const headers: Record<string, string> = {
+        "Content-Type": "application/json",
+      };
+      if (token) {
+        headers.Authorization = `Bearer ${token}`;
+      }
+
       const { data, error } = await supabase.functions.invoke<FeedResponse>("feed", {
+        method: "POST",
+        headers,
         body: { tone, safeMode },
       });
 
-      if (error) throw new Error(error.message || "Failed to load feed");
-      if (!data?.feed) throw new Error("Invalid response from feed function");
+      if (error) {
+        // Log full error details for debugging
+        console.error("[Explore] Edge Function error:", error);
+        
+        // Handle 401 specifically - auth might be required
+        const statusCode = (error as any).status || (error as any).code;
+        if (statusCode === 401 || (error as any).message?.includes("401")) {
+          throw new Error(
+            "Authentication required. The feed function may need to be deployed with --no-verify-jwt flag to allow anonymous access. " +
+            "Please try signing in, or contact support if this persists."
+          );
+        }
+        
+        const errorMsg = error.message || "Failed to load feed";
+        // Include status code if available
+        const statusMsg = statusCode ? ` (Status: ${statusCode})` : "";
+        throw new Error(`${errorMsg}${statusMsg}. Check console for details.`);
+      }
+      
+      // Handle case where feed might be empty but valid
+      if (!data || !Array.isArray(data.feed)) {
+        console.error("[Explore] Invalid response:", data);
+        throw new Error("Invalid response from feed function - expected array");
+      }
 
       const sanitized = (data.feed ?? [])
         .filter(Boolean)
@@ -786,7 +843,12 @@ export default function Explore() {
   };
 
   // unified description field (prefer blurb, then legacy)
-  const desc = cleanText(current?.blurb) || cleanText(current?.bio) || cleanText(current?.story) || cleanText(current?.opener) || "";
+  const desc =
+    cleanText(current?.blurb) ||
+    cleanText(current?.bio) ||
+    cleanText(current?.story) ||
+    cleanText(current?.opener) ||
+    "";
   const shortDesc = desc.length > 190 ? desc.slice(0, 190).trimEnd() + "…" : desc;
 
   // ============================================================
@@ -855,7 +917,8 @@ export default function Explore() {
         >
           {items.map((c) => {
             const m = formatMeta(c.kind, c.meta);
-            const d = cleanText(c.blurb) || cleanText(c.bio) || cleanText(c.story) || cleanText(c.opener) || "";
+            const d =
+              cleanText(c.blurb) || cleanText(c.bio) || cleanText(c.story) || cleanText(c.opener) || "";
             const d2 = d.length > 96 ? d.slice(0, 96).trimEnd() + "…" : d;
 
             const saved = isLocallySaved(c.id);
@@ -915,7 +978,9 @@ export default function Explore() {
                             {m ? <span style={{ opacity: 0.75 }}>{m}</span> : null}
                           </>
                         ) : (
-                          <>{m ? <span style={{ opacity: 0.75 }}>{m}</span> : <span style={{ opacity: 0.65 }}>{c.source}</span>}</>
+                          <>
+                            {m ? <span style={{ opacity: 0.75 }}>{m}</span> : <span style={{ opacity: 0.65 }}>{c.source}</span>}
+                          </>
                         )}
                       </div>
                     </div>
@@ -1007,7 +1072,9 @@ export default function Explore() {
                 Your vibe: <b>{likedSignals.join(", ")}</b>
               </div>
             ) : (
-              <div style={{ marginLeft: 6, fontSize: 12, opacity: 0.65 }}>Like a few things and I’ll start tailoring shelves 👀</div>
+              <div style={{ marginLeft: 6, fontSize: 12, opacity: 0.65 }}>
+                Like a few things and I’ll start tailoring shelves 👀
+              </div>
             )}
           </div>
         </div>
@@ -1078,7 +1145,7 @@ export default function Explore() {
             type="button"
             onClick={() => {
               const yes = window.confirm(
-                "Reset your Explore?\n\nThis clears Likes/Passes (and server personalization if you’re logged in).",
+                "Reset your Explore?\n\nThis clears Likes/Passes (and server personalization if you’re logged in)."
               );
               if (yes) handleReset();
             }}
@@ -1101,7 +1168,7 @@ export default function Explore() {
             type="button"
             onClick={() => {
               const yes = window.confirm(
-                "Hard reset?\n\nClears Likes/Passes + server personalization AND resets your tone.\nThis will reload the page.",
+                "Hard reset?\n\nClears Likes/Passes + server personalization AND resets your tone.\nThis will reload the page."
               );
               if (yes) handleReset({ resetTone: true });
             }}
@@ -1358,9 +1425,7 @@ export default function Explore() {
 
               {/* Content */}
               <div style={{ padding: 18 }}>
-                <h3 style={{ fontSize: 18, fontWeight: 950, margin: 0, lineHeight: 1.25 }}>
-                  {current.title}
-                </h3>
+                <h3 style={{ fontSize: 18, fontWeight: 950, margin: 0, lineHeight: 1.25 }}>{current.title}</h3>
 
                 <div style={{ marginTop: 8, fontSize: 14, color: "rgba(0,0,0,0.72)" }}>
                   {current.byline ? <span style={{ fontWeight: 800 }}>{cleanText(current.byline)}</span> : null}
@@ -1369,9 +1434,7 @@ export default function Explore() {
                 </div>
 
                 {shortDesc ? (
-                  <div style={{ marginTop: 12, fontSize: 14, lineHeight: 1.55, color: "rgba(0,0,0,0.82)" }}>
-                    {shortDesc}
-                  </div>
+                  <div style={{ marginTop: 12, fontSize: 14, lineHeight: 1.55, color: "rgba(0,0,0,0.82)" }}>{shortDesc}</div>
                 ) : (
                   <div style={{ marginTop: 12, fontSize: 13, opacity: 0.65 }}>No description yet.</div>
                 )}
@@ -1499,6 +1562,7 @@ export default function Explore() {
     </div>
   );
 }
+
 
 
 

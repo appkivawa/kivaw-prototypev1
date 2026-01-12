@@ -7,14 +7,12 @@ import { getUserId } from "../../data/savesApi";
 type AppSettings = {
   maintenance_mode: boolean;
   home_trending_enabled: boolean;
-  max_waves: number;
 };
 
 export default function Settings() {
   const [settings, setSettings] = useState<AppSettings>({
     maintenance_mode: false,
     home_trending_enabled: true,
-    max_waves: 100,
   });
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
@@ -54,7 +52,6 @@ export default function Settings() {
       const loadedSettings: AppSettings = {
         maintenance_mode: false,
         home_trending_enabled: true,
-        max_waves: 100,
       };
 
       (data || []).forEach((row) => {
@@ -65,8 +62,6 @@ export default function Settings() {
           loadedSettings.maintenance_mode = value === true || value === "true";
         } else if (key === "home_trending_enabled") {
           loadedSettings.home_trending_enabled = value === true || value === "true";
-        } else if (key === "max_waves") {
-          loadedSettings.max_waves = typeof value === "number" ? value : parseInt(String(value), 10) || 100;
         }
       });
 
@@ -96,11 +91,6 @@ export default function Settings() {
           setting_value: settings.home_trending_enabled,
           updated_at: new Date().toISOString(),
         },
-        {
-          setting_key: "max_waves",
-          setting_value: settings.max_waves,
-          updated_at: new Date().toISOString(),
-        },
       ];
 
       const { error } = await supabase.from("app_settings").upsert(updates, {
@@ -113,7 +103,6 @@ export default function Settings() {
       await logAdminAction("settings_update", null, {
         maintenance_mode: settings.maintenance_mode,
         home_trending_enabled: settings.home_trending_enabled,
-        max_waves: settings.max_waves,
       });
 
       setSuccess(true);
@@ -313,25 +302,6 @@ export default function Settings() {
             </label>
           </div>
 
-          {/* Max Waves */}
-          <div className="admin-setting-item">
-            <div className="admin-setting-info">
-              <div className="admin-setting-label">Max Waves</div>
-              <div className="admin-setting-desc">
-                Maximum number of waves to display (integer)
-              </div>
-            </div>
-            <input
-              type="number"
-              className="admin-setting-input"
-              value={settings.max_waves}
-              onChange={(e) =>
-                setSettings({ ...settings, max_waves: parseInt(e.target.value, 10) || 0 })
-              }
-              min="0"
-              step="1"
-            />
-          </div>
         </div>
 
         <div className="admin-settings-actions">

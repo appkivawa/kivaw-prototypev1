@@ -32,7 +32,15 @@ function CreatorRequestsContent() {
         .select("*")
         .order("created_at", { ascending: false });
 
-      if (fetchError) throw fetchError;
+      if (fetchError) {
+        // If table doesn't exist, that's okay - show empty state
+        if (fetchError.code === "42P01" || fetchError.message?.includes("does not exist") || fetchError.message?.includes("schema cache")) {
+          setRequests([]);
+          setError(null);
+          return;
+        }
+        throw fetchError;
+      }
       setRequests(data || []);
     } catch (e: any) {
       console.error("Error loading creator requests:", e);
@@ -68,7 +76,14 @@ function CreatorRequestsContent() {
         })
         .eq("id", requestId);
 
-      if (updateError) throw updateError;
+      if (updateError) {
+        // If table doesn't exist, that's okay
+        if (updateError.code === "42P01" || updateError.message?.includes("does not exist") || updateError.message?.includes("schema cache")) {
+          alert("The creator_access_requests table is not available. This feature requires the table to be created in the database.");
+          return;
+        }
+        throw updateError;
+      }
 
       // If approved, try to assign creator role
       if (newStatus === "approved") {

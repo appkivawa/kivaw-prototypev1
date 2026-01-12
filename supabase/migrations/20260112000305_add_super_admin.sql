@@ -31,8 +31,9 @@ END;
 $_is_super_admin_func$;
 
 -- Grant execute permission
+-- Note: Function has DEFAULT parameter, so we only GRANT on the signature with parameter
+-- The function can still be called without arguments due to the DEFAULT
 GRANT EXECUTE ON FUNCTION public.is_super_admin(UUID) TO authenticated;
-GRANT EXECUTE ON FUNCTION public.is_super_admin() TO authenticated;
 
 -- Update is_admin() to also check for super_admin
 -- (Super admins are also admins, but with extra powers)

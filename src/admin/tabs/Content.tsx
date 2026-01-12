@@ -10,8 +10,6 @@ type ContentItem = {
   created_at: string;
   effectiveness_score?: number;
   saves_count?: number;
-  echoes_count?: number;
-  waves_count?: number;
 };
 
 function ContentManagement() {
@@ -23,12 +21,10 @@ function ContentManagement() {
 
   function calculateEffectivenessScore(
     saves: number,
-    echoes: number,
-    waves: number,
     createdAt: string
   ): number {
     // Base score from engagement
-    const engagementScore = saves * 2 + echoes * 3 + waves * 1.5;
+    const engagementScore = saves * 2;
 
     // Time decay: newer items get a boost (items older than 30 days decay)
     const daysSinceCreation = (Date.now() - new Date(createdAt).getTime()) / (1000 * 60 * 60 * 24);
@@ -58,26 +54,10 @@ function ContentManagement() {
             .select("*", { count: "exact", head: true })
             .eq("content_id", item.id);
 
-          // Get echoes count
-          const { count: echoesCount } = await supabase
-            .from("echoes")
-            .select("*", { count: "exact", head: true })
-            .eq("content_id", item.id);
-
-          // Get waves count (from waves_events or waves_summary)
-          const { count: wavesCount } = await supabase
-            .from("waves_events")
-            .select("*", { count: "exact", head: true })
-            .eq("content_id", item.id);
-
           const saves = savesCount || 0;
-          const echoes = echoesCount || 0;
-          const waves = wavesCount || 0;
 
           const effectivenessScore = calculateEffectivenessScore(
             saves,
-            echoes,
-            waves,
             item.created_at
           );
 
@@ -85,8 +65,6 @@ function ContentManagement() {
             ...item,
             effectiveness_score: effectivenessScore,
             saves_count: saves,
-            echoes_count: echoes,
-            waves_count: waves,
           };
         })
       );
@@ -164,10 +142,6 @@ function ContentManagement() {
                     <td>
                       <div style={{ fontSize: 12, color: "var(--text2)" }}>
                         <span>🔖 {item.saves_count || 0}</span>
-                        {" • "}
-                        <span>📖 {item.echoes_count || 0}</span>
-                        {" • "}
-                        <span>🌊 {item.waves_count || 0}</span>
                       </div>
                     </td>
                     <td>{new Date(item.created_at).toLocaleDateString()}</td>

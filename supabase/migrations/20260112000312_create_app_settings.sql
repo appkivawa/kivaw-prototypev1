@@ -11,37 +11,17 @@ CREATE TABLE IF NOT EXISTS public.app_settings (
 ALTER TABLE public.app_settings ENABLE ROW LEVEL SECURITY;
 
 -- Policy: Only admins can read app_settings
+DROP POLICY IF EXISTS "Admins can read app_settings" ON public.app_settings;
 CREATE POLICY "Admins can read app_settings" ON public.app_settings
   FOR SELECT USING (
-    EXISTS (
-      SELECT 1 FROM public.admin_roles ar
-      WHERE ar.user_id = auth.uid() AND (ar.role = 'owner' OR ar.role = 'admin')
-    )
-    OR EXISTS (
-      SELECT 1 FROM public.admin_users au
-      WHERE au.user_id = auth.uid()
-    )
-    OR EXISTS (
-      SELECT 1 FROM public.profiles p
-      WHERE p.id = auth.uid() AND p.is_admin = true
-    )
+    public.is_admin(auth.uid())
   );
 
 -- Policy: Only admins can insert/update app_settings
+DROP POLICY IF EXISTS "Admins can manage app_settings" ON public.app_settings;
 CREATE POLICY "Admins can manage app_settings" ON public.app_settings
   FOR ALL USING (
-    EXISTS (
-      SELECT 1 FROM public.admin_roles ar
-      WHERE ar.user_id = auth.uid() AND (ar.role = 'owner' OR ar.role = 'admin')
-    )
-    OR EXISTS (
-      SELECT 1 FROM public.admin_users au
-      WHERE au.user_id = auth.uid()
-    )
-    OR EXISTS (
-      SELECT 1 FROM public.profiles p
-      WHERE p.id = auth.uid() AND p.is_admin = true
-    )
+    public.is_admin(auth.uid())
   );
 
 -- Insert default settings
@@ -62,6 +42,7 @@ END;
 $$ LANGUAGE plpgsql;
 
 -- Create trigger to auto-update updated_at
+DROP TRIGGER IF EXISTS update_app_settings_updated_at ON public.app_settings;
 CREATE TRIGGER update_app_settings_updated_at
   BEFORE UPDATE ON public.app_settings
   FOR EACH ROW

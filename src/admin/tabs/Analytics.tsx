@@ -7,15 +7,11 @@ import * as XLSX from "xlsx";
 type DailyActivity = {
   date: string;
   saves: number;
-  echoes: number;
-  waves: number;
   total: number;
 };
 
 type AnalyticsData = {
   totalSaves: number;
-  totalEchoes: number;
-  totalWaves: number;
   dailyActivity: DailyActivity[];
 };
 
@@ -27,16 +23,6 @@ type StateHealth = {
   avg_engagement_score: number; // simplified metric
 };
 
-type EchoPattern = {
-  time_of_day_distribution: Array<{ hour: number; count: number }>;
-  states_most_associated: Array<{ state: string; count: number }>;
-  word_count_trends: {
-    short: number; // < 100 words
-    medium: number; // 100-500 words
-    long: number; // > 500 words
-  };
-};
-
 import { useRoles } from "../../auth/useRoles";
 import { canManage } from "../permissions";
 
@@ -44,10 +30,8 @@ export default function Analytics() {
   const { roleKeys, isSuperAdmin } = useRoles();
   const [data, setData] = useState<AnalyticsData | null>(null);
   const [stateHealth, setStateHealth] = useState<StateHealth[]>([]);
-  const [echoPatterns, setEchoPatterns] = useState<EchoPattern | null>(null);
   const [loading, setLoading] = useState(true);
   const [loadingStateHealth, setLoadingStateHealth] = useState(false);
-  const [loadingEchoPatterns, setLoadingEchoPatterns] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [showExportMenu, setShowExportMenu] = useState(false);
   
@@ -59,15 +43,9 @@ export default function Analytics() {
     setError(null);
     try {
       // Get total counts
-      const [savesResult, echoesResult, wavesResult] = await Promise.all([
-        supabase.from("saves_v2").select("*", { count: "exact", head: true }),
-        supabase.from("echoes").select("*", { count: "exact", head: true }),
-        supabase.from("waves_events").select("*", { count: "exact", head: true }),
-      ]);
-
-      const totalSaves = savesResult.count || 0;
-      const totalEchoes = echoesResult.count || 0;
-      const totalWaves = wavesResult.count || 0;
+      const { count: totalSaves } = await supabase
+        .from("saves_v2")
+        .select("*", { count: "exact", head: true });
 
       // Get daily activity for last 7 days
       const sevenDaysAgo = new Date();
@@ -80,27 +58,15 @@ export default function Analytics() {
         .select("created_at")
         .gte("created_at", startDate);
 
-      // Fetch echoes for last 7 days
-      const { data: echoesData } = await supabase
-        .from("echoes")
-        .select("created_at")
-        .gte("created_at", startDate);
-
-      // Fetch waves for last 7 days (from waves_events table)
-      const { data: wavesData } = await supabase
-        .from("waves_events")
-        .select("created_at")
-        .gte("created_at", startDate);
-
       // Group by date
-      const activityMap = new Map<string, { saves: number; echoes: number; waves: number }>();
+      const activityMap = new Map<string, { saves: number }>();
 
       // Initialize last 7 days
       for (let i = 6; i >= 0; i--) {
         const date = new Date();
         date.setDate(date.getDate() - i);
         const dateStr = date.toISOString().split("T")[0];
-        activityMap.set(dateStr, { saves: 0, echoes: 0, waves: 0 });
+        activityMap.set(dateStr, { saves: 0 });
       }
 
       // Count saves by date
@@ -110,29 +76,7 @@ export default function Analytics() {
         if (existing) {
           existing.saves++;
         } else {
-          activityMap.set(date, { saves: 1, echoes: 0, waves: 0 });
-        }
-      });
-
-      // Count echoes by date
-      (echoesData || []).forEach((echo) => {
-        const date = new Date(echo.created_at).toISOString().split("T")[0];
-        const existing = activityMap.get(date);
-        if (existing) {
-          existing.echoes++;
-        } else {
-          activityMap.set(date, { saves: 0, echoes: 1, waves: 0 });
-        }
-      });
-
-      // Count waves by date
-      (wavesData || []).forEach((wave) => {
-        const date = new Date(wave.created_at).toISOString().split("T")[0];
-        const existing = activityMap.get(date);
-        if (existing) {
-          existing.waves++;
-        } else {
-          activityMap.set(date, { saves: 0, echoes: 0, waves: 1 });
+          activityMap.set(date, { saves: 1 });
         }
       });
 
@@ -141,16 +85,12 @@ export default function Analytics() {
         .map(([date, counts]) => ({
           date,
           saves: counts.saves,
-          echoes: counts.echoes,
-          waves: counts.waves,
-          total: counts.saves + counts.echoes + counts.waves,
+          total: counts.saves,
         }))
         .sort((a, b) => a.date.localeCompare(b.date));
 
       setData({
-        totalSaves,
-        totalEchoes,
-        totalWaves,
+        totalSaves: totalSaves || 0,
         dailyActivity,
       });
     } catch (e: any) {
@@ -158,8 +98,6 @@ export default function Analytics() {
       setError(e?.message || "Could not load analytics data.");
       setData({
         totalSaves: 0,
-        totalEchoes: 0,
-        totalWaves: 0,
         dailyActivity: [],
       });
     } finally {
@@ -197,20 +135,14 @@ export default function Analytics() {
         Object.entries(stateGroups).map(async ([state, users]) => {
           const userIds = users.map((u) => u.id);
 
-          // Get users who took a second action (saved or echoed after state selection)
-          const [savesResult, echoesResult] = await Promise.all([
-            supabase
-              .from("saves_v2")
-              .select("user_id, created_at")
-              .in("user_id", userIds),
-            supabase
-              .from("echoes")
-              .select("user_id, created_at")
-              .in("user_id", userIds),
-          ]);
+          // Get users who took a second action (saved after state selection)
+          const { data: savesData } = await supabase
+            .from("saves_v2")
+            .select("user_id, created_at")
+            .in("user_id", userIds);
 
           const usersWithSecondAction = new Set<string>();
-          [...(savesResult.data || []), ...(echoesResult.data || [])].forEach((action) => {
+          (savesData || []).forEach((action) => {
             usersWithSecondAction.add(action.user_id);
           });
 
@@ -228,10 +160,9 @@ export default function Analytics() {
 
           const return24hRate = users.length > 0 ? (usersReturned24h / users.length) * 100 : 0;
 
-          // Calculate average engagement (saves + echoes per user)
-          const totalSaves = savesResult.data?.length || 0;
-          const totalEchoes = echoesResult.data?.length || 0;
-          const avgEngagement = users.length > 0 ? (totalSaves + totalEchoes) / users.length : 0;
+          // Calculate average engagement (saves per user)
+          const totalSaves = savesData?.length || 0;
+          const avgEngagement = users.length > 0 ? totalSaves / users.length : 0;
 
           return {
             state,
@@ -253,87 +184,6 @@ export default function Analytics() {
     }
   }
 
-  async function loadEchoPatterns() {
-    setLoadingEchoPatterns(true);
-    try {
-      // Get all echoes
-      const { data: echoes } = await supabase
-        .from("echoes")
-        .select("id, user_id, content_id, created_at, reflection");
-
-      if (!echoes || echoes.length === 0) {
-        setEchoPatterns({
-          time_of_day_distribution: [],
-          states_most_associated: [],
-          word_count_trends: { short: 0, medium: 0, long: 0 },
-        });
-        return;
-      }
-
-      // Time of day distribution
-      const hourCounts: Record<number, number> = {};
-      echoes.forEach((echo) => {
-        const hour = new Date(echo.created_at).getHours();
-        hourCounts[hour] = (hourCounts[hour] || 0) + 1;
-      });
-
-      const timeDistribution = Array.from({ length: 24 }, (_, i) => ({
-        hour: i,
-        count: hourCounts[i] || 0,
-      }));
-
-      // States most associated with echoes (from user profiles)
-      const userIds = [...new Set(echoes.map((e) => e.user_id).filter(Boolean))];
-      const stateCounts: Record<string, number> = {};
-      
-      if (userIds.length > 0) {
-        const { data: userProfiles } = await supabase
-          .from("profiles")
-          .select("id, last_state")
-          .in("id", userIds);
-
-        // Count echoes per state
-        userProfiles?.forEach((profile) => {
-          if (profile.last_state) {
-            const userEchoCount = echoes.filter((e) => e.user_id === profile.id).length;
-            stateCounts[profile.last_state] = (stateCounts[profile.last_state] || 0) + userEchoCount;
-          }
-        });
-      }
-
-      const statesMostAssociated = Object.entries(stateCounts)
-        .sort((a, b) => b[1] - a[1])
-        .slice(0, 5)
-        .map(([state, count]) => ({ state, count }));
-
-      // Word count trends
-      const wordCounts = { short: 0, medium: 0, long: 0 };
-      echoes.forEach((echo) => {
-        if (echo.reflection) {
-          const wordCount = echo.reflection.split(/\s+/).filter((w: string) => w.length > 0).length;
-          if (wordCount < 100) {
-            wordCounts.short++;
-          } else if (wordCount <= 500) {
-            wordCounts.medium++;
-          } else {
-            wordCounts.long++;
-          }
-        } else {
-          wordCounts.short++; // No reflection = short
-        }
-      });
-
-      setEchoPatterns({
-        time_of_day_distribution: timeDistribution,
-        states_most_associated: statesMostAssociated,
-        word_count_trends: wordCounts,
-      });
-    } catch (e: any) {
-      console.error("Error loading echo patterns:", e);
-    } finally {
-      setLoadingEchoPatterns(false);
-    }
-  }
 
   async function gatherExportData() {
     // Get weekly state usage
@@ -371,14 +221,14 @@ export default function Analytics() {
       .slice(0, 10)
       .map(([theme, count]) => ({ theme, count }));
 
-    // Get time-of-day trends (from echoes)
-    const { data: echoes } = await supabase
-      .from("echoes")
+    // Get time-of-day trends (from saves)
+    const { data: savesData } = await supabase
+      .from("saves_v2")
       .select("created_at");
 
     const timeOfDayCounts: Record<number, number> = {};
-    echoes?.forEach((echo) => {
-      const hour = new Date(echo.created_at).getHours();
+    savesData?.forEach((save) => {
+      const hour = new Date(save.created_at).getHours();
       timeOfDayCounts[hour] = (timeOfDayCounts[hour] || 0) + 1;
     });
 
@@ -397,7 +247,7 @@ export default function Analytics() {
       time_of_day_trends: timeOfDayTrends,
       summary: {
         total_users: profiles?.length || 0,
-        total_echoes: echoes?.length || 0,
+        total_saves: savesData?.length || 0,
         most_used_state: Object.entries(stateUsage).sort((a, b) => b[1] - a[1])[0]?.[0] || "N/A",
         peak_hour: timeOfDayTrends.sort((a, b) => b.count - a.count)[0]?.hour || null,
       },
@@ -431,7 +281,7 @@ export default function Analytics() {
         // Summary
         csvContent += "Summary\n";
         csvContent += `Total Users,${exportData.summary.total_users}\n`;
-        csvContent += `Total Echoes,${exportData.summary.total_echoes}\n`;
+        csvContent += `Total Saves,${exportData.summary.total_saves}\n`;
         csvContent += `Most Used State,${exportData.summary.most_used_state}\n`;
         csvContent += `Peak Hour,${exportData.summary.peak_hour}\n\n`;
 
@@ -471,7 +321,7 @@ export default function Analytics() {
           [],
           ["Summary"],
           ["Total Users", exportData.summary.total_users],
-          ["Total Echoes", exportData.summary.total_echoes],
+          ["Total Saves", exportData.summary.total_saves],
           ["Most Used State", exportData.summary.most_used_state],
           ["Peak Hour", exportData.summary.peak_hour],
         ];
@@ -508,7 +358,6 @@ export default function Analytics() {
   useEffect(() => {
     loadAnalytics();
     loadStateHealth();
-    loadEchoPatterns();
   }, []);
 
   // Close export menu when clicking outside
@@ -548,8 +397,6 @@ export default function Analytics() {
   // Calculate totals for the 7-day period
   const sevenDayTotal = data.dailyActivity.reduce((sum, day) => sum + day.total, 0);
   const sevenDaySaves = data.dailyActivity.reduce((sum, day) => sum + day.saves, 0);
-  const sevenDayEchoes = data.dailyActivity.reduce((sum, day) => sum + day.echoes, 0);
-  const sevenDayWaves = data.dailyActivity.reduce((sum, day) => sum + day.waves, 0);
 
   return (
     <div className="admin-analytics">
@@ -648,22 +495,6 @@ export default function Analytics() {
             <div className="admin-stat-label">Total Saves</div>
           </div>
         </Card>
-
-        <Card className="admin-stat-card">
-          <div className="admin-stat-icon">🫧</div>
-          <div className="admin-stat-content">
-            <div className="admin-stat-value">{data.totalEchoes.toLocaleString()}</div>
-            <div className="admin-stat-label">Total Echoes</div>
-          </div>
-        </Card>
-
-        <Card className="admin-stat-card">
-          <div className="admin-stat-icon">🌊</div>
-          <div className="admin-stat-content">
-            <div className="admin-stat-value">{data.totalWaves.toLocaleString()}</div>
-            <div className="admin-stat-label">Total Waves</div>
-          </div>
-        </Card>
       </div>
 
       {/* Daily Activity Section */}
@@ -683,14 +514,6 @@ export default function Analytics() {
               <div className="admin-metric-label">Saves</div>
               <div className="admin-metric-value">{sevenDaySaves.toLocaleString()}</div>
             </div>
-            <div className="admin-metric-item">
-              <div className="admin-metric-label">Echoes</div>
-              <div className="admin-metric-value">{sevenDayEchoes.toLocaleString()}</div>
-            </div>
-            <div className="admin-metric-item">
-              <div className="admin-metric-label">Waves</div>
-              <div className="admin-metric-value">{sevenDayWaves.toLocaleString()}</div>
-            </div>
           </div>
         </div>
 
@@ -702,8 +525,6 @@ export default function Analytics() {
                 <tr>
                   <th>Date</th>
                   <th>Saves</th>
-                  <th>Echoes</th>
-                  <th>Waves</th>
                   <th>Total</th>
                 </tr>
               </thead>
@@ -718,8 +539,6 @@ export default function Analytics() {
                       })}
                     </td>
                     <td>{day.saves}</td>
-                    <td>{day.echoes}</td>
-                    <td>{day.waves}</td>
                     <td>
                       <strong>{day.total}</strong>
                     </td>
@@ -876,178 +695,6 @@ export default function Analytics() {
         </Card>
       </div>
 
-      {/* Echo Pattern Analyzer */}
-      <div style={{ marginTop: 24 }}>
-        <Card className="admin-section-card">
-        <div className="admin-section-header">
-          <h4 className="admin-subsection-title">
-            <span className="admin-section-icon">📖</span>
-            Echo Pattern Analyzer
-          </h4>
-          <button
-            className="btn btn-ghost"
-            type="button"
-            onClick={loadEchoPatterns}
-            disabled={loadingEchoPatterns}
-          >
-            {loadingEchoPatterns ? "Loading…" : "🔄 Refresh"}
-          </button>
-        </div>
-
-        {loadingEchoPatterns ? (
-          <p className="muted">Loading echo patterns…</p>
-        ) : echoPatterns ? (
-          <div style={{ display: "flex", flexDirection: "column", gap: 24 }}>
-            {/* Time of Day Distribution */}
-            <div>
-              <h5 style={{ fontSize: 14, fontWeight: 800, marginBottom: 12, color: "var(--text)" }}>
-                Time of Day Distribution
-              </h5>
-              <div
-                style={{
-                  display: "flex",
-                  alignItems: "flex-end",
-                  gap: 4,
-                  height: 120,
-                  padding: 12,
-                  background: "var(--white-75)",
-                  borderRadius: 8,
-                  border: "1px solid var(--border)",
-                }}
-              >
-                {echoPatterns.time_of_day_distribution.map((item) => {
-                  const maxCount = Math.max(
-                    ...echoPatterns.time_of_day_distribution.map((i) => i.count),
-                    1
-                  );
-                  const height = (item.count / maxCount) * 100;
-                  return (
-                    <div
-                      key={item.hour}
-                      style={{
-                        flex: 1,
-                        display: "flex",
-                        flexDirection: "column",
-                        alignItems: "center",
-                        gap: 4,
-                      }}
-                    >
-                      <div
-                        style={{
-                          width: "100%",
-                          height: `${height}%`,
-                          minHeight: item.count > 0 ? 4 : 0,
-                          background: "linear-gradient(180deg, var(--accent), rgba(142,163,255,0.6))",
-                          borderRadius: "4px 4px 0 0",
-                          transition: "all 0.2s ease",
-                        }}
-                        title={`${item.hour}:00 - ${item.count} echoes`}
-                      />
-                      <span style={{ fontSize: 10, color: "var(--text2)", fontWeight: 700 }}>
-                        {item.hour}
-                      </span>
-                    </div>
-                  );
-                })}
-              </div>
-            </div>
-
-            {/* States Most Associated */}
-            {echoPatterns.states_most_associated.length > 0 && (
-              <div>
-                <h5 style={{ fontSize: 14, fontWeight: 800, marginBottom: 12, color: "var(--text)" }}>
-                  States Most Associated with Echoes
-                </h5>
-                <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
-                  {echoPatterns.states_most_associated.map((item) => (
-                    <div
-                      key={item.state}
-                      style={{
-                        display: "flex",
-                        justifyContent: "space-between",
-                        alignItems: "center",
-                        padding: "10px 14px",
-                        background: "var(--white-75)",
-                        borderRadius: 8,
-                        border: "1px solid var(--border)",
-                      }}
-                    >
-                      <span className="admin-badge">{item.state}</span>
-                      <span style={{ fontWeight: 700, color: "var(--text)" }}>{item.count} echoes</span>
-                    </div>
-                  ))}
-                </div>
-              </div>
-            )}
-
-            {/* Word Count Trends */}
-            <div>
-              <h5 style={{ fontSize: 14, fontWeight: 800, marginBottom: 12, color: "var(--text)" }}>
-                Word Count Trends
-              </h5>
-              <div style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: 12 }}>
-                <div
-                  style={{
-                    padding: 16,
-                    background: "var(--white-75)",
-                    borderRadius: 8,
-                    border: "1px solid var(--border)",
-                    textAlign: "center",
-                  }}
-                >
-                  <div style={{ fontSize: 24, fontWeight: 900, color: "var(--text)", marginBottom: 4 }}>
-                    {echoPatterns.word_count_trends.short}
-                  </div>
-                  <div style={{ fontSize: 12, color: "var(--text2)", fontWeight: 700 }}>
-                    Short (&lt;100 words)
-                  </div>
-                </div>
-                <div
-                  style={{
-                    padding: 16,
-                    background: "var(--white-75)",
-                    borderRadius: 8,
-                    border: "1px solid var(--border)",
-                    textAlign: "center",
-                  }}
-                >
-                  <div style={{ fontSize: 24, fontWeight: 900, color: "var(--text)", marginBottom: 4 }}>
-                    {echoPatterns.word_count_trends.medium}
-                  </div>
-                  <div style={{ fontSize: 12, color: "var(--text2)", fontWeight: 700 }}>
-                    Medium (100-500)
-                  </div>
-                </div>
-                <div
-                  style={{
-                    padding: 16,
-                    background: "var(--white-75)",
-                    borderRadius: 8,
-                    border: "1px solid var(--border)",
-                    textAlign: "center",
-                  }}
-                >
-                  <div style={{ fontSize: 24, fontWeight: 900, color: "var(--text)", marginBottom: 4 }}>
-                    {echoPatterns.word_count_trends.long}
-                  </div>
-                  <div style={{ fontSize: 12, color: "var(--text2)", fontWeight: 700 }}>
-                    Long (&gt;500 words)
-                  </div>
-                </div>
-              </div>
-            </div>
-          </div>
-        ) : (
-          <div className="admin-empty-state">
-            <div className="admin-empty-state-icon">📖</div>
-            <div className="admin-empty-state-title">No Echo Patterns</div>
-            <div className="admin-empty-state-desc">
-              Echo patterns will appear here as users create echoes.
-            </div>
-          </div>
-        )}
-        </Card>
-      </div>
     </div>
   );
 }

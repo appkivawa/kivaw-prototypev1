@@ -506,13 +506,33 @@ serve(async (req) => {
       fetchOpenLibraryBooks(18),
     ]);
 
-    if (moviesRes.status !== "fulfilled") throw moviesRes.reason;
+    // Handle errors gracefully - don't throw, log and continue
+    if (genresRes.status !== "fulfilled") {
+      console.error("Failed to fetch movie genres:", genresRes.reason);
+      debug.genresError = String(genresRes.reason);
+    }
+    if (moviesRes.status !== "fulfilled") {
+      console.error("Failed to fetch movies:", moviesRes.reason);
+      debug.moviesError = String(moviesRes.reason);
+    }
+    if (booksRes.status !== "fulfilled") {
+      console.error("Failed to fetch books:", booksRes.reason);
+      debug.openLibraryError = String(booksRes.reason);
+    }
 
     const genreMap = genresRes.status === "fulfilled" ? genresRes.value : {};
-    const movies = moviesRes.value;
-
+    const movies = moviesRes.status === "fulfilled" ? moviesRes.value : [];
     const booksDocs = booksRes.status === "fulfilled" ? booksRes.value : [];
-    if (booksRes.status !== "fulfilled") debug.openLibraryError = String(booksRes.reason);
+
+    // If both sources failed, return empty feed with error info
+    if (movies.length === 0 && booksDocs.length === 0) {
+      debug.allSourcesFailed = true;
+      return jsonResponse({
+        feed: [],
+        debug,
+        error: "All content sources failed. Check API keys and network connectivity.",
+      });
+    }
 
     // 2) Normalize
     const movieCards = movies.map((m) => normalizeTMDBMovie(m, genreMap)).slice(0, 20);
@@ -525,29 +545,45 @@ serve(async (req) => {
     const toEnrich = bookCards.slice(0, 12);
 
     const enriched = await mapLimit(toEnrich, 3, async (card) => {
-      const workKey = card.id.startsWith("ol:") ? card.id.slice(3) : card.id;
+      try {
+        const workKey = card.id.startsWith("ol:") ? card.id.slice(3) : card.id;
 
-      let olDesc: string | null = null;
-      let olSubjects: string[] | null = null;
+        let olDesc: string | null = null;
+        let olSubjects: string[] | null = null;
 
-      if (!safeMode) {
-        const work = await fetchOpenLibraryWork(workKey);
-        const desc = extractWorkDescription(work);
-        olDesc = desc ? firstSentences(desc, 520) : null;
-        olSubjects = work?.subjects?.slice(0, 18) ?? null;
+        if (!safeMode) {
+          try {
+            const work = await fetchOpenLibraryWork(workKey);
+            const desc = extractWorkDescription(work);
+            olDesc = desc ? firstSentences(desc, 520) : null;
+            olSubjects = work?.subjects?.slice(0, 18) ?? null;
+          } catch (e) {
+            console.error(`Failed to enrich OL work for ${card.id}:`, e);
+            // Continue without enrichment
+          }
+        }
+
+        let gb = null as Awaited<ReturnType<typeof fetchGoogleBooksBestMatch>>;
+        if (!safeMode) {
+          try {
+            gb = await fetchGoogleBooksBestMatch({
+              title: card.title,
+              author: card.byline ?? null,
+              apiKey: GOOGLE_BOOKS_API_KEY || null,
+              timeoutMs: 6500,
+            });
+          } catch (e) {
+            console.error(`Failed to enrich GB for ${card.id}:`, e);
+            // Continue without enrichment
+          }
+        }
+
+        return { id: card.id, olDesc, olSubjects, gb };
+      } catch (e) {
+        console.error(`Failed to enrich card ${card.id}:`, e);
+        // Return empty enrichment
+        return { id: card.id, olDesc: null, olSubjects: null, gb: null };
       }
-
-      let gb = null as Awaited<ReturnType<typeof fetchGoogleBooksBestMatch>>;
-      if (!safeMode) {
-        gb = await fetchGoogleBooksBestMatch({
-          title: card.title,
-          author: card.byline ?? null,
-          apiKey: GOOGLE_BOOKS_API_KEY || null,
-          timeoutMs: 6500,
-        });
-      }
-
-      return { id: card.id, olDesc, olSubjects, gb };
     });
 
     let gbHits = 0;
@@ -623,7 +659,19 @@ serve(async (req) => {
   } catch (e) {
     const err = e instanceof Error ? { message: e.message, stack: e.stack } : { message: String(e) };
     console.error("feed function error:", err);
-    return jsonResponse({ error: err.message, stack: err.stack ?? null, version: VERSION }, 500);
+    
+    // Return proper error response but include debug info
+    return jsonResponse({
+      feed: [],
+      error: err.message,
+      debug: {
+        version: VERSION,
+        error: true,
+        errorMessage: err.message,
+        ms: Date.now() - started,
+        ...(err.stack ? { stack: err.stack.substring(0, 500) } : {}), // Limit stack trace length
+      },
+    }, 500);
   }
 });
 

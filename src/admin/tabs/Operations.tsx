@@ -83,9 +83,10 @@ function OperationsContent() {
         .limit(20);
 
       if (error) {
-        // If table doesn't exist, that's okay
-        if (error.code === "42P01" || error.message?.includes("does not exist")) {
+        // If table doesn't exist, that's okay - show empty state
+        if (error.code === "42P01" || error.message?.includes("does not exist") || error.message?.includes("schema cache")) {
           setReports([]);
+          setError(null);
           return;
         }
         throw error;
@@ -172,7 +173,14 @@ function OperationsContent() {
         .update({ status: newStatus })
         .eq("id", id);
 
-      if (error) throw error;
+      if (error) {
+        // If table doesn't exist, that's okay
+        if (error.code === "42P01" || error.message?.includes("does not exist") || error.message?.includes("schema cache")) {
+          alert("The user_reports table is not available. This feature requires the table to be created in the database.");
+          return;
+        }
+        throw error;
+      }
 
       await logAdminAction("report_status", id, { status: newStatus });
       await loadReports();

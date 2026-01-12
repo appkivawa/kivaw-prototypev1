@@ -98,9 +98,7 @@ CREATE POLICY "Admins can delete roles" ON public.roles
 -- ============================================================
 
 -- Drop ALL existing policies on user_roles (comprehensive cleanup)
-DROP POLICY IF EXISTS "Users can read own roles" ON public.user_roles;
-DROP POLICY IF EXISTS "Admins can read all user roles" ON public.user_roles;
-DROP POLICY IF EXISTS "Admins can manage user roles" ON public.user_roles;
+-- Note: The DO block below will handle dropping all policies, but we include these for clarity
 DROP POLICY IF EXISTS "Users can read own roles" ON public.user_roles;
 DROP POLICY IF EXISTS "Admins can read all user roles" ON public.user_roles;
 DROP POLICY IF EXISTS "Admins can manage user roles" ON public.user_roles;
