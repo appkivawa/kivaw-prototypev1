@@ -276,8 +276,22 @@ export default function App() {
         <Route path="for-you" element={<ForYou />} />
         <Route path="recs" element={<RecommendationsPage />} />
 
-        <Route path="waves" element={<Waves />} />
-        <Route path="timeline" element={<Timeline />} />
+        <Route
+          path="waves"
+          element={
+            <RequireAuth title="Waves" message="Please log in to view Waves">
+              <Waves />
+            </RequireAuth>
+          }
+        />
+        <Route
+          path="timeline"
+          element={
+            <RequireAuth title="Timeline" message="Please log in to view your Timeline">
+              <Timeline />
+            </RequireAuth>
+          }
+        />
         <Route path="echo" element={<Navigate to="/timeline" replace />} />
         <Route path="save-echo" element={<Navigate to="/timeline" replace />} />
         <Route path="match" element={<MatchPage />} />

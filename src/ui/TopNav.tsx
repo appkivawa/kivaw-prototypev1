@@ -64,19 +64,23 @@ export default function TopNav() {
             Discover
           </NavLink>
 
-          <NavLink
-            to="/timeline"
-            className={({ isActive }) => `navlink coral-nav-link ${isActive ? "active" : ""}`}
-          >
-            Timeline
-          </NavLink>
+          {isSignedIn && (
+            <>
+              <NavLink
+                to="/timeline"
+                className={({ isActive }) => `navlink coral-nav-link ${isActive ? "active" : ""}`}
+              >
+                Timeline
+              </NavLink>
 
-          <NavLink
-            to="/waves"
-            className={({ isActive }) => `navlink coral-nav-link ${isActive ? "active" : ""}`}
-          >
-            Waves
-          </NavLink>
+              <NavLink
+                to="/waves"
+                className={({ isActive }) => `navlink coral-nav-link ${isActive ? "active" : ""}`}
+              >
+                Waves
+              </NavLink>
+            </>
+          )}
         </nav>
 
         <div className="topnav__right">
@@ -106,19 +110,23 @@ export default function TopNav() {
           </NavLink>
         </div>
 
-        <div className="tabbar__item">
-          <NavLink to="/timeline" className="tabbar__btn">
-            <span className="tabbar__icon">💭</span>
-            <span className="tabbar__label">Timeline</span>
-          </NavLink>
-        </div>
+        {isSignedIn && (
+          <>
+            <div className="tabbar__item">
+              <NavLink to="/timeline" className="tabbar__btn">
+                <span className="tabbar__icon">💭</span>
+                <span className="tabbar__label">Timeline</span>
+              </NavLink>
+            </div>
 
-        <div className="tabbar__item">
-          <NavLink to="/waves" className="tabbar__btn">
-            <span className="tabbar__icon">🌊</span>
-            <span className="tabbar__label">Waves</span>
-          </NavLink>
-        </div>
+            <div className="tabbar__item">
+              <NavLink to="/waves" className="tabbar__btn">
+                <span className="tabbar__icon">🌊</span>
+                <span className="tabbar__label">Waves</span>
+              </NavLink>
+            </div>
+          </>
+        )}
       </nav>
     </header>
   );
