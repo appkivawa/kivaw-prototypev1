@@ -200,20 +200,16 @@ serve(async (req) => {
       },
     });
 
-    // Parse body with timeout protection
+    // Parse body with error handling
     let body: any = {};
     try {
       if (req.method === "POST") {
-        // Add timeout for body parsing (5 seconds)
-        const bodyPromise = req.json();
-        const timeoutPromise = new Promise((_, reject) =>
-          setTimeout(() => reject(new Error("Request body parsing timeout")), 5000)
-        );
-        body = await Promise.race([bodyPromise, timeoutPromise]);
+        body = await req.json();
       }
     } catch (parseErr: any) {
-      console.warn("[social_feed] Body parse error:", parseErr?.message);
-      body = {}; // Continue with empty body
+      // Body parsing errors are non-fatal - continue with empty body
+      console.warn("[social_feed] Body parse error (non-fatal):", parseErr?.message);
+      body = {};
     }
 
     const limit = typeof body.limit === "number" ? Math.min(Math.max(body.limit, 10), 120) : 60;
@@ -307,7 +303,7 @@ serve(async (req) => {
     let rowsErr: any = null;
 
     try {
-      // Add timeout for database query (10 seconds)
+      // Query feed_items - simplified without complex timeout (Supabase has built-in timeouts)
       let qx = supabase
         .from("feed_items")
         .select("id,source,external_id,url,title,summary,author,image_url,published_at,tags,topics,metadata,created_at,ingested_at")
@@ -317,14 +313,9 @@ serve(async (req) => {
 
       if (types.length) qx = qx.in("source", types);
 
-      const queryPromise = qx;
-      const timeoutPromise = new Promise<{ data: null; error: { message: string; code: string } }>((resolve) =>
-        setTimeout(() => resolve({ data: null, error: { message: "Database query timeout", code: "TIMEOUT" } }), 10000)
-      );
-
-      const result = await Promise.race([queryPromise, timeoutPromise]);
-      rows = result.data ?? [];
-      rowsErr = result.error ?? null;
+      const { data: queryData, error: queryError } = await qx;
+      rows = queryData ?? [];
+      rowsErr = queryError ?? null;
     } catch (queryErr: any) {
       console.error("[social_feed] Query execution error:", queryErr);
       rowsErr = queryErr;
@@ -377,19 +368,13 @@ serve(async (req) => {
     // Isolated error handling - if this fails, continue without weights
     const rssWeightMap = new Map<string, number>();
     try {
-      const rssQueryPromise = supabase
+      const { data: rssSources } = await supabase
         .from("rss_sources")
         .select("url, weight")
         .eq("active", true);
       
-      const timeoutPromise = new Promise<{ data: null; error: null }>((resolve) =>
-        setTimeout(() => resolve({ data: null, error: null }), 5000)
-      );
-
-      const rssResult = await Promise.race([rssQueryPromise, timeoutPromise]);
-      
-      if (rssResult.data) {
-        for (const src of rssResult.data) {
+      if (rssSources) {
+        for (const src of rssSources) {
           rssWeightMap.set(src.url, src.weight ?? 1);
         }
       }
