@@ -151,8 +151,35 @@ export default function TopNav() {
             {isSignedIn ? "Sign out" : "Continue"}
           </button>
 
-          <button className="moon coral-theme-toggle" onClick={toggle} aria-label="Toggle theme">
-            {theme === "dark" ? "☀️" : "🌙"}
+          <button
+            onClick={toggle}
+            type="button"
+            aria-label={theme === "dark" ? "Switch to light mode" : "Switch to dark mode"}
+            title={theme === "dark" ? "Switch to light mode" : "Switch to dark mode"}
+            style={{
+              width: "32px",
+              height: "32px",
+              padding: 0,
+              border: "none",
+              background: "transparent",
+              color: "var(--text-secondary)",
+              cursor: "pointer",
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "center",
+              fontSize: "18px",
+              transition: "color 0.2s, transform 0.2s",
+            }}
+            onMouseEnter={(e) => {
+              e.currentTarget.style.color = "var(--text-primary)";
+              e.currentTarget.style.transform = "scale(1.1)";
+            }}
+            onMouseLeave={(e) => {
+              e.currentTarget.style.color = "var(--text-secondary)";
+              e.currentTarget.style.transform = "scale(1)";
+            }}
+          >
+            {theme === "dark" ? "☀" : "☾"}
           </button>
         </div>
       </div>

@@ -28,16 +28,19 @@
 }
 
 .feed-title {
-  font-size: clamp(24px, 4vw, 32px);
+  font-size: clamp(36px, 5vw, 48px);
   font-weight: 700;
-  margin: 0 0 8px 0;
+  margin: 0 0 12px 0;
   color: var(--ink);
+  letter-spacing: -0.02em;
+  line-height: 1.1;
 }
 
 .feed-subtitle {
-  font-size: 15px;
-  color: var(--ink-muted);
+  font-size: 14px;
+  color: var(--ink-tertiary);
   margin: 0;
+  fontWeight: 400;
 }
 
 .feed-header-actions {
@@ -183,20 +186,19 @@
 
 /* Post Frame (Tumblr-like) */
 .feed-post-frame {
-  border-radius: 24px;
-  border: 1px solid var(--border);
-  background: var(--surface);
-  box-shadow: var(--shadow-soft);
-  margin-bottom: 24px;
+  border-radius: 0;
+  border: none;
+  background: transparent;
+  box-shadow: none;
+  margin-bottom: 64px;
   padding: 0;
-  transition: all 0.2s;
+  transition: opacity 0.2s;
   position: relative;
 }
 
 .feed-post-frame:hover,
 .feed-post-frame:focus-within {
-  border-color: var(--border-strong);
-  box-shadow: var(--shadow);
+  opacity: 0.85;
 }
 
 .feed-post-frame:hover::before,
@@ -206,14 +208,14 @@
   left: 0;
   top: 0;
   bottom: 0;
-  width: 3px;
+  width: 2px;
   background: var(--ink);
-  border-radius: 24px 0 0 24px;
+  border-radius: 0;
   z-index: 1;
 }
 
 .feed-post-content {
-  padding: 20px;
+  padding: 0;
 }
 
 /* 1 Column Layout */
@@ -226,7 +228,7 @@
 .feed-list-2col {
   display: grid;
   grid-template-columns: repeat(auto-fill, minmax(320px, 1fr));
-  gap: 24px;
+  gap: 64px 48px;
 }
 
 /* Swipe Mode */

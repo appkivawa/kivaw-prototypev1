@@ -51,6 +51,7 @@ import Timeline from "./pages/Timeline";
 import Waves from "./pages/Waves";
 import Saved from "./pages/Saved";
 import Profile from "./pages/Profile";
+import DevRSSIngest from "./pages/DevRSSIngest";
 
 function HashAuthRedirect() {
   const nav = useNavigate();
@@ -305,6 +306,9 @@ export default function App() {
         <Route path="quiz/result" element={<QuizResult />} />
 
         <Route path="guide" element={<FAQPage />} />
+
+        {/* Dev-only RSS ingest page */}
+        {import.meta.env.DEV && <Route path="dev/rss-ingest" element={<DevRSSIngest />} />}
 
         {/* shell catch-all */}
         <Route path="*" element={<Navigate to="/" replace />} />

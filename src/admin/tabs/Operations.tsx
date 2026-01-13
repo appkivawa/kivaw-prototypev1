@@ -6,6 +6,7 @@ import UserJourneyInspector from "../components/UserJourneyInspector";
 import RequireRole from "../../auth/RequireRole";
 import { useRoles } from "../../auth/useRoles";
 import { canManage } from "../permissions";
+import RSSIngestTrigger from "../components/RSSIngestTrigger";
 
 type ContentItem = {
   id: string;
@@ -339,6 +340,9 @@ function OperationsContent() {
           <p className="muted">No user reports.</p>
         )}
       </Card>
+
+      {/* RSS Ingest Trigger */}
+      {canManageOperations && <RSSIngestTrigger />}
 
       {/* Human Flags */}
       {humanFlags.length > 0 && (

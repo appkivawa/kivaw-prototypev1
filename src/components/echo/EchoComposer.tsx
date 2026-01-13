@@ -223,70 +223,58 @@ export default function EchoComposer({ contentId, onClose, onSaved, inline = fal
           placeholder="What are your thoughts?"
           style={{
             width: "100%",
-            minHeight: "200px",
-            padding: "12px",
-            borderRadius: "6px",
-            border: "1px solid var(--border-strong)",
-            fontSize: "15px",
-            lineHeight: 1.6,
+            minHeight: "120px",
+            padding: 0,
+            borderRadius: 0,
+            border: "none",
+            borderBottom: "1px solid var(--border)",
+            fontSize: "16px",
+            lineHeight: 1.7,
             fontFamily: "inherit",
             resize: "vertical",
             marginBottom: "16px",
+            backgroundColor: "transparent",
+            fontStyle: "italic",
           }}
           autoFocus
         />
 
-        <div style={{ marginBottom: "16px" }}>
-          <div
+        <div style={{ marginBottom: "16px", display: "flex", gap: "16px", alignItems: "center" }}>
+          <button
+            onClick={() => setShareToWaves(false)}
             style={{
-              display: "flex",
-              gap: "8px",
-              padding: "4px",
-              borderRadius: "6px",
-              border: "1px solid var(--border-strong)",
-              backgroundColor: "var(--border)",
+              padding: 0,
+              border: "none",
+              background: "transparent",
+              cursor: "pointer",
+              fontSize: "12px",
+              fontWeight: !shareToWaves ? 600 : 400,
+              color: !shareToWaves ? "var(--ink)" : "var(--ink-muted)",
+              textDecoration: !shareToWaves ? "underline" : "none",
+              textUnderlineOffset: "3px",
+              transition: "all 0.2s",
             }}
           >
-            <button
-              onClick={() => setShareToWaves(false)}
-              style={{
-                flex: 1,
-                padding: "6px 12px",
-                borderRadius: "4px",
-                border: "none",
-                background: !shareToWaves ? "var(--surface)" : "transparent",
-                cursor: "pointer",
-                fontSize: "13px",
-                fontWeight: !shareToWaves ? 600 : 500,
-                color: "var(--ink-muted)",
-                transition: "all 0.2s",
-              }}
-            >
-              Private
-            </button>
-            <button
-              onClick={() => setShareToWaves(true)}
-              style={{
-                flex: 1,
-                padding: "6px 12px",
-                borderRadius: "4px",
-                border: "none",
-                background: shareToWaves ? "var(--surface)" : "transparent",
-                cursor: "pointer",
-                fontSize: "13px",
-                fontWeight: shareToWaves ? 600 : 500,
-                color: "var(--ink-muted)",
-                transition: "all 0.2s",
-              }}
-            >
-              Share to Waves
-            </button>
-          </div>
-          <p style={{ margin: "8px 0 0 0", fontSize: "12px", color: "var(--ink-tertiary)" }}>
-            {shareToWaves
-              ? "This reflection will appear in the Waves feed"
-              : "Only you can see this reflection"}
-          </p>
+            Private
+          </button>
+          <span style={{ color: "var(--ink-tertiary)", fontSize: "11px" }}>/</span>
+          <button
+            onClick={() => setShareToWaves(true)}
+            style={{
+              padding: 0,
+              border: "none",
+              background: "transparent",
+              cursor: "pointer",
+              fontSize: "12px",
+              fontWeight: shareToWaves ? 600 : 400,
+              color: shareToWaves ? "var(--ink)" : "var(--ink-muted)",
+              textDecoration: shareToWaves ? "underline" : "none",
+              textUnderlineOffset: "3px",
+              transition: "all 0.2s",
+            }}
+          >
+            Share to Waves
+          </button>
         </div>
 
         {error && (
@@ -326,17 +314,19 @@ export default function EchoComposer({ contentId, onClose, onSaved, inline = fal
           onClick={handleSave}
           disabled={saving || !text.trim()}
           style={{
-            padding: inline ? "8px 12px" : "10px 16px",
-            borderRadius: "6px",
+            padding: 0,
+            borderRadius: 0,
             border: "none",
-            background: saving || !text.trim() ? "var(--border-strong)" : "var(--ink)",
-            color: saving || !text.trim() ? "var(--ink-tertiary)" : "var(--bg)",
+            background: "transparent",
+            color: saving || !text.trim() ? "var(--ink-tertiary)" : "var(--ink)",
             cursor: saving || !text.trim() ? "not-allowed" : "pointer",
             fontWeight: 600,
-            fontSize: inline ? "13px" : "14px",
+            fontSize: "13px",
+            textDecoration: saving || !text.trim() ? "none" : "underline",
+            textUnderlineOffset: "3px",
           }}
         >
-          {saving ? "Saving..." : "Save Echo"}
+          {saving ? "Saving..." : "Save"}
         </button>
       </div>
     </div>

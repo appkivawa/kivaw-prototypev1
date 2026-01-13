@@ -68,22 +68,20 @@ export default function ExploreCard({ item, onClick, allItems = [], badge: provi
       onClick={() => onClick(item)}
       style={{
         width: "100%",
-        borderRadius: "12px",
-        border: "1px solid var(--border)",
-        backgroundColor: "var(--surface)",
-        overflow: "hidden",
+        borderRadius: 0,
+        border: "none",
+        backgroundColor: "transparent",
+        overflow: "visible",
         cursor: "pointer",
-        transition: "transform 0.2s, box-shadow 0.2s",
+        transition: "opacity 0.2s",
         textAlign: "left",
         padding: 0,
       }}
       onMouseEnter={(e) => {
-        e.currentTarget.style.transform = "translateY(-2px)";
-        e.currentTarget.style.boxShadow = "0 4px 12px rgba(0,0,0,0.08)";
+        e.currentTarget.style.opacity = "0.75";
       }}
       onMouseLeave={(e) => {
-        e.currentTarget.style.transform = "translateY(0)";
-        e.currentTarget.style.boxShadow = "none";
+        e.currentTarget.style.opacity = "1";
       }}
     >
       <div
@@ -148,7 +146,7 @@ export default function ExploreCard({ item, onClick, allItems = [], badge: provi
           </span>
         </div>
       </div>
-      <div style={{ padding: "12px" }}>
+      <div style={{ padding: "0" }}>
         {/* Header with favicon, source, time */}
         {item.url && (
           <div
@@ -198,19 +196,22 @@ export default function ExploreCard({ item, onClick, allItems = [], badge: provi
           style={{
             display: "flex",
             alignItems: "center",
-            gap: "6px",
-            marginBottom: "6px",
+            gap: "8px",
+            marginBottom: "8px",
+            marginTop: "12px",
           }}
         >
           <div
             style={{
-              fontSize: "14px",
+              fontSize: "18px",
               fontWeight: 600,
               color: "var(--ink)",
               overflow: "hidden",
               textOverflow: "ellipsis",
               whiteSpace: "nowrap",
               flex: 1,
+              letterSpacing: "-0.01em",
+              lineHeight: 1.3,
             }}
           >
             {cleanText(item.title)}
@@ -240,12 +241,13 @@ export default function ExploreCard({ item, onClick, allItems = [], badge: provi
         {item.byline && (
           <div
             style={{
-              fontSize: "12px",
-              color: "var(--ink-muted)",
+              fontSize: "11px",
+              color: "var(--ink-tertiary)",
               overflow: "hidden",
               textOverflow: "ellipsis",
               whiteSpace: "nowrap",
-              marginBottom: "6px",
+              marginBottom: "8px",
+              fontWeight: 400,
             }}
           >
             {cleanText(item.byline)}

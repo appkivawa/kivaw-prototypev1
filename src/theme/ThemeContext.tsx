@@ -13,19 +13,59 @@ const STORAGE_KEY = "kivaw_theme";
 
 export function ThemeProvider({ children }: { children: React.ReactNode }) {
   const [theme, setThemeState] = useState<Theme>(() => {
+    // Check for saved preference first
     const saved = localStorage.getItem(STORAGE_KEY);
-    const initialTheme = saved === "light" ? "light" : "dark";
-    // Set immediately to prevent flash of light mode
-    if (typeof document !== "undefined") {
-      document.documentElement.setAttribute("data-theme", initialTheme);
+    if (saved === "light" || saved === "dark") {
+      return saved;
     }
-    return initialTheme;
+    
+    // Otherwise, respect system preference
+    if (typeof window !== "undefined" && window.matchMedia) {
+      const prefersDark = window.matchMedia("(prefers-color-scheme: dark)").matches;
+      return prefersDark ? "dark" : "light";
+    }
+    
+    // Default to light if no system preference available
+    return "light";
   });
+
+  useEffect(() => {
+    // Set immediately to prevent flash
+    if (typeof document !== "undefined") {
+      document.documentElement.setAttribute("data-theme", theme);
+    }
+  }, []);
 
   useEffect(() => {
     document.documentElement.setAttribute("data-theme", theme);
     localStorage.setItem(STORAGE_KEY, theme);
   }, [theme]);
+
+  // Listen for system preference changes (only if no manual preference is set)
+  useEffect(() => {
+    if (typeof window === "undefined" || !window.matchMedia) return;
+    
+    const mediaQuery = window.matchMedia("(prefers-color-scheme: dark)");
+    const saved = localStorage.getItem(STORAGE_KEY);
+    
+    // Only auto-update if user hasn't manually set a preference
+    if (!saved) {
+      const handleChange = (e: MediaQueryListEvent) => {
+        setThemeState(e.matches ? "dark" : "light");
+      };
+      
+      // Modern browsers
+      if (mediaQuery.addEventListener) {
+        mediaQuery.addEventListener("change", handleChange);
+        return () => mediaQuery.removeEventListener("change", handleChange);
+      }
+      // Legacy browsers
+      else if (mediaQuery.addListener) {
+        mediaQuery.addListener(handleChange);
+        return () => mediaQuery.removeListener(handleChange);
+      }
+    }
+  }, []);
 
   const toggle = () => setThemeState((prev) => (prev === "dark" ? "light" : "dark"));
   const setTheme = (t: Theme) => setThemeState(t);

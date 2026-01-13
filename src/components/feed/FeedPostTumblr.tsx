@@ -222,31 +222,34 @@ export default function FeedPostTumblr({ item, index, allItems = [], badge: prov
       {/* Main card */}
       <div
         style={{
-          backgroundColor: "var(--surface)",
-          borderRadius: "22px",
-          border: "1px solid var(--border)",
-          boxShadow: "0 2px 8px rgba(0,0,0,0.04), 0 1px 2px rgba(0,0,0,0.06)",
-          overflow: "hidden",
-          marginLeft: showEchoComposer ? "12px" : "0",
+          backgroundColor: "transparent",
+          borderRadius: 0,
+          border: "none",
+          boxShadow: "none",
+          overflow: "visible",
+          marginLeft: showEchoComposer ? "16px" : "0",
           transition: "margin-left 0.3s ease-out",
+          marginBottom: "64px",
         }}
       >
         {/* Existing Echo (Your take) - shown above content like a reblog comment */}
         {existingEcho && !showEchoComposer && (
           <div
             style={{
-              padding: "20px 20px 16px",
-              borderBottom: "1px solid var(--border)",
-              backgroundColor: "var(--border)",
+              padding: "0 0 24px 0",
+              borderBottom: "none",
+              backgroundColor: "transparent",
+              marginBottom: "24px",
             }}
           >
             <div
               style={{
-                fontSize: "15px",
-                lineHeight: 1.6,
+                fontSize: "16px",
+                lineHeight: 1.7,
                 color: "var(--ink)",
                 marginBottom: "8px",
                 fontWeight: 400,
+                fontStyle: "italic",
               }}
             >
               {existingEcho.note}
@@ -395,16 +398,19 @@ export default function FeedPostTumblr({ item, index, allItems = [], badge: prov
         )}
 
         {/* Content */}
-        <div style={{ padding: "20px" }}>
+        <div style={{ padding: "0" }}>
           {/* Header - favicon, source, time, domain */}
           <div
             style={{
               display: "flex",
               alignItems: "center",
               gap: "8px",
-              marginBottom: "12px",
-              fontSize: "13px",
+              marginBottom: "16px",
+              fontSize: "11px",
               color: "var(--ink-tertiary)",
+              textTransform: "uppercase",
+              letterSpacing: "0.05em",
+              fontWeight: 400,
             }}
           >
             {/* Favicon */}
@@ -448,12 +454,13 @@ export default function FeedPostTumblr({ item, index, allItems = [], badge: prov
             >
               <h2
                 style={{
-                  fontSize: "22px",
-                  fontWeight: 600,
-                  lineHeight: 1.4,
+                  fontSize: "32px",
+                  fontWeight: 700,
+                  lineHeight: 1.2,
                   margin: 0,
                   color: "var(--ink)",
                   flex: 1,
+                  letterSpacing: "-0.02em",
                 }}
               >
                 <a
@@ -501,10 +508,11 @@ export default function FeedPostTumblr({ item, index, allItems = [], badge: prov
           {item.summary && (
             <div
               style={{
-                fontSize: "15px",
+                fontSize: "16px",
                 lineHeight: 1.7,
                 color: "var(--ink-muted)",
-                marginBottom: "12px",
+                marginBottom: "24px",
+                fontWeight: 400,
               }}
             >
               {item.summary.length > 200 ? `${item.summary.slice(0, 200)}...` : item.summary}
@@ -570,9 +578,10 @@ export default function FeedPostTumblr({ item, index, allItems = [], badge: prov
             style={{
               display: "flex",
               alignItems: "center",
-              gap: "24px",
-              paddingTop: "16px",
-              borderTop: "1px solid var(--border)",
+              gap: "32px",
+              paddingTop: "24px",
+              borderTop: "none",
+              marginTop: "24px",
             }}
           >
             <button
@@ -650,10 +659,11 @@ export default function FeedPostTumblr({ item, index, allItems = [], badge: prov
         {showEchoComposer && (
           <div
             style={{
-              padding: "20px",
-              paddingTop: "20px",
-              backgroundColor: "var(--border)",
+              padding: "0",
+              paddingTop: "24px",
+              backgroundColor: "transparent",
               animation: "slideDown 0.3s ease-out",
+              marginTop: "24px",
             }}
           >
             <EchoComposer

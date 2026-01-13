@@ -288,10 +288,12 @@ function TimelineContent() {
           >
             <h1
               style={{
-                fontSize: "24px",
+                fontSize: "48px",
                 fontWeight: 700,
                 margin: 0,
                 color: "var(--ink)",
+                letterSpacing: "-0.02em",
+                lineHeight: 1.1,
               }}
             >
               Timeline
@@ -301,24 +303,22 @@ function TimelineContent() {
             <div
               style={{
                 display: "flex",
-                gap: "4px",
-                padding: "4px",
-                borderRadius: "8px",
-                border: "1px solid var(--border-strong)",
-                background: "var(--surface)",
+                gap: "24px",
+                alignItems: "baseline",
               }}
             >
               <button
                 onClick={() => handleViewModeChange("echo")}
                 style={{
-                  padding: "8px 16px",
-                  borderRadius: "6px",
+                  padding: 0,
                   border: "none",
-                  background: viewMode === "echo" ? "var(--border)" : "transparent",
+                  background: "transparent",
                   cursor: "pointer",
-                  fontWeight: viewMode === "echo" ? 600 : 500,
-                  fontSize: "13px",
-                  color: "var(--ink-muted)",
+                  fontWeight: viewMode === "echo" ? 600 : 400,
+                  fontSize: "16px",
+                  color: viewMode === "echo" ? "var(--ink)" : "var(--ink-muted)",
+                  textDecoration: viewMode === "echo" ? "underline" : "none",
+                  textUnderlineOffset: "4px",
                   transition: "all 0.2s",
                 }}
               >
@@ -327,14 +327,15 @@ function TimelineContent() {
               <button
                 onClick={() => handleViewModeChange("saved")}
                 style={{
-                  padding: "8px 16px",
-                  borderRadius: "6px",
+                  padding: 0,
                   border: "none",
-                  background: viewMode === "saved" ? "var(--border)" : "transparent",
+                  background: "transparent",
                   cursor: "pointer",
-                  fontWeight: viewMode === "saved" ? 600 : 500,
-                  fontSize: "13px",
-                  color: "var(--ink-muted)",
+                  fontWeight: viewMode === "saved" ? 600 : 400,
+                  fontSize: "16px",
+                  color: viewMode === "saved" ? "var(--ink)" : "var(--ink-muted)",
+                  textDecoration: viewMode === "saved" ? "underline" : "none",
+                  textUnderlineOffset: "4px",
                   transition: "all 0.2s",
                 }}
               >

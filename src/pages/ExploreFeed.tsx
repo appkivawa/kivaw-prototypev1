@@ -9,6 +9,8 @@ import ExploreCardSkeleton from "../components/explore/ExploreCardSkeleton";
 import { useSession } from "../auth/useSession";
 import LoginModal from "../components/auth/LoginModal";
 import { getBadge } from "../utils/badgeHelpers";
+import ExploreEchoButton from "../components/explore/ExploreEchoButton";
+import EchoComposer from "../components/echo/EchoComposer";
 
 // ============================================================
 // Types
@@ -300,6 +302,7 @@ export default function ExploreFeed() {
   const [query, setQuery] = useState("");
   const [exploreCursor, setExploreCursor] = useState(0);
   const [exploreDisplayCount, setExploreDisplayCount] = useState(24); // Number of cards to display
+  const [lastUpdated, setLastUpdated] = useState<Date | null>(null);
   const [exploreLoadingMore, setExploreLoadingMore] = useState(false);
   const [exploreHasMore, setExploreHasMore] = useState(true);
   const [quickFilter, setQuickFilter] = useState<string | null>(null); // "fresh" | "tech" | "culture" | "finance" | "music" | null
@@ -405,6 +408,7 @@ export default function ExploreFeed() {
       setExploreCursor(0);
       setExploreDisplayCount(24); // Reset display count on new load
       setExploreHasMore(final.length > 24);
+      setLastUpdated(new Date());
     } catch (e: any) {
       setErr(e?.message ?? "Failed to load explore content.");
     } finally {
@@ -461,12 +465,14 @@ export default function ExploreFeed() {
       const sevenDaysAgo = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000).toISOString();
       const thirtyDaysAgo = new Date(now.getTime() - 30 * 24 * 60 * 60 * 1000).toISOString();
 
-      // Query feed_items for sections (order by published_at desc, fallback to ingested_at)
+      // Query feed_items for sections
+      // Use created_at for ordering (more reliable), then sort client-side by coalesce(published_at, ingested_at)
+      // Don't filter too aggressively - get more items to allow better client-side filtering
       const { data: allItems, error: itemsError } = await supabase
         .from("feed_items")
         .select("id,source,external_id,url,title,summary,author,image_url,published_at,tags,topics,metadata,ingested_at")
-        .order("published_at", { ascending: false, nullsLast: true })
-        .limit(500);
+        .order("created_at", { ascending: false }) // Order by created_at to get recent items
+        .limit(1000); // Get more items to allow better client-side filtering
 
       if (itemsError) {
         console.warn("[Feed] Error querying feed_items directly:", itemsError);
@@ -631,6 +637,7 @@ export default function ExploreFeed() {
       // Reset pagination state
       setFeedOffset(500); // Next load starts at 500 (we already loaded first 500)
       setFeedHasMore((allItems?.length ?? 0) >= 500); // Has more if we got full batch
+      setLastUpdated(new Date());
     } catch (e: any) {
       console.error("[Feed load error]", e);
       setErr(e?.message ?? "Failed to load feed");
@@ -649,6 +656,17 @@ export default function ExploreFeed() {
     }
   }, [location.pathname]); // Only depend on pathname, not pageMode to avoid loops
 
+  // Helper to format "X min ago"
+  function formatTimeAgo(date: Date | null): string {
+    if (!date) return "Never";
+    const now = new Date();
+    const diffMs = now.getTime() - date.getTime();
+    const diffMins = Math.floor(diffMs / (1000 * 60));
+    if (diffMins < 1) return "Just now";
+    if (diffMins === 1) return "1 min ago";
+    return `${diffMins} min ago`;
+  }
+
   // Load content based on current mode
   useEffect(() => {
     if (pageMode === "explore") {
@@ -658,6 +676,27 @@ export default function ExploreFeed() {
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [pageMode, tone, safeMode]);
+
+  // Polling: refresh every 3 minutes while page is open
+  useEffect(() => {
+    if (pageMode === "feed") {
+      const intervalId = setInterval(() => {
+        if (!loadingRef.current) {
+          loadFeed();
+        }
+      }, 3 * 60 * 1000); // 3 minutes
+
+      return () => clearInterval(intervalId);
+    } else if (pageMode === "explore") {
+      const intervalId = setInterval(() => {
+        if (!loadingRef.current) {
+          loadExplore({ shuffleOnLoad: false });
+        }
+      }, 3 * 60 * 1000); // 3 minutes
+
+      return () => clearInterval(intervalId);
+    }
+  }, [pageMode]);
 
   // Handle mode change
   function handleModeChange(mode: PageMode) {
@@ -837,7 +876,7 @@ export default function ExploreFeed() {
       const { data: moreItems, error: itemsError } = await supabase
         .from("feed_items")
         .select("id,source,external_id,url,title,summary,author,image_url,published_at,tags,topics,metadata,ingested_at")
-        .order("published_at", { ascending: false, nullsLast: true })
+        .order("published_at", { ascending: false, nullsFirst: false })
         .range(feedOffset, newOffset - 1);
 
       if (itemsError) {
@@ -1070,25 +1109,22 @@ export default function ExploreFeed() {
           <div
             style={{
               display: "flex",
-              gap: "4px",
-              padding: "4px",
-              borderRadius: "12px",
-              border: "1px solid var(--border-strong)",
-              background: "var(--surface)",
-              boxShadow: "var(--shadow-soft)",
+              gap: "24px",
+              alignItems: "baseline",
             }}
           >
             <button
               onClick={() => handleModeChange("explore")}
               style={{
-                padding: "10px 20px",
-                borderRadius: "8px",
+                padding: 0,
                 border: "none",
-                background: pageMode === "explore" ? "var(--border-strong)" : "transparent",
+                background: "transparent",
                 cursor: "pointer",
-                fontWeight: pageMode === "explore" ? 600 : 500,
-                fontSize: "14px",
-                color: "var(--ink-muted)",
+                fontWeight: pageMode === "explore" ? 600 : 400,
+                fontSize: "16px",
+                color: pageMode === "explore" ? "var(--text-primary)" : "var(--text-muted)",
+                textDecoration: pageMode === "explore" ? "underline" : "none",
+                textUnderlineOffset: "4px",
                 transition: "all 0.2s",
               }}
             >
@@ -1097,18 +1133,63 @@ export default function ExploreFeed() {
             <button
               onClick={() => handleModeChange("feed")}
               style={{
-                padding: "10px 20px",
-                borderRadius: "8px",
+                padding: 0,
                 border: "none",
-                background: pageMode === "feed" ? "var(--border-strong)" : "transparent",
+                background: "transparent",
                 cursor: "pointer",
-                fontWeight: pageMode === "feed" ? 600 : 500,
-                fontSize: "14px",
-                color: "var(--ink-muted)",
+                fontWeight: pageMode === "feed" ? 600 : 400,
+                fontSize: "16px",
+                color: pageMode === "feed" ? "var(--text-primary)" : "var(--text-muted)",
+                textDecoration: pageMode === "feed" ? "underline" : "none",
+                textUnderlineOffset: "4px",
                 transition: "all 0.2s",
               }}
             >
               Feed
+            </button>
+          </div>
+          
+          {/* Refresh button and timestamp */}
+          <div
+            style={{
+              display: "flex",
+              alignItems: "center",
+              gap: "12px",
+              marginLeft: "auto",
+            }}
+          >
+            {lastUpdated && (
+              <span
+                style={{
+                  fontSize: "13px",
+                  color: "var(--text-muted)",
+                }}
+              >
+                Updated {formatTimeAgo(lastUpdated)}
+              </span>
+            )}
+            <button
+              onClick={() => {
+                if (pageMode === "explore") {
+                  loadExplore({ shuffleOnLoad: false });
+                } else {
+                  loadFeed();
+                }
+              }}
+              disabled={loading}
+              style={{
+                padding: "6px 12px",
+                border: "1px solid var(--border)",
+                background: loading ? "var(--bg-secondary)" : "var(--bg-primary)",
+                color: loading ? "var(--text-muted)" : "var(--text-primary)",
+                cursor: loading ? "not-allowed" : "pointer",
+                fontSize: "13px",
+                borderRadius: "6px",
+                transition: "all 0.2s",
+              }}
+              title="Refresh content"
+            >
+              {loading ? "Refreshing..." : "🔄 Refresh"}
             </button>
           </div>
         </div>
@@ -1148,29 +1229,30 @@ export default function ExploreFeed() {
               <div>
                 <h1
                   style={{
-                    fontSize: "28px",
+                    fontSize: "48px",
                     fontWeight: 700,
                     margin: 0,
-                    marginBottom: "6px",
+                    marginBottom: "8px",
                     color: "var(--ink)",
+                    letterSpacing: "-0.02em",
+                    lineHeight: 1.1,
                   }}
                 >
                   Explore
                 </h1>
-                <div style={{ marginTop: 4, display: "flex", gap: 8, alignItems: "center", flexWrap: "wrap" }}>
+                <div style={{ marginTop: 12, display: "flex", gap: 16, alignItems: "center", flexWrap: "wrap" }}>
                   <span
                     style={{
-                      fontSize: 11,
-                      fontWeight: 600,
-                      padding: "4px 8px",
-                      borderRadius: 999,
-                      background: "var(--border)",
-                      color: "var(--ink-muted)",
+                      fontSize: 12,
+                      fontWeight: 400,
+                      color: "var(--ink-tertiary)",
+                      textTransform: "uppercase",
+                      letterSpacing: "0.05em",
                     }}
                   >
                     {toneLabels[tone]}
                   </span>
-                  <div style={{ display: "flex", gap: 8, flexWrap: "wrap", fontSize: 12, color: "var(--ink-tertiary)" }}>
+                  <div style={{ display: "flex", gap: 12, flexWrap: "wrap", fontSize: 11, color: "var(--ink-tertiary)" }}>
                     <span>Matches: <strong>{matchCount}</strong></span>
                     <span>Passes: <strong>{passCount}</strong></span>
                   </div>
@@ -1667,10 +1749,11 @@ export default function ExploreFeed() {
                       style={{
                         width: "100%",
                         maxWidth: "500px",
-                        padding: "10px 16px",
-                        borderRadius: "8px",
-                        border: "1px solid var(--border)",
-                        backgroundColor: "var(--surface)",
+                        padding: "8px 0",
+                        borderRadius: 0,
+                        border: "none",
+                        borderBottom: "1px solid var(--border)",
+                        backgroundColor: "transparent",
                         color: "var(--ink)",
                         fontSize: "14px",
                         outline: "none",
@@ -1706,26 +1789,26 @@ export default function ExploreFeed() {
                           display: "flex",
                           alignItems: "center",
                           gap: "6px",
-                          padding: "8px 14px",
-                          borderRadius: "20px",
-                          border: "1px solid var(--border)",
-                          backgroundColor: quickFilter === filter.id ? "var(--ink)" : "var(--surface)",
-                          color: quickFilter === filter.id ? "var(--bg)" : "var(--ink)",
+                          padding: 0,
+                          borderRadius: 0,
+                          border: "none",
+                          backgroundColor: "transparent",
+                          color: quickFilter === filter.id ? "var(--ink)" : "var(--ink-muted)",
                           cursor: "pointer",
                           fontSize: "13px",
-                          fontWeight: 500,
+                          fontWeight: quickFilter === filter.id ? 600 : 400,
+                          textDecoration: quickFilter === filter.id ? "underline" : "none",
+                          textUnderlineOffset: "3px",
                           transition: "all 0.2s",
                         }}
                         onMouseEnter={(e) => {
                           if (quickFilter !== filter.id) {
-                            e.currentTarget.style.backgroundColor = "var(--control-bg)";
-                            e.currentTarget.style.borderColor = "var(--border-strong)";
+                            e.currentTarget.style.color = "var(--ink)";
                           }
                         }}
                         onMouseLeave={(e) => {
                           if (quickFilter !== filter.id) {
-                            e.currentTarget.style.backgroundColor = "var(--surface)";
-                            e.currentTarget.style.borderColor = "var(--border)";
+                            e.currentTarget.style.color = "var(--ink-muted)";
                           }
                         }}
                       >
@@ -1737,14 +1820,16 @@ export default function ExploreFeed() {
                       <button
                         onClick={() => setQuickFilter(null)}
                         style={{
-                          padding: "8px 14px",
-                          borderRadius: "20px",
-                          border: "1px solid var(--border)",
-                          backgroundColor: "var(--surface)",
-                          color: "var(--ink-muted)",
+                          padding: 0,
+                          borderRadius: 0,
+                          border: "none",
+                          backgroundColor: "transparent",
+                          color: "var(--ink-tertiary)",
                           cursor: "pointer",
-                          fontSize: "13px",
-                          fontWeight: 500,
+                          fontSize: "11px",
+                          fontWeight: 400,
+                          textTransform: "uppercase",
+                          letterSpacing: "0.05em",
                         }}
                       >
                         Clear
@@ -1757,8 +1842,8 @@ export default function ExploreFeed() {
                 <div
                   style={{
                     display: "grid",
-                    gridTemplateColumns: "repeat(auto-fill, minmax(200px, 1fr))",
-                    gap: 16,
+                    gridTemplateColumns: "repeat(auto-fill, minmax(220px, 1fr))",
+                    gap: "48px 32px",
                   }}
                 >
                   {filteredExplore.slice(0, exploreDisplayCount).map((c) => {
@@ -1767,18 +1852,19 @@ export default function ExploreFeed() {
                       <div key={c.id}>
                         <div
                           style={{
-                            borderRadius: "6px",
-                            overflow: "hidden",
-                            background: "var(--surface)",
+                            borderRadius: 0,
+                            overflow: "visible",
+                            background: "transparent",
                             cursor: "pointer",
-                            transition: "transform 0.2s",
-                            border: "1px solid var(--border)",
+                            transition: "opacity 0.2s",
+                            border: "none",
+                            marginBottom: "48px",
                           }}
                           onMouseEnter={(e) => {
-                            e.currentTarget.style.transform = "scale(1.02)";
+                            e.currentTarget.style.opacity = "0.85";
                           }}
                           onMouseLeave={(e) => {
-                            e.currentTarget.style.transform = "scale(1)";
+                            e.currentTarget.style.opacity = "1";
                           }}
                           onClick={() => {
                             const idx = filteredExplore.findIndex((x) => x.id === c.id);

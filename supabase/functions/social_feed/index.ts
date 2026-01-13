@@ -129,8 +129,24 @@ serve(async (req) => {
   }
 
   try {
-    const SUPABASE_URL = Deno.env.get("SUPABASE_URL")!;
-    const SUPABASE_ANON_KEY = Deno.env.get("SUPABASE_ANON_KEY")!;
+    // Validate required environment variables
+    const SUPABASE_URL = Deno.env.get("SUPABASE_URL");
+    const SUPABASE_ANON_KEY = Deno.env.get("SUPABASE_ANON_KEY");
+
+    if (!SUPABASE_URL || !SUPABASE_ANON_KEY) {
+      const missing = [];
+      if (!SUPABASE_URL) missing.push("SUPABASE_URL");
+      if (!SUPABASE_ANON_KEY) missing.push("SUPABASE_ANON_KEY");
+      
+      console.error("[social_feed] Missing required environment variables:", missing);
+      return jsonResponse(
+        {
+          error: `Missing required environment variables: ${missing.join(", ")}`,
+          message: "Please configure SUPABASE_URL and SUPABASE_ANON_KEY in the Supabase dashboard under Edge Functions secrets.",
+        },
+        500
+      );
+    }
 
     // IMPORTANT:
     // - Pass through Authorization header so supabase.auth.getUser() works.
@@ -230,26 +246,42 @@ serve(async (req) => {
       console.error("[social_feed] Query error:", rowsErr);
       // If table doesn't exist, return empty feed with helpful error
       if (rowsErr.code === "42P01" || rowsErr.message?.includes("does not exist")) {
-        return jsonResponse({ 
-          feed: [], 
-          error: "feed_items table does not exist. Please run the migration: supabase/migrations/create_feed_items.sql",
+        return jsonResponse(
+          {
+            feed: [],
+            fresh: [],
+            today: [],
+            error: "feed_items table does not exist. Please run the migration: supabase/migrations/create_feed_items.sql",
+            message: rowsErr.message,
+            debug: {
+              authed: Boolean(userId),
+              candidates: 0,
+              returned: 0,
+              error: rowsErr.message,
+              code: rowsErr.code,
+            },
+          },
+          200
+        );
+      }
+      return jsonResponse(
+        {
+          feed: [],
+          fresh: [],
+          today: [],
+          error: `Database query failed: ${rowsErr.message}`,
+          message: rowsErr.message,
+          code: rowsErr.code,
           debug: {
             authed: Boolean(userId),
             candidates: 0,
             returned: 0,
             error: rowsErr.message,
-          }
-        }, 200);
-      }
-      return jsonResponse({ 
-        error: `Database query failed: ${rowsErr.message}`, 
-        code: rowsErr.code,
-        debug: {
-          authed: Boolean(userId),
-          candidates: 0,
-          returned: 0,
-        }
-      }, 500);
+            code: rowsErr.code,
+          },
+        },
+        500
+      );
     }
 
     // Build map of RSS feed URLs to weights for quick lookup
@@ -398,13 +430,37 @@ serve(async (req) => {
       },
     });
   } catch (e: any) {
-    console.error("[social_feed] Unhandled error:", e);
-    return jsonResponse({ 
-      error: e?.message ?? String(e),
-      debug: {
-        errorType: e?.constructor?.name ?? "Unknown",
-        stack: import.meta.env.DEV ? e?.stack : undefined,
-      }
-    }, 500);
+    // Log full error details to console for Supabase logs
+    console.error("[social_feed] Unhandled error:", {
+      message: e?.message ?? String(e),
+      name: e?.name ?? "Unknown",
+      stack: e?.stack,
+      cause: e?.cause,
+    });
+
+    // Always return a proper JSON response with status code
+    const errorMessage = e?.message ?? String(e) ?? "Unknown error occurred";
+    const errorName = e?.name ?? e?.constructor?.name ?? "Error";
+
+    return jsonResponse(
+      {
+        feed: [],
+        fresh: [],
+        today: [],
+        error: errorMessage,
+        message: `social_feed function error: ${errorMessage}`,
+        errorType: errorName,
+        debug: {
+          authed: false,
+          candidates: 0,
+          returned: 0,
+          error: errorMessage,
+          errorType: errorName,
+          // Only include stack in development
+          stack: import.meta.env.DEV ? e?.stack : undefined,
+        },
+      },
+      500
+    );
   }
 });

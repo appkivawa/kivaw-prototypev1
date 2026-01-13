@@ -9,6 +9,18 @@
       content="Match your energy. Discover what fits."
     />
     <title>Match your energy. Discover what fits.</title>
+    <script>
+      // Set theme immediately to prevent flash
+      (function() {
+        const saved = localStorage.getItem('kivaw_theme');
+        let theme = saved;
+        if (!theme && window.matchMedia) {
+          theme = window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light';
+        }
+        if (!theme) theme = 'light';
+        document.documentElement.setAttribute('data-theme', theme);
+      })();
+    </script>
   </head>
   <body>
     <div id="root"></div>

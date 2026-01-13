@@ -39,6 +39,7 @@ export default function Feed() {
   const [isAnimating, setIsAnimating] = useState(false);
   const [animDir, setAnimDir] = useState<"left" | "right">("right");
   const [showDebug, setShowDebug] = useState(false);
+  const [lastUpdated, setLastUpdated] = useState<Date | null>(null);
 
   const loadingRef = useRef(false);
 
@@ -64,6 +65,7 @@ export default function Feed() {
 
       setItems(data.feed);
       setDebug(data.debug ?? null);
+      setLastUpdated(new Date());
     } catch (e: any) {
       console.error("[Feed load error]", e);
       setErr(e?.message ?? "Failed to load feed");
@@ -72,6 +74,28 @@ export default function Feed() {
       loadingRef.current = false;
     }
   }
+
+  // Helper to format "X min ago"
+  function formatTimeAgo(date: Date | null): string {
+    if (!date) return "Never";
+    const now = new Date();
+    const diffMs = now.getTime() - date.getTime();
+    const diffMins = Math.floor(diffMs / (1000 * 60));
+    if (diffMins < 1) return "Just now";
+    if (diffMins === 1) return "1 min ago";
+    return `${diffMins} min ago`;
+  }
+
+  // Polling: refresh every 3 minutes while page is open
+  useEffect(() => {
+    const intervalId = setInterval(() => {
+      if (!loadingRef.current) {
+        load();
+      }
+    }, 3 * 60 * 1000); // 3 minutes
+
+    return () => clearInterval(intervalId);
+  }, []);
 
   // Swipe functionality
   const SWIPE_THRESHOLD = 110;
@@ -188,31 +212,87 @@ export default function Feed() {
             <p className="feed-subtitle">One scroll. Everything you care about.</p>
           </div>
 
-          <div className="feed-header-actions">
+          <div className="feed-header-actions" style={{ display: "flex", gap: "32px", alignItems: "baseline" }}>
             {/* View Mode Selector */}
-            <div className="segmented-control">
+            <div style={{ display: "flex", gap: "24px", alignItems: "baseline" }}>
               <button
                 onClick={() => setViewMode("1col")}
-                className={`segmented-control-button ${viewMode === "1col" ? "active" : ""}`}
+                style={{
+                  padding: 0,
+                  border: "none",
+                  background: "transparent",
+                  cursor: "pointer",
+                  fontWeight: viewMode === "1col" ? 600 : 400,
+                  fontSize: "14px",
+                  color: viewMode === "1col" ? "var(--ink)" : "var(--ink-muted)",
+                  textDecoration: viewMode === "1col" ? "underline" : "none",
+                  textUnderlineOffset: "3px",
+                }}
               >
                 1 Col
               </button>
               <button
                 onClick={() => setViewMode("2col")}
-                className={`segmented-control-button ${viewMode === "2col" ? "active" : ""}`}
+                style={{
+                  padding: 0,
+                  border: "none",
+                  background: "transparent",
+                  cursor: "pointer",
+                  fontWeight: viewMode === "2col" ? 600 : 400,
+                  fontSize: "14px",
+                  color: viewMode === "2col" ? "var(--ink)" : "var(--ink-muted)",
+                  textDecoration: viewMode === "2col" ? "underline" : "none",
+                  textUnderlineOffset: "3px",
+                }}
               >
                 2 Col
               </button>
               <button
                 onClick={() => setViewMode("swipe")}
-                className={`segmented-control-button ${viewMode === "swipe" ? "active" : ""}`}
+                style={{
+                  padding: 0,
+                  border: "none",
+                  background: "transparent",
+                  cursor: "pointer",
+                  fontWeight: viewMode === "swipe" ? 600 : 400,
+                  fontSize: "14px",
+                  color: viewMode === "swipe" ? "var(--ink)" : "var(--ink-muted)",
+                  textDecoration: viewMode === "swipe" ? "underline" : "none",
+                  textUnderlineOffset: "3px",
+                }}
               >
                 Swipe
               </button>
             </div>
 
-            <button onClick={load} disabled={loading} className="btn">
-              {loading ? "Refreshing..." : "Refresh"}
+            {lastUpdated && (
+              <span
+                style={{
+                  fontSize: "13px",
+                  color: "var(--ink-muted)",
+                  marginRight: "8px",
+                }}
+              >
+                Updated {formatTimeAgo(lastUpdated)}
+              </span>
+            )}
+            <button
+              onClick={load}
+              disabled={loading}
+              style={{
+                padding: "6px 12px",
+                border: "1px solid var(--border)",
+                background: loading ? "var(--bg-secondary)" : "var(--bg-primary)",
+                color: loading ? "var(--text-muted)" : "var(--text-primary)",
+                cursor: loading ? "not-allowed" : "pointer",
+                fontWeight: 400,
+                fontSize: "13px",
+                borderRadius: "6px",
+                transition: "all 0.2s",
+              }}
+              title="Refresh feed"
+            >
+              {loading ? "Refreshing..." : "🔄 Refresh"}
             </button>
 
             {debug && (

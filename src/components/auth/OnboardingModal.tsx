@@ -71,23 +71,28 @@ export default function OnboardingModal({
       // Upsert profile with interests and set onboarded=true
       // Use upsert to handle case where profile might not exist yet
       // Ensure interests is a proper array (text[]) and onboarded is boolean
+      const interestsArray = selectedTags.length > 0 ? selectedTags : [];
       const { error } = await supabase
         .from("profiles")
         .upsert(
           {
             id: session.user.id,
             email: session.user.email || null,
-            interests: selectedTags.length > 0 ? selectedTags : [], // Ensure it's always an array
+            interests: interestsArray, // Ensure it's always an array
             onboarded: true, // Set to true when user completes onboarding
             updated_at: new Date().toISOString(),
           },
           { onConflict: "id" }
         );
 
-      if (error) throw error;
+      if (error) {
+        console.error("Error saving profile:", error);
+        throw error;
+      }
 
       showToast(initialInterests.length > 0 ? "Interests updated!" : "Welcome to Kivaw!");
-      onComplete();
+      // Call onComplete with saved interests to update local state immediately
+      onComplete(interestsArray);
     } catch (e: any) {
       console.error("Error saving onboarding:", e);
       showToast(e?.message || "Failed to save preferences");
