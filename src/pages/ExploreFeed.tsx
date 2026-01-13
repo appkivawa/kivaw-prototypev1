@@ -9,7 +9,7 @@ import ExploreCardSkeleton from "../components/explore/ExploreCardSkeleton";
 import { useSession } from "../auth/useSession";
 import LoginModal from "../components/auth/LoginModal";
 import { getBadge } from "../utils/badgeHelpers";
-import ExploreEchoButton from "../components/explore/ExploreEchoButton";
+import { ExploreEchoButton } from "../components/explore/ExploreEchoButton";
 import EchoComposer from "../components/echo/EchoComposer";
 
 // ============================================================
