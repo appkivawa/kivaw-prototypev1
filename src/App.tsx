@@ -50,6 +50,7 @@ import Preferences from "./pages/preferences";
 import Timeline from "./pages/Timeline";
 import Waves from "./pages/Waves";
 import Saved from "./pages/Saved";
+import Profile from "./pages/Profile";
 
 function HashAuthRedirect() {
   const nav = useNavigate();
@@ -292,6 +293,7 @@ export default function App() {
             </RequireAuth>
           }
         />
+        <Route path="profile" element={<Profile />} />
         <Route path="echo" element={<Navigate to="/timeline" replace />} />
         <Route path="save-echo" element={<Navigate to="/timeline" replace />} />
         <Route path="match" element={<MatchPage />} />

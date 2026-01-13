@@ -13,6 +13,11 @@ CREATE TABLE IF NOT EXISTS public.admin_roles (
 -- Enable RLS
 ALTER TABLE public.admin_roles ENABLE ROW LEVEL SECURITY;
 
+-- Drop existing policies if they exist (idempotent)
+DROP POLICY IF EXISTS "Admins can view all roles" ON public.admin_roles;
+DROP POLICY IF EXISTS "Owners and admins can insert roles" ON public.admin_roles;
+DROP POLICY IF EXISTS "Owners can update roles" ON public.admin_roles;
+
 -- Policy: Admins can view all roles
 CREATE POLICY "Admins can view all roles" ON public.admin_roles
   FOR SELECT USING (
@@ -62,6 +67,9 @@ CREATE TABLE IF NOT EXISTS public.audit_log (
 
 -- Enable RLS
 ALTER TABLE public.audit_log ENABLE ROW LEVEL SECURITY;
+
+-- Drop existing policies if they exist (idempotent)
+DROP POLICY IF EXISTS "Admins can view audit logs" ON public.audit_log;
 
 -- Policy: Admins can view audit logs
 CREATE POLICY "Admins can view audit logs" ON public.audit_log
@@ -125,6 +133,9 @@ CREATE TABLE IF NOT EXISTS public.feature_flags (
 -- Enable RLS
 ALTER TABLE public.feature_flags ENABLE ROW LEVEL SECURITY;
 
+-- Drop existing policies if they exist (idempotent)
+DROP POLICY IF EXISTS "Admins can manage feature flags" ON public.feature_flags;
+
 -- Policy: Admins can manage feature flags
 CREATE POLICY "Admins can manage feature flags" ON public.feature_flags
   FOR ALL USING (
@@ -147,6 +158,9 @@ CREATE TABLE IF NOT EXISTS public.system_settings (
 
 -- Enable RLS
 ALTER TABLE public.system_settings ENABLE ROW LEVEL SECURITY;
+
+-- Drop existing policies if they exist (idempotent)
+DROP POLICY IF EXISTS "Admins can manage system settings" ON public.system_settings;
 
 -- Policy: Admins can manage system settings
 CREATE POLICY "Admins can manage system settings" ON public.system_settings
@@ -174,6 +188,11 @@ CREATE TABLE IF NOT EXISTS public.user_reports (
 
 -- Enable RLS
 ALTER TABLE public.user_reports ENABLE ROW LEVEL SECURITY;
+
+-- Drop existing policies if they exist (idempotent)
+DROP POLICY IF EXISTS "Users can create reports" ON public.user_reports;
+DROP POLICY IF EXISTS "Users can view their own reports" ON public.user_reports;
+DROP POLICY IF EXISTS "Support can view all reports" ON public.user_reports;
 
 -- Policy: Users can create reports
 CREATE POLICY "Users can create reports" ON public.user_reports
@@ -205,6 +224,9 @@ CREATE TABLE IF NOT EXISTS public.admin_notes (
 
 -- Enable RLS
 ALTER TABLE public.admin_notes ENABLE ROW LEVEL SECURITY;
+
+-- Drop existing policies if they exist (idempotent)
+DROP POLICY IF EXISTS "Admins can manage notes" ON public.admin_notes;
 
 -- Policy: Only admins can view/manage notes
 CREATE POLICY "Admins can manage notes" ON public.admin_notes

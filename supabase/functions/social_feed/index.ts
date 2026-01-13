@@ -218,7 +218,7 @@ serve(async (req) => {
     // If published_at is null, we'll still allow the row through if created_at is recent (via OR).
     let qx = supabase
       .from("feed_items")
-      .select("id,source,external_id,url,title,summary,author,image_url,published_at,tags,topics,metadata,created_at")
+      .select("id,source,external_id,url,title,summary,author,image_url,published_at,tags,topics,metadata,created_at,ingested_at")
       .or(`published_at.gte.${sinceIso},and(published_at.is.null,created_at.gte.${sinceIso})`)
       .order("published_at", { ascending: false, nullsFirst: false })
       .limit(400);
@@ -252,20 +252,48 @@ serve(async (req) => {
       }, 500);
     }
 
-    let items: FeedItem[] = (rows ?? []).map((r: any) => ({
-      id: r.id,
-      source: r.source,
-      external_id: r.external_id,
-      url: r.url,
-      title: r.title,
-      summary: r.summary,
-      author: r.author,
-      image_url: r.image_url,
-      published_at: r.published_at ?? r.created_at ?? null,
-      tags: r.tags,
-      topics: r.topics,
-      metadata: r.metadata ?? {},
-    }));
+    // Build map of RSS feed URLs to weights for quick lookup
+    const rssWeightMap = new Map<string, number>();
+    const { data: rssSources } = await supabase
+      .from("rss_sources")
+      .select("url, weight")
+      .eq("active", true);
+    
+    if (rssSources) {
+      for (const src of rssSources) {
+        rssWeightMap.set(src.url, src.weight ?? 1);
+      }
+    }
+
+    let items: FeedItem[] = (rows ?? []).map((r: any) => {
+      // Extract RSS source weight from metadata.feed_url
+      let rssWeight = 1; // Default weight
+      if (r.source === "rss" && r.metadata) {
+        const feedUrl = (r.metadata as any)?.feed_url;
+        if (feedUrl && rssWeightMap.has(feedUrl)) {
+          rssWeight = rssWeightMap.get(feedUrl) ?? 1;
+        }
+      }
+      
+      return {
+        id: r.id,
+        source: r.source,
+        external_id: r.external_id,
+        url: r.url,
+        title: r.title,
+        summary: r.summary,
+        author: r.author,
+        image_url: r.image_url,
+        published_at: r.published_at ?? r.created_at ?? null,
+        tags: r.tags,
+        topics: r.topics,
+        metadata: { 
+          ...(r.metadata ?? {}), 
+          _rss_weight: rssWeight,
+          ingested_at: r.ingested_at ?? null, // Store ingested_at for age calculation
+        }, // Store weight in metadata for scoring
+      };
+    });
 
     // Search filter
     if (query) {
@@ -276,17 +304,26 @@ serve(async (req) => {
     // ============================================================
     // Score + sort
     // ============================================================
+    // RSS source weight constant: small multiplier (0.2 per weight point)
+    // This ensures weight nudges ranking without dominating
+    // Weight range: 1-5, so boost range: 0.2 to 1.0
+    const RSS_WEIGHT_MULTIPLIER = 0.2;
+    
     const scored = items
       .map((it) => {
-        // For logged-out users, only use recency + default source weight
+        // Get RSS source weight (if RSS item)
+        const rssWeight = it.source === "rss" ? ((it.metadata as any)?._rss_weight ?? 1) : 0;
+        const rssWeightBoost = rssWeight * RSS_WEIGHT_MULTIPLIER;
+        
+        // For logged-out users, only use recency + default source weight + RSS weight
         if (!userId) {
           const r = recencyScore(it.published_at);
           const s = sourceWeight(it, prefs);
-          const score = (r * 1.8) + (s * 0.9);
+          const score = (r * 1.8) + (s * 0.9) + rssWeightBoost;
           return { ...it, score: Number(score.toFixed(4)) };
         }
 
-        // For logged-in users, use full personalization
+        // For logged-in users, use full personalization + RSS weight
         const acts = actionMap.get(it.id) ?? [];
         const acted = actionWeights(acts);
         if (acted <= -5) return { ...it, score: -999 };
@@ -299,15 +336,54 @@ serve(async (req) => {
         const followMarker = String((it.metadata as any)?.follow_key ?? "");
         const followBoost = followMarker && followKeys.has(followMarker) ? 1.25 : 0;
 
-        const score = (r * 1.8) + (t * 1.2) + (s * 0.9) + acted + followBoost - bpen;
+        const score = (r * 1.8) + (t * 1.2) + (s * 0.9) + acted + followBoost - bpen + rssWeightBoost;
         return { ...it, score: Number(score.toFixed(4)) };
       })
       .filter((x) => (x.score ?? 0) > -100)
       .sort((a, b) => (b.score ?? 0) - (a.score ?? 0))
       .slice(0, limit);
 
+    // ============================================================
+    // Build Fresh (6h) and Today (24h) sections
+    // ============================================================
+    const now = new Date();
+    const sixHoursAgo = new Date(now.getTime() - 6 * 60 * 60 * 1000).toISOString();
+    const twentyFourHoursAgo = new Date(now.getTime() - 24 * 60 * 60 * 1000).toISOString();
+
+    // Helper to get item timestamp (coalesce published_at, ingested_at, created_at)
+    function getItemTimestamp(item: FeedItem): string | null {
+      return item.published_at ?? (item.metadata as any)?.ingested_at ?? null;
+    }
+
+    // Filter items by age
+    const freshItems = items.filter((it) => {
+      const ts = getItemTimestamp(it);
+      if (!ts) return false;
+      return ts >= sixHoursAgo;
+    })
+      .sort((a, b) => {
+        const tsA = getItemTimestamp(a) ?? "";
+        const tsB = getItemTimestamp(b) ?? "";
+        return tsB.localeCompare(tsA);
+      })
+      .slice(0, 50);
+
+    const todayItems = items.filter((it) => {
+      const ts = getItemTimestamp(it);
+      if (!ts) return false;
+      return ts >= twentyFourHoursAgo;
+    })
+      .sort((a, b) => {
+        const tsA = getItemTimestamp(a) ?? "";
+        const tsB = getItemTimestamp(b) ?? "";
+        return tsB.localeCompare(tsA);
+      })
+      .slice(0, 50);
+
     return jsonResponse({
       feed: scored,
+      fresh: freshItems.slice(0, 50),
+      today: todayItems.slice(0, 50),
       debug: {
         authed: Boolean(userId),
         days,
@@ -317,6 +393,8 @@ serve(async (req) => {
         query: query ? true : false,
         candidates: items.length,
         returned: scored.length,
+        freshCount: freshItems.length,
+        todayCount: todayItems.length,
       },
     });
   } catch (e: any) {

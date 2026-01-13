@@ -1,6 +1,8 @@
 import React, { useState } from "react";
 import { createEcho } from "../../data/echoApi";
 import { useSession } from "../../auth/useSession";
+import { showToast } from "../ui/Toast";
+import LoginModal from "../auth/LoginModal";
 
 type EchoComposerProps = {
   contentId?: string | null;
@@ -15,85 +17,143 @@ export default function EchoComposer({ contentId, onClose, onSaved, inline = fal
   const [shareToWaves, setShareToWaves] = useState(false);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [showLoginModal, setShowLoginModal] = useState(false);
 
   if (!isAuthed) {
     if (inline) {
       return (
-        <div
-          style={{
-            padding: "16px",
-            borderRadius: "8px",
-            backgroundColor: "var(--border)",
-            border: "1px solid var(--border-strong)",
-          }}
-        >
-          <p style={{ margin: "0 0 12px 0", fontSize: "14px", color: "var(--ink-muted)" }}>
-            Please sign in to create an Echo reflection.
-          </p>
-          <button
-            onClick={onClose}
+        <>
+          <div
             style={{
-              padding: "8px 12px",
-              borderRadius: "6px",
+              padding: "16px",
+              borderRadius: "8px",
+              backgroundColor: "var(--border)",
               border: "1px solid var(--border-strong)",
-              background: "var(--control-bg)",
-              cursor: "pointer",
-              fontWeight: 500,
-              fontSize: "13px",
             }}
           >
-            Close
-          </button>
-        </div>
+            <p style={{ margin: "0 0 12px 0", fontSize: "14px", color: "var(--ink-muted)" }}>
+              Please sign in to create an Echo reflection.
+            </p>
+            <div style={{ display: "flex", gap: "8px" }}>
+              <button
+                onClick={() => setShowLoginModal(true)}
+                style={{
+                  flex: 1,
+                  padding: "8px 12px",
+                  borderRadius: "6px",
+                  border: "none",
+                  background: "var(--ink)",
+                  color: "var(--bg)",
+                  cursor: "pointer",
+                  fontWeight: 600,
+                  fontSize: "13px",
+                }}
+              >
+                Sign in
+              </button>
+              <button
+                onClick={onClose}
+                style={{
+                  padding: "8px 12px",
+                  borderRadius: "6px",
+                  border: "1px solid var(--border-strong)",
+                  background: "var(--control-bg)",
+                  cursor: "pointer",
+                  fontWeight: 500,
+                  fontSize: "13px",
+                }}
+              >
+                Close
+              </button>
+            </div>
+          </div>
+          <LoginModal
+            isOpen={showLoginModal}
+            onClose={() => setShowLoginModal(false)}
+            title="Sign in to Echo"
+            message="We'll send you a magic link to sign in."
+            pendingAction={contentId ? { type: "echo", contentId, note: text, shareToWaves } : undefined}
+          />
+        </>
       );
     }
     return (
-      <div
-        style={{
-          position: "fixed",
-          top: 0,
-          left: 0,
-          right: 0,
-          bottom: 0,
-          backgroundColor: "rgba(0, 0, 0, 0.5)",
-          display: "flex",
-          alignItems: "center",
-          justifyContent: "center",
-          zIndex: 1000,
-        }}
-      >
+      <>
         <div
           style={{
-            backgroundColor: "var(--surface)",
-            borderRadius: "8px",
-            padding: "24px",
-            maxWidth: "500px",
-            width: "90%",
-            boxShadow: "var(--shadow)",
+            position: "fixed",
+            top: 0,
+            left: 0,
+            right: 0,
+            bottom: 0,
+            backgroundColor: "rgba(0, 0, 0, 0.5)",
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "center",
+            zIndex: 1000,
           }}
         >
-          <h3 style={{ margin: "0 0 12px 0", fontSize: "18px", fontWeight: 600 }}>
-            Sign in to Echo
-          </h3>
-          <p style={{ margin: "0 0 16px 0", fontSize: "14px", color: "var(--ink-muted)" }}>
-            Please sign in to create an Echo reflection.
-          </p>
-          <button
-            onClick={onClose}
+          <div
             style={{
-              padding: "10px 16px",
-              borderRadius: "6px",
-              border: "1px solid var(--border-strong)",
-              background: "var(--control-bg)",
-              cursor: "pointer",
-              fontWeight: 500,
-              fontSize: "14px",
+              backgroundColor: "var(--surface)",
+              borderRadius: "8px",
+              padding: "24px",
+              maxWidth: "500px",
+              width: "90%",
+              boxShadow: "var(--shadow)",
             }}
           >
-            Close
-          </button>
+            <h3 style={{ margin: "0 0 12px 0", fontSize: "18px", fontWeight: 600 }}>
+              Sign in to Echo
+            </h3>
+            <p style={{ margin: "0 0 16px 0", fontSize: "14px", color: "var(--ink-muted)" }}>
+              Please sign in to create an Echo reflection.
+            </p>
+            <div style={{ display: "flex", gap: "8px" }}>
+              <button
+                onClick={() => setShowLoginModal(true)}
+                style={{
+                  flex: 1,
+                  padding: "10px 16px",
+                  borderRadius: "6px",
+                  border: "none",
+                  background: "var(--ink)",
+                  color: "var(--bg)",
+                  cursor: "pointer",
+                  fontWeight: 600,
+                  fontSize: "14px",
+                }}
+              >
+                Sign in
+              </button>
+              <button
+                onClick={onClose}
+                style={{
+                  padding: "10px 16px",
+                  borderRadius: "6px",
+                  border: "1px solid var(--border-strong)",
+                  background: "var(--control-bg)",
+                  cursor: "pointer",
+                  fontWeight: 500,
+                  fontSize: "14px",
+                }}
+              >
+                Close
+              </button>
+            </div>
+          </div>
         </div>
-      </div>
+        <LoginModal
+          isOpen={showLoginModal}
+          onClose={() => {
+            setShowLoginModal(false);
+            onClose();
+          }}
+          title="Sign in to Echo"
+          message="We'll send you a magic link to sign in."
+          pendingAction={contentId ? { type: "echo", contentId } : undefined}
+        />
+      </>
     );
   }
 
@@ -114,6 +174,7 @@ export default function EchoComposer({ contentId, onClose, onSaved, inline = fal
       });
       setText("");
       setShareToWaves(false);
+      showToast("Saved to Timeline");
       if (onSaved) onSaved();
       onClose();
     } catch (e: any) {
@@ -176,27 +237,55 @@ export default function EchoComposer({ contentId, onClose, onSaved, inline = fal
         />
 
         <div style={{ marginBottom: "16px" }}>
-          <label
+          <div
             style={{
               display: "flex",
-              alignItems: "center",
               gap: "8px",
-              cursor: "pointer",
-              fontSize: "14px",
+              padding: "4px",
+              borderRadius: "6px",
+              border: "1px solid var(--border-strong)",
+              backgroundColor: "var(--border)",
             }}
           >
-            <input
-              type="checkbox"
-              checked={shareToWaves}
-              onChange={(e) => setShareToWaves(e.target.checked)}
-              style={{ cursor: "pointer" }}
-            />
-            <span>Share as Wave</span>
-          </label>
-          <p style={{ margin: "4px 0 0 24px", fontSize: "12px", color: "rgba(0,0,0,0.6)" }}>
+            <button
+              onClick={() => setShareToWaves(false)}
+              style={{
+                flex: 1,
+                padding: "6px 12px",
+                borderRadius: "4px",
+                border: "none",
+                background: !shareToWaves ? "var(--surface)" : "transparent",
+                cursor: "pointer",
+                fontSize: "13px",
+                fontWeight: !shareToWaves ? 600 : 500,
+                color: "var(--ink-muted)",
+                transition: "all 0.2s",
+              }}
+            >
+              Private
+            </button>
+            <button
+              onClick={() => setShareToWaves(true)}
+              style={{
+                flex: 1,
+                padding: "6px 12px",
+                borderRadius: "4px",
+                border: "none",
+                background: shareToWaves ? "var(--surface)" : "transparent",
+                cursor: "pointer",
+                fontSize: "13px",
+                fontWeight: shareToWaves ? 600 : 500,
+                color: "var(--ink-muted)",
+                transition: "all 0.2s",
+              }}
+            >
+              Share to Waves
+            </button>
+          </div>
+          <p style={{ margin: "8px 0 0 0", fontSize: "12px", color: "var(--ink-tertiary)" }}>
             {shareToWaves
               ? "This reflection will appear in the Waves feed"
-              : "Private by default. Only you can see this reflection."}
+              : "Only you can see this reflection"}
           </p>
         </div>
 

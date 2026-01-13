@@ -16,6 +16,12 @@ CREATE INDEX IF NOT EXISTS idx_admin_users_user_id ON admin_users(user_id);
 -- Enable Row Level Security (RLS)
 ALTER TABLE admin_users ENABLE ROW LEVEL SECURITY;
 
+-- Drop existing policies if they exist (idempotent)
+DROP POLICY IF EXISTS "Admins can read admin_users" ON public.admin_users;
+DROP POLICY IF EXISTS "Admins can insert admin_users" ON public.admin_users;
+DROP POLICY IF EXISTS "Admins can update admin_users" ON public.admin_users;
+DROP POLICY IF EXISTS "Admins can delete admin_users" ON public.admin_users;
+
 -- Policy: Only admins can read the admin_users table
 CREATE POLICY "Admins can read admin_users"
   ON admin_users

@@ -3,6 +3,7 @@ import React, { useEffect, useRef, useState } from "react";
 import { supabase } from "../lib/supabaseClient";
 import FeedPost from "../components/feed/FeedPost";
 import FeedPostSkeleton from "../components/feed/FeedPostSkeleton";
+import "../styles/feed.css";
 
 type Source = "rss" | "youtube" | "reddit" | "podcast" | "eventbrite" | "spotify";
 
@@ -37,6 +38,7 @@ export default function Feed() {
   const [dragOffset, setDragOffset] = useState(0);
   const [isAnimating, setIsAnimating] = useState(false);
   const [animDir, setAnimDir] = useState<"left" | "right">("right");
+  const [showDebug, setShowDebug] = useState(false);
 
   const loadingRef = useRef(false);
 
@@ -159,442 +161,187 @@ export default function Feed() {
     return () => window.removeEventListener("keydown", handleKeyDown);
   }, [viewMode, currentItem, isAnimating]);
 
-  // Swipe visual state
+  // Swipe visual state - single computed transform
   const rotation = viewMode === "swipe" ? dragOffset * 0.06 : 0;
   const opacity = viewMode === "swipe" ? Math.max(0.35, 1 - Math.abs(dragOffset) / 320) : 1;
   const swipeLabel = viewMode === "swipe" && dragOffset > 40 ? "LIKE" : viewMode === "swipe" && dragOffset < -40 ? "PASS" : "";
   const swipeLabelOpacity = viewMode === "swipe" ? Math.min(1, Math.abs(dragOffset) / 140) : 0;
   const animX = animDir === "right" ? 420 : -420;
-  const transform = isAnimating
+  const swipeTransform = isAnimating
     ? `translateX(${animX}px) rotate(${animDir === "right" ? 8 : -8}deg)`
     : viewMode === "swipe"
-    ? `translateX(${dragOffset}px) rotate(${rotation}deg)`
-    : "none";
+    ? `translateX(calc(-50% + ${dragOffset}px)) rotate(${rotation}deg)`
+    : "translateX(-50%)";
   const transition = isDragging ? "none" : "transform 240ms ease, opacity 240ms ease";
 
   useEffect(() => {
     load();
   }, []);
 
-  const [showDebug, setShowDebug] = useState(false);
-
   return (
-    <div
-      style={{
-        minHeight: "100vh",
-        backgroundColor: "rgba(250, 248, 245, 0.5)",
-        padding: "24px 16px",
-      }}
-    >
-      {/* Main Feed Container */}
-      <div
-        style={{
-          display: "grid",
-          gridTemplateColumns: "minmax(0, 1fr) minmax(0, 680px) minmax(0, 1fr)",
-          gap: "24px",
-          maxWidth: "1400px",
-          margin: "0 auto",
-        }}
-        className="feed-layout"
-      >
-        <style>{`
-          @media (min-width: 1024px) {
-            .feed-sidebar-left,
-            .feed-sidebar-right {
-              display: block !important;
-            }
-          }
-        `}</style>
-
-        {/* Left Sidebar (placeholder for filters) - hidden on mobile */}
-        <aside
-          style={{
-            display: "none",
-          }}
-          className="feed-sidebar-left"
-        >
-          <div
-            style={{
-              position: "sticky",
-              top: "24px",
-              padding: "16px",
-              borderRadius: "8px",
-              border: "1px solid rgba(0,0,0,0.08)",
-              backgroundColor: "rgba(255,255,255,0.6)",
-            }}
-          >
-            <h3 style={{ fontSize: "14px", fontWeight: 600, marginBottom: "12px", color: "rgba(0,0,0,0.7)" }}>
-              Filters
-            </h3>
-            <p style={{ fontSize: "12px", color: "rgba(0,0,0,0.5)" }}>Coming soon</p>
+    <div className="feed-page">
+      <div className="feed-container">
+        {/* Header */}
+        <header className="feed-header">
+          <div className="feed-header-content">
+            <h1 className="feed-title">Your Feed</h1>
+            <p className="feed-subtitle">One scroll. Everything you care about.</p>
           </div>
-        </aside>
 
-        {/* Center Feed Column */}
-        <main style={{ width: "100%" }}>
-          {/* Header */}
-          <div
-            style={{
-              display: "flex",
-              justifyContent: "space-between",
-              alignItems: "flex-start",
-              gap: "16px",
-              marginBottom: "32px",
-              flexWrap: "wrap",
-            }}
-          >
-            <div>
-              <h1
-                style={{
-                  fontSize: "clamp(24px, 4vw, 32px)",
-                  fontWeight: 700,
-                  margin: 0,
-                  marginBottom: "8px",
-                  color: "rgba(0,0,0,0.9)",
-                }}
-              >
-                Your Feed
-              </h1>
-              <p
-                style={{
-                  fontSize: "15px",
-                  color: "rgba(0,0,0,0.6)",
-                  margin: 0,
-                }}
-              >
-                One scroll. Everything you care about.
-              </p>
-            </div>
-
-            <div style={{ display: "flex", gap: "8px", alignItems: "center", flexWrap: "wrap" }}>
-              {/* View Mode Selector */}
-              <div
-                style={{
-                  display: "flex",
-                  gap: "4px",
-                  padding: "4px",
-                  borderRadius: "8px",
-                  border: "1px solid rgba(0,0,0,0.12)",
-                  background: "rgba(255,255,255,0.9)",
-                }}
-              >
-                <button
-                  onClick={() => setViewMode("1col")}
-                  style={{
-                    padding: "6px 12px",
-                    borderRadius: "6px",
-                    border: "none",
-                    background: viewMode === "1col" ? "rgba(0,0,0,0.1)" : "transparent",
-                    cursor: "pointer",
-                    fontWeight: viewMode === "1col" ? 600 : 500,
-                    fontSize: "12px",
-                    color: "rgba(0,0,0,0.8)",
-                    transition: "all 0.2s",
-                  }}
-                >
-                  1 Col
-                </button>
-                <button
-                  onClick={() => setViewMode("2col")}
-                  style={{
-                    padding: "6px 12px",
-                    borderRadius: "6px",
-                    border: "none",
-                    background: viewMode === "2col" ? "rgba(0,0,0,0.1)" : "transparent",
-                    cursor: "pointer",
-                    fontWeight: viewMode === "2col" ? 600 : 500,
-                    fontSize: "12px",
-                    color: "rgba(0,0,0,0.8)",
-                    transition: "all 0.2s",
-                  }}
-                >
-                  2 Col
-                </button>
-                <button
-                  onClick={() => setViewMode("swipe")}
-                  style={{
-                    padding: "6px 12px",
-                    borderRadius: "6px",
-                    border: "none",
-                    background: viewMode === "swipe" ? "rgba(0,0,0,0.1)" : "transparent",
-                    cursor: "pointer",
-                    fontWeight: viewMode === "swipe" ? 600 : 500,
-                    fontSize: "12px",
-                    color: "rgba(0,0,0,0.8)",
-                    transition: "all 0.2s",
-                  }}
-                >
-                  Swipe
-                </button>
-              </div>
+          <div className="feed-header-actions">
+            {/* View Mode Selector */}
+            <div className="segmented-control">
               <button
-                onClick={load}
-                disabled={loading}
-                style={{
-                  padding: "10px 16px",
-                  borderRadius: "8px",
-                  border: "1px solid rgba(0,0,0,0.12)",
-                  background: loading ? "rgba(0,0,0,0.05)" : "rgba(255,255,255,0.9)",
-                  cursor: loading ? "not-allowed" : "pointer",
-                  fontWeight: 600,
-                  fontSize: "14px",
-                  color: "rgba(0,0,0,0.8)",
-                  transition: "all 0.2s",
-                  opacity: loading ? 0.6 : 1,
-                }}
-                onMouseEnter={(e) => {
-                  if (!loading) {
-                    e.currentTarget.style.backgroundColor = "rgba(255,255,255,1)";
-                    e.currentTarget.style.borderColor = "rgba(0,0,0,0.2)";
-                  }
-                }}
-                onMouseLeave={(e) => {
-                  if (!loading) {
-                    e.currentTarget.style.backgroundColor = "rgba(255,255,255,0.9)";
-                    e.currentTarget.style.borderColor = "rgba(0,0,0,0.12)";
-                  }
-                }}
+                onClick={() => setViewMode("1col")}
+                className={`segmented-control-button ${viewMode === "1col" ? "active" : ""}`}
               >
-                {loading ? "Refreshing..." : "Refresh"}
+                1 Col
               </button>
-              {debug && (
-                <button
-                  onClick={() => setShowDebug(!showDebug)}
-                  style={{
-                    padding: "10px 16px",
-                    borderRadius: "8px",
-                    border: "1px solid rgba(0,0,0,0.12)",
-                    background: "rgba(255,255,255,0.9)",
-                    cursor: "pointer",
-                    fontWeight: 500,
-                    fontSize: "12px",
-                    color: "rgba(0,0,0,0.6)",
-                  }}
-                >
-                  {showDebug ? "Hide" : "Show"} Debug
-                </button>
-              )}
+              <button
+                onClick={() => setViewMode("2col")}
+                className={`segmented-control-button ${viewMode === "2col" ? "active" : ""}`}
+              >
+                2 Col
+              </button>
+              <button
+                onClick={() => setViewMode("swipe")}
+                className={`segmented-control-button ${viewMode === "swipe" ? "active" : ""}`}
+              >
+                Swipe
+              </button>
             </div>
+
+            <button onClick={load} disabled={loading} className="btn">
+              {loading ? "Refreshing..." : "Refresh"}
+            </button>
+
+            {debug && (
+              <button onClick={() => setShowDebug(!showDebug)} className="btn btn-secondary">
+                {showDebug ? "Hide" : "Show"} Debug
+              </button>
+            )}
           </div>
+        </header>
 
-          {/* Error Message */}
-          {err && (
-            <div
-              style={{
-                marginBottom: "24px",
-                padding: "16px",
-                borderRadius: "8px",
-                border: "1px solid rgba(239, 68, 68, 0.3)",
-                backgroundColor: "rgba(239, 68, 68, 0.05)",
-                color: "rgba(239, 68, 68, 0.9)",
-              }}
-            >
-              <strong>Error:</strong> {err}
-              <div style={{ marginTop: "8px", fontSize: "12px", opacity: 0.8 }}>
-                Check the console for more details.
-              </div>
-            </div>
-          )}
+        {/* Error Message */}
+        {err && (
+          <div className="feed-error">
+            <strong>Error:</strong> {err}
+            <div className="feed-error-detail">Check the console for more details.</div>
+          </div>
+        )}
 
-          {/* Debug Info */}
-          {showDebug && debug && (
-            <div
-              style={{
-                marginBottom: "24px",
-                padding: "12px",
-                borderRadius: "6px",
-                backgroundColor: "rgba(0,0,0,0.03)",
-                fontSize: "12px",
-                fontFamily: "monospace",
-                color: "rgba(0,0,0,0.6)",
-                overflow: "auto",
-              }}
+        {/* Debug Panel */}
+        {debug && (
+          <div className="debug-panel">
+            <button
+              onClick={() => setShowDebug(!showDebug)}
+              className="debug-panel-header"
+              type="button"
             >
-              <pre style={{ margin: 0, whiteSpace: "pre-wrap" }}>{JSON.stringify(debug, null, 2)}</pre>
-            </div>
-          )}
+              <span>Debug Info</span>
+              <span>{showDebug ? "−" : "+"}</span>
+            </button>
+            {showDebug && (
+              <div className="debug-panel-content">
+                <pre>{JSON.stringify(debug, null, 2)}</pre>
+              </div>
+            )}
+          </div>
+        )}
 
-          {/* Feed Posts */}
-          {loading ? (
-            <div>
-              {[1, 2, 3].map((i) => (
-                <FeedPostSkeleton key={i} />
-              ))}
-            </div>
-          ) : items.length === 0 ? (
-            <div
-              style={{
-                textAlign: "center",
-                padding: "48px 24px",
-                color: "rgba(0,0,0,0.5)",
-              }}
-            >
-              <p style={{ fontSize: "16px", marginBottom: "8px" }}>No posts yet</p>
-              <p style={{ fontSize: "14px" }}>Your feed will appear here once content is available.</p>
-            </div>
-          ) : viewMode === "swipe" ? (
-            <div
-              style={{
-                position: "relative",
-                width: "100%",
-                maxWidth: "680px",
-                margin: "0 auto",
-                height: "600px",
-              }}
-            >
-              {/* Next card (behind) */}
-              {nextItem && (
-                <div
-                  style={{
-                    position: "absolute",
-                    top: "10px",
-                    left: "50%",
-                    transform: "translateX(-50%) scale(0.97)",
-                    width: "100%",
-                    zIndex: 1,
-                    opacity: 0.6,
-                    pointerEvents: "none",
-                  }}
-                >
-                  <FeedPost item={nextItem} index={swipeIndex + 1} />
-              </div>
-              )}
-              {/* Current card (on top) */}
-              {currentItem && (
-                <div
-                  onMouseDown={handleDragStart}
-                  onTouchStart={handleDragStart}
-                  style={{
-                    position: "absolute",
-                    top: 0,
-                    left: "50%",
-                    transform: `translateX(calc(-50% + ${isAnimating ? 0 : dragOffset}px)) ${isAnimating ? "" : `rotate(${rotation}deg)`}`,
-                    width: "100%",
-                    zIndex: 2,
-                    opacity,
-                    transition,
-                    cursor: isDragging ? "grabbing" : "grab",
-                    touchAction: "none",
-                  }}
-                >
-                  {swipeLabel && (
-                    <div
-                      style={{
-                        position: "absolute",
-                        top: "50%",
-                        left: "50%",
-                        transform: "translate(-50%, -50%)",
-                        fontSize: "48px",
-                        fontWeight: 900,
-                        color: swipeLabel === "LIKE" ? "rgba(34, 197, 94, 0.9)" : "rgba(239, 68, 68, 0.9)",
-                        opacity: swipeLabelOpacity,
-                        pointerEvents: "none",
-                        zIndex: 10,
-                        textShadow: "0 2px 8px rgba(0,0,0,0.3)",
-                      }}
-                    >
-                      {swipeLabel}
-              </div>
-                  )}
-                  <FeedPost item={currentItem} index={swipeIndex} />
+        {/* Feed Posts */}
+        {loading ? (
+          <div>
+            {[1, 2, 3].map((i) => (
+              <FeedPostSkeleton key={i} />
+            ))}
+          </div>
+        ) : items.length === 0 ? (
+          <div className="feed-empty">
+            <p className="feed-empty-title">No posts yet</p>
+            <p className="feed-empty-text">Your feed will appear here once content is available.</p>
+          </div>
+        ) : viewMode === "swipe" ? (
+          <div className="feed-swipe-container">
+            {/* Next card (behind) */}
+            {nextItem && (
+              <div className="feed-swipe-next">
+                <div className="feed-post-frame">
+                  <div className="feed-post-content">
+                    <FeedPost item={nextItem} index={swipeIndex + 1} />
+                  </div>
                 </div>
-              )}
-              {/* Swipe instructions */}
+              </div>
+            )}
+            {/* Current card (on top) */}
+            {currentItem && (
               <div
+                className="feed-swipe-current"
+                onMouseDown={handleDragStart}
+                onTouchStart={handleDragStart}
                 style={{
-                  position: "absolute",
-                  bottom: "20px",
-                  left: "50%",
-                  transform: "translateX(-50%)",
-                  display: "flex",
-                  gap: "16px",
-                  zIndex: 3,
+                  transform: swipeTransform,
+                  opacity,
+                  transition,
+                  cursor: isDragging ? "grabbing" : "grab",
                 }}
               >
-                <button
-                  onClick={() => handleSwipe("left")}
-                  disabled={!currentItem || isAnimating}
-                  style={{
-                    padding: "12px 24px",
-                    borderRadius: "12px",
-                    border: "1px solid rgba(239, 68, 68, 0.3)",
-                    background: "rgba(255,255,255,0.9)",
-                    cursor: !currentItem || isAnimating ? "not-allowed" : "pointer",
-                    fontWeight: 600,
-                    fontSize: "14px",
-                    color: "rgba(239, 68, 68, 0.9)",
-                    opacity: !currentItem || isAnimating ? 0.5 : 1,
-                  }}
-                >
-                  ❌ Pass
-                </button>
-                <button
-                  onClick={() => handleSwipe("right")}
-                  disabled={!currentItem || isAnimating}
-                  style={{
-                    padding: "12px 24px",
-                    borderRadius: "12px",
-                    border: "1px solid rgba(34, 197, 94, 0.3)",
-                    background: "rgba(255,255,255,0.9)",
-                    cursor: !currentItem || isAnimating ? "not-allowed" : "pointer",
-                    fontWeight: 600,
-                    fontSize: "14px",
-                    color: "rgba(34, 197, 94, 0.9)",
-                    opacity: !currentItem || isAnimating ? 0.5 : 1,
-                  }}
-                >
-                  ♥ Like
-                </button>
+                {swipeLabel && (
+                  <div
+                    className={`feed-swipe-label ${swipeLabel === "LIKE" ? "like" : "pass"}`}
+                    style={{ opacity: swipeLabelOpacity }}
+                  >
+                    {swipeLabel}
+                  </div>
+                )}
+                <div className="feed-post-frame">
+                  <div className="feed-post-content">
+                    <FeedPost item={currentItem} index={swipeIndex} />
+                  </div>
+                </div>
               </div>
+            )}
+            {/* Swipe Actions */}
+            <div className="feed-swipe-actions">
+              <button
+                onClick={() => handleSwipe("left")}
+                disabled={!currentItem || isAnimating}
+                className="btn-swipe btn-swipe-pass"
+              >
+                Pass
+              </button>
+              <button
+                onClick={() => handleSwipe("right")}
+                disabled={!currentItem || isAnimating}
+                className="btn-swipe btn-swipe-like"
+              >
+                Like
+              </button>
             </div>
-          ) : viewMode === "2col" ? (
-            <div
-              style={{
-                display: "grid",
-                gridTemplateColumns: "repeat(auto-fill, minmax(320px, 1fr))",
-                gap: "24px",
-              }}
-            >
-              {items.map((it, index) => (
-                <FeedPost key={it.id} item={it} index={index} />
-              ))}
-            </div>
-          ) : (
-            <div>
-              {items.map((it, index) => (
-                <FeedPost key={it.id} item={it} index={index} />
-              ))}
-            </div>
-          )}
-        </main>
-
-        {/* Right Sidebar (placeholder for saved) - hidden on mobile */}
-        <aside
-          style={{
-            display: "none",
-          }}
-          className="feed-sidebar-right"
-        >
-          <div
-            style={{
-              position: "sticky",
-              top: "24px",
-              padding: "16px",
-              borderRadius: "8px",
-              border: "1px solid rgba(0,0,0,0.08)",
-              backgroundColor: "rgba(255,255,255,0.6)",
-            }}
-          >
-            <h3 style={{ fontSize: "14px", fontWeight: 600, marginBottom: "12px", color: "rgba(0,0,0,0.7)" }}>
-              Saved
-            </h3>
-            <p style={{ fontSize: "12px", color: "rgba(0,0,0,0.5)" }}>Coming soon</p>
           </div>
-        </aside>
+        ) : viewMode === "2col" ? (
+          <div className="feed-list-2col">
+            {items.map((it, index) => (
+              <div key={it.id} className="feed-post-frame">
+                <div className="feed-post-content">
+                  <FeedPost item={it} index={index} />
+                </div>
+              </div>
+            ))}
+          </div>
+        ) : (
+          <div className="feed-list-1col">
+            {items.map((it, index) => (
+              <div key={it.id} className="feed-post-frame">
+                <div className="feed-post-content">
+                  <FeedPost item={it} index={index} />
+                </div>
+              </div>
+            ))}
+          </div>
+        )}
       </div>
     </div>
   );
 }
-
-
-

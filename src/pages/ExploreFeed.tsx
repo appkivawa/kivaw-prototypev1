@@ -2,9 +2,13 @@ import React, { useEffect, useMemo, useRef, useState } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
 import { supabase } from "../lib/supabaseClient";
 import { saveLocal, unsaveLocal, isLocallySaved } from "../data/savedLocal";
-import EchoComposer from "../components/echo/EchoComposer";
-import FeedPost from "../components/feed/FeedPost";
+import { showToast } from "../components/ui/Toast";
+import FeedPostTumblr from "../components/feed/FeedPostTumblr";
 import FeedPostSkeleton from "../components/feed/FeedPostSkeleton";
+import ExploreCardSkeleton from "../components/explore/ExploreCardSkeleton";
+import { useSession } from "../auth/useSession";
+import LoginModal from "../components/auth/LoginModal";
+import { getBadge } from "../utils/badgeHelpers";
 
 // ============================================================
 // Types
@@ -28,6 +32,7 @@ type ExploreCard = {
   opener?: string | null;
   bio?: string | null;
   blurb?: string | null;
+  created_at?: string | null;
 };
 
 type ExploreResponse = { feed: ExploreCard[]; debug?: Record<string, unknown> };
@@ -54,7 +59,19 @@ type FeedItem = {
   metadata?: Record<string, unknown>;
   score?: number;
 };
-type FeedResponse = { feed: FeedItem[]; debug?: Record<string, unknown> };
+type FeedResponse = { 
+  feed: FeedItem[]; 
+  fresh?: FeedItem[];
+  today?: FeedItem[];
+  debug?: Record<string, unknown> 
+};
+
+type FeedSection = {
+  id: string;
+  title: string;
+  subtitle?: string;
+  items: FeedItem[];
+};
 
 // ============================================================
 // Helpers
@@ -245,6 +262,28 @@ async function syncSaveToAccount(contentId: string, shouldSave: boolean) {
   }
 }
 
+// Component-level function to handle save with auth check
+function useExploreSave() {
+  const { isAuthed } = useSession();
+  const [showLoginModal, setShowLoginModal] = useState(false);
+  const [pendingSave, setPendingSave] = useState<{ contentId: string; shouldSave: boolean } | null>(null);
+
+  async function handleSave(contentId: string, shouldSave: boolean) {
+    if (!isAuthed) {
+      // Store pending action and show login modal
+      const { storePendingAction } = await import("../utils/pendingActions");
+      storePendingAction({ type: "save", contentId, shouldSave });
+      setPendingSave({ contentId, shouldSave });
+      setShowLoginModal(true);
+      return;
+    }
+    await syncSaveToAccount(contentId, shouldSave);
+    saveLocal(contentId);
+  }
+
+  return { handleSave, showLoginModal, setShowLoginModal, pendingSave };
+}
+
 // ============================================================
 // Component
 // ============================================================
@@ -260,6 +299,10 @@ export default function ExploreFeed() {
   const [kindFilter, setKindFilter] = useState<KindFilter>("all");
   const [query, setQuery] = useState("");
   const [exploreCursor, setExploreCursor] = useState(0);
+  const [exploreDisplayCount, setExploreDisplayCount] = useState(24); // Number of cards to display
+  const [exploreLoadingMore, setExploreLoadingMore] = useState(false);
+  const [exploreHasMore, setExploreHasMore] = useState(true);
+  const [quickFilter, setQuickFilter] = useState<string | null>(null); // "fresh" | "tech" | "culture" | "finance" | "music" | null
   const [exploreIsDragging, setExploreIsDragging] = useState(false);
   const [exploreDragStartX, setExploreDragStartX] = useState(0);
   const [exploreDragOffset, setExploreDragOffset] = useState(0);
@@ -271,12 +314,23 @@ export default function ExploreFeed() {
 
   // Feed mode state
   const [feedItems, setFeedItems] = useState<FeedItem[]>([]);
+  const [feedSections, setFeedSections] = useState<FeedSection[]>([]);
+  const [showFreshOnly, setShowFreshOnly] = useState(false);
+  const [feedOffset, setFeedOffset] = useState(0);
+  const [feedLoadingMore, setFeedLoadingMore] = useState(false);
+  const [feedHasMore, setFeedHasMore] = useState(true);
+  const feedLoadMoreRef = useRef<HTMLDivElement>(null);
+  const exploreLoadMoreRef = useRef<HTMLDivElement>(null);
+
+  // Echo composer state for Explore mode
+  const [exploreEchoCardId, setExploreEchoCardId] = useState<string | null>(null);
+
+  // Save handler with login modal
+  const { handleSave, showLoginModal, setShowLoginModal, pendingSave } = useExploreSave();
 
   // Shared state
   const [loading, setLoading] = useState(true);
   const [err, setErr] = useState("");
-  const [showEchoComposer, setShowEchoComposer] = useState(false);
-  const [echoContentId, setEchoContentId] = useState<string | null>(null);
   const loadingRef = useRef(false);
   const safeMode = false;
 
@@ -349,6 +403,8 @@ export default function ExploreFeed() {
 
       setExploreCards(final);
       setExploreCursor(0);
+      setExploreDisplayCount(24); // Reset display count on new load
+      setExploreHasMore(final.length > 24);
     } catch (e: any) {
       setErr(e?.message ?? "Failed to load explore content.");
     } finally {
@@ -357,7 +413,12 @@ export default function ExploreFeed() {
     }
   }
 
-  // Load Feed content (timely)
+  // Helper to get item timestamp (coalesce published_at, ingested_at)
+  function getItemTimestamp(item: FeedItem): string | null {
+    return item.published_at ?? (item.metadata as any)?.ingested_at ?? null;
+  }
+
+  // Load Feed content with multiple sections
   async function loadFeed() {
     if (loadingRef.current) return;
     loadingRef.current = true;
@@ -365,20 +426,211 @@ export default function ExploreFeed() {
     setErr("");
 
     try {
-      const { data, error } = await supabase.functions.invoke<FeedResponse>("social_feed", {
-        body: { limit: 50 },
+      // Get current user for personalized feed (optional)
+      let token: string | null = null;
+      try {
+        token = await getAccessTokenWithRetry({ tries: 2, delayMs: 50 });
+      } catch {
+        token = null;
+      }
+
+      const headers: Record<string, string> = { "Content-Type": "application/json" };
+      if (token) headers.Authorization = `Bearer ${token}`;
+
+      // Fetch main feed for scoring/trending
+      const { data: feedData, error: feedError } = await supabase.functions.invoke<FeedResponse>("social_feed", {
+        method: "POST",
+        headers,
+        body: { limit: 200 }, // Get more items for sectioning
       });
 
-      if (error) {
-        console.error("[Feed] Edge Function error:", error);
-        const status = (error as any).status ?? "no-status";
-        const msg = (error as any).message ?? "no-message";
+      if (feedError) {
+        console.error("[Feed] Edge Function error:", feedError);
+        const status = (feedError as any).status ?? "no-status";
+        const msg = (feedError as any).message ?? "no-message";
         throw new Error(`social_feed failed (${status}): ${msg}`);
       }
 
-      if (!data?.feed) throw new Error("Invalid feed response (missing feed array).");
+      if (!feedData?.feed) throw new Error("Invalid feed response (missing feed array).");
 
-      setFeedItems(data.feed);
+      // Also query feed_items directly for more sections
+      const now = new Date();
+      const sixHoursAgo = new Date(now.getTime() - 6 * 60 * 60 * 1000).toISOString();
+      const twentyFourHoursAgo = new Date(now.getTime() - 24 * 60 * 60 * 1000).toISOString();
+      const fortyEightHoursAgo = new Date(now.getTime() - 48 * 60 * 60 * 1000).toISOString();
+      const sevenDaysAgo = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000).toISOString();
+      const thirtyDaysAgo = new Date(now.getTime() - 30 * 24 * 60 * 60 * 1000).toISOString();
+
+      // Query feed_items for sections (order by published_at desc, fallback to ingested_at)
+      const { data: allItems, error: itemsError } = await supabase
+        .from("feed_items")
+        .select("id,source,external_id,url,title,summary,author,image_url,published_at,tags,topics,metadata,ingested_at")
+        .order("published_at", { ascending: false, nullsLast: true })
+        .limit(500);
+
+      if (itemsError) {
+        console.warn("[Feed] Error querying feed_items directly:", itemsError);
+      }
+
+      // Convert feed_items to FeedItem format
+      const allFeedItems: FeedItem[] = (allItems || []).map((item: any) => ({
+        id: item.id,
+        source: item.source as FeedSource,
+        external_id: item.external_id,
+        url: item.url,
+        title: item.title,
+        summary: item.summary,
+        author: item.author,
+        image_url: item.image_url,
+        published_at: item.published_at,
+        tags: item.tags,
+        topics: item.topics,
+        metadata: { ...(item.metadata || {}), ingested_at: item.ingested_at }, // Store ingested_at in metadata for getItemTimestamp
+        score: 0, // Will be set from feedData if available
+      }));
+
+      // Merge scores from feedData
+      const scoredMap = new Map<string, FeedItem>();
+      for (const item of feedData.feed) {
+        scoredMap.set(item.id, item);
+      }
+      for (const item of allFeedItems) {
+        const scored = scoredMap.get(item.id);
+        if (scored) {
+          item.score = scored.score;
+        }
+      }
+
+      // Track seen IDs to prevent duplicates across sections
+      const seenIds = new Set<string>();
+
+      // Helper to filter and dedupe items
+      function filterAndDedupe(items: FeedItem[], filterFn: (item: FeedItem) => boolean, limit: number): FeedItem[] {
+        const filtered = items.filter((item) => {
+          if (seenIds.has(item.id)) return false;
+          return filterFn(item);
+        });
+        const result = filtered.slice(0, limit);
+        result.forEach((item) => seenIds.add(item.id));
+        return result;
+      }
+
+      // Build sections
+      const sections: FeedSection[] = [];
+
+      // 1. Fresh: last 6h ordered by time desc
+      const freshItems = filterAndDedupe(allFeedItems, (item) => {
+        const ts = getItemTimestamp(item);
+        if (!ts) return false;
+        return ts >= sixHoursAgo;
+      }, 20);
+      if (freshItems.length > 0) {
+        freshItems.sort((a, b) => {
+          const tsA = getItemTimestamp(a) ?? "";
+          const tsB = getItemTimestamp(b) ?? "";
+          return tsB.localeCompare(tsA);
+        });
+        sections.push({
+          id: "fresh",
+          title: "Fresh",
+          subtitle: "Last 6 hours",
+          items: freshItems,
+        });
+      }
+
+      // 2. Today: last 24h ordered by time desc
+      const todayItems = filterAndDedupe(allFeedItems, (item) => {
+        const ts = getItemTimestamp(item);
+        if (!ts) return false;
+        return ts >= twentyFourHoursAgo && ts < sixHoursAgo;
+      }, 20);
+      if (todayItems.length > 0) {
+        todayItems.sort((a, b) => {
+          const tsA = getItemTimestamp(a) ?? "";
+          const tsB = getItemTimestamp(b) ?? "";
+          return tsB.localeCompare(tsA);
+        });
+        sections.push({
+          id: "today",
+          title: "Today",
+          subtitle: "Last 24 hours",
+          items: todayItems,
+        });
+      }
+
+      // 3. Trending: last 48h ordered by score desc
+      const trendingItems = filterAndDedupe(allFeedItems, (item) => {
+        const ts = getItemTimestamp(item);
+        if (!ts) return false;
+        return ts >= fortyEightHoursAgo && ts < twentyFourHoursAgo;
+      }, 20);
+      if (trendingItems.length > 0) {
+        trendingItems.sort((a, b) => (b.score ?? 0) - (a.score ?? 0));
+        sections.push({
+          id: "trending",
+          title: "Trending",
+          subtitle: "Last 48 hours",
+          items: trendingItems,
+        });
+      }
+
+      // 4. Deep cuts: 7-30 days old ordered by score desc
+      const deepCutsItems = filterAndDedupe(allFeedItems, (item) => {
+        const ts = getItemTimestamp(item);
+        if (!ts) return false;
+        return ts >= thirtyDaysAgo && ts < sevenDaysAgo;
+      }, 20);
+      if (deepCutsItems.length > 0) {
+        deepCutsItems.sort((a, b) => (b.score ?? 0) - (a.score ?? 0));
+        sections.push({
+          id: "deep-cuts",
+          title: "Deep Cuts",
+          subtitle: "7-30 days ago",
+          items: deepCutsItems,
+        });
+      }
+
+      // 5. Category rows: tech/culture/finance/music
+      const categoryKeywords: Record<string, string[]> = {
+        tech: ["tech", "technology", "ai", "startup", "engineering", "software", "coding", "developer", "programming"],
+        culture: ["culture", "film", "movie", "tv", "television", "entertainment", "arts", "media", "cinema"],
+        finance: ["finance", "money", "economy", "market", "trading", "investment", "business", "vc", "startup"],
+        music: ["music", "album", "song", "artist", "band", "concert", "festival", "playlist", "spotify"],
+      };
+
+      for (const [category, keywords] of Object.entries(categoryKeywords)) {
+        const categoryItems = filterAndDedupe(allFeedItems, (item) => {
+          const blob = `${item.title} ${item.summary || ""} ${(item.tags || []).join(" ")} ${(item.topics || []).join(" ")}`.toLowerCase();
+          return keywords.some((kw) => blob.includes(kw));
+        }, 15);
+        if (categoryItems.length > 0) {
+          categoryItems.sort((a, b) => {
+            const tsA = getItemTimestamp(a) ?? "";
+            const tsB = getItemTimestamp(b) ?? "";
+            return tsB.localeCompare(tsA);
+          });
+          sections.push({
+            id: `category-${category}`,
+            title: category.charAt(0).toUpperCase() + category.slice(1),
+            subtitle: "Curated",
+            items: categoryItems,
+          });
+        }
+      }
+
+      // Set sections and fallback to flat feed if no sections
+      if (sections.length > 0) {
+        setFeedSections(sections);
+        setFeedItems([]); // Clear flat feed when using sections
+      } else {
+        // Fallback to original feed if sections are empty
+        setFeedItems(feedData.feed);
+        setFeedSections([]);
+      }
+      
+      // Reset pagination state
+      setFeedOffset(500); // Next load starts at 500 (we already loaded first 500)
+      setFeedHasMore((allItems?.length ?? 0) >= 500); // Has more if we got full batch
     } catch (e: any) {
       console.error("[Feed load error]", e);
       setErr(e?.message ?? "Failed to load feed");
@@ -420,17 +672,231 @@ export default function ExploreFeed() {
     }
   }
 
-  // Explore mode filtered list
+  // Helper to get domain from URL
+  function getDomainFromUrl(url?: string | null): string {
+    if (!url) return "";
+    try {
+      const u = new URL(url);
+      return u.hostname.replace("www.", "").toLowerCase();
+    } catch {
+      return url.toLowerCase();
+    }
+  }
+
+  // Explore mode filtered list with search and quick filters
   const filteredExplore = useMemo(() => {
     const q = cleanText(query);
-    return exploreCards
-      .filter((c) => (kindFilter === "all" ? true : c.kind === kindFilter))
-      .filter((c) => matchesQuery(c, q));
-  }, [exploreCards, kindFilter, query]);
+    let filtered = exploreCards;
+
+    // Quick filter: Fresh (last 2 hours)
+    if (quickFilter === "fresh") {
+      const twoHoursAgo = new Date(Date.now() - 2 * 60 * 60 * 1000).toISOString();
+      filtered = filtered.filter((c) => {
+        const timestamp = c.created_at;
+        if (!timestamp) return false;
+        return timestamp >= twoHoursAgo;
+      });
+    }
+
+    // Quick filter: Tech
+    if (quickFilter === "tech") {
+      filtered = filtered.filter((c) => {
+        const titleLower = (c.title || "").toLowerCase();
+        const tagsLower = (c.tags || []).join(" ").toLowerCase();
+        const sourceLower = (c.source || "").toLowerCase();
+        const blob = `${titleLower} ${tagsLower} ${sourceLower}`;
+        return (
+          blob.includes("tech") ||
+          blob.includes("technology") ||
+          blob.includes("ai") ||
+          blob.includes("startup") ||
+          blob.includes("engineering") ||
+          blob.includes("software") ||
+          blob.includes("coding") ||
+          blob.includes("developer")
+        );
+      });
+    }
+
+    // Quick filter: Culture
+    if (quickFilter === "culture") {
+      filtered = filtered.filter((c) => {
+        const titleLower = (c.title || "").toLowerCase();
+        const tagsLower = (c.tags || []).join(" ").toLowerCase();
+        const sourceLower = (c.source || "").toLowerCase();
+        const blob = `${titleLower} ${tagsLower} ${sourceLower}`;
+        return (
+          blob.includes("culture") ||
+          blob.includes("film") ||
+          blob.includes("movie") ||
+          blob.includes("tv") ||
+          blob.includes("television") ||
+          blob.includes("entertainment") ||
+          blob.includes("arts") ||
+          blob.includes("media") ||
+          blob.includes("cinema")
+        );
+      });
+    }
+
+    // Quick filter: Finance
+    if (quickFilter === "finance") {
+      filtered = filtered.filter((c) => {
+        const titleLower = (c.title || "").toLowerCase();
+        const tagsLower = (c.tags || []).join(" ").toLowerCase();
+        const sourceLower = (c.source || "").toLowerCase();
+        const blob = `${titleLower} ${tagsLower} ${sourceLower}`;
+        return (
+          blob.includes("finance") ||
+          blob.includes("money") ||
+          blob.includes("economy") ||
+          blob.includes("market") ||
+          blob.includes("trading") ||
+          blob.includes("investment") ||
+          blob.includes("business") ||
+          blob.includes("vc")
+        );
+      });
+    }
+
+    // Quick filter: Music
+    if (quickFilter === "music") {
+      filtered = filtered.filter((c) => {
+        const titleLower = (c.title || "").toLowerCase();
+        const tagsLower = (c.tags || []).join(" ").toLowerCase();
+        const sourceLower = (c.source || "").toLowerCase();
+        const blob = `${titleLower} ${tagsLower} ${sourceLower}`;
+        return (
+          blob.includes("music") ||
+          blob.includes("album") ||
+          blob.includes("song") ||
+          blob.includes("artist") ||
+          blob.includes("band") ||
+          blob.includes("concert") ||
+          blob.includes("festival") ||
+          blob.includes("playlist") ||
+          blob.includes("spotify")
+        );
+      });
+    }
+
+    // Kind filter
+    filtered = filtered.filter((c) => (kindFilter === "all" ? true : c.kind === kindFilter));
+
+    // Search filter: title + domain
+    if (q) {
+      filtered = filtered.filter((c) => {
+        const titleMatch = matchesQuery(c, q);
+        const domain = getDomainFromUrl(c.url);
+        const domainMatch = domain.includes(q.toLowerCase());
+        return titleMatch || domainMatch;
+      });
+    }
+
+    return filtered;
+  }, [exploreCards, kindFilter, query, quickFilter]);
 
   useEffect(() => {
     setExploreCursor((c) => Math.max(0, Math.min(c, Math.max(0, filteredExplore.length - 1))));
-  }, [filteredExplore.length]);
+    // Update hasMore based on filtered results
+    setExploreHasMore(exploreDisplayCount < filteredExplore.length);
+    // Reset display count when filters change
+    setExploreDisplayCount(24);
+  }, [filteredExplore.length, exploreDisplayCount, query, quickFilter, kindFilter]);
+
+  // IntersectionObserver for Explore infinite scroll
+  useEffect(() => {
+    if (exploreMode !== "browse" || !exploreLoadMoreRef.current || exploreLoadingMore || !exploreHasMore) return;
+
+    const observer = new IntersectionObserver(
+      (entries) => {
+        if (entries[0]?.isIntersecting && exploreHasMore && !exploreLoadingMore) {
+          setExploreLoadingMore(true);
+          // Simulate loading delay for better UX
+          setTimeout(() => {
+            setExploreDisplayCount((prev) => Math.min(prev + 24, filteredExplore.length));
+            setExploreLoadingMore(false);
+          }, 300);
+        }
+      },
+      { rootMargin: "200px" }
+    );
+
+    observer.observe(exploreLoadMoreRef.current);
+
+    return () => observer.disconnect();
+  }, [exploreMode, exploreHasMore, exploreLoadingMore, filteredExplore.length]);
+
+  // Load more Feed items
+  async function loadMoreFeed() {
+    if (feedLoadingMore || !feedHasMore) return;
+    setFeedLoadingMore(true);
+
+    try {
+      const newOffset = feedOffset + 500;
+      const { data: moreItems, error: itemsError } = await supabase
+        .from("feed_items")
+        .select("id,source,external_id,url,title,summary,author,image_url,published_at,tags,topics,metadata,ingested_at")
+        .order("published_at", { ascending: false, nullsLast: true })
+        .range(feedOffset, newOffset - 1);
+
+      if (itemsError) {
+        console.warn("[Feed] Error loading more items:", itemsError);
+        setFeedHasMore(false);
+        return;
+      }
+
+      if (!moreItems || moreItems.length === 0) {
+        setFeedHasMore(false);
+        return;
+      }
+
+      // Convert to FeedItem format
+      const newFeedItems: FeedItem[] = (moreItems || []).map((item: any) => ({
+        id: item.id,
+        source: item.source as FeedSource,
+        external_id: item.external_id,
+        url: item.url,
+        title: item.title,
+        summary: item.summary,
+        author: item.author,
+        image_url: item.image_url,
+        published_at: item.published_at,
+        tags: item.tags,
+        topics: item.topics,
+        metadata: { ...(item.metadata || {}), ingested_at: item.ingested_at },
+        score: 0,
+      }));
+
+      // Append to flat feedItems (sections will be rebuilt on next full load)
+      setFeedItems((prev) => [...prev, ...newFeedItems]);
+      setFeedOffset(newOffset);
+      setFeedHasMore(moreItems.length === 500); // If we got less than 500, we're done
+    } catch (e: any) {
+      console.error("[Feed] Error loading more:", e);
+      setFeedHasMore(false);
+    } finally {
+      setFeedLoadingMore(false);
+    }
+  }
+
+  // IntersectionObserver for Feed infinite scroll
+  useEffect(() => {
+    if (pageMode !== "feed" || !feedLoadMoreRef.current || feedLoadingMore || !feedHasMore) return;
+
+    const observer = new IntersectionObserver(
+      (entries) => {
+        if (entries[0]?.isIntersecting && feedHasMore && !feedLoadingMore) {
+          loadMoreFeed();
+        }
+      },
+      { rootMargin: "200px" }
+    );
+
+    observer.observe(feedLoadMoreRef.current);
+
+    return () => observer.disconnect();
+  }, [pageMode, feedHasMore, feedLoadingMore, feedOffset]);
 
   const currentExplore = filteredExplore[exploreCursor] ?? null;
   const nextExplore = filteredExplore.slice(exploreCursor + 1, exploreCursor + 7);
@@ -833,7 +1299,7 @@ export default function ExploreFeed() {
                       borderRadius: "8px",
                       border: "1px solid var(--border-strong)",
                       background: "var(--surface)",
-                      boxShadow: "0 1px 3px rgba(0,0,0,0.05)",
+                      boxShadow: "var(--shadow-soft)",
                     }}
                   >
                     <div style={{ fontSize: "12px", fontWeight: 600, letterSpacing: "0.5px", opacity: 0.7, marginBottom: "12px" }}>
@@ -876,7 +1342,7 @@ export default function ExploreFeed() {
                                 height: 44,
                                 borderRadius: 12,
                                 overflow: "hidden",
-                                background: "rgba(0,0,0,0.06)",
+                                background: "var(--border)",
                                 display: "grid",
                                 placeItems: "center",
                                 flexShrink: 0,
@@ -924,7 +1390,7 @@ export default function ExploreFeed() {
                       opacity: exploreIsAnimating ? 0 : exploreOpacity,
                       transition: exploreTransition,
                       position: "relative",
-                      boxShadow: "0 1px 3px rgba(0,0,0,0.05)",
+                      boxShadow: "var(--shadow-soft)",
                     }}
                     onMouseDown={exploreHandleDragStart}
                     onTouchStart={exploreHandleDragStart}
@@ -939,8 +1405,8 @@ export default function ExploreFeed() {
                           zIndex: 5,
                           padding: "8px 12px",
                           borderRadius: 12,
-                          border: "2px solid rgba(0,0,0,0.22)",
-                          background: "rgba(255,255,255,0.72)",
+                          border: "2px solid var(--border-strong)",
+                          background: "var(--surface)",
                           fontWeight: 950,
                           letterSpacing: "1px",
                           opacity: exploreSwipeLabelOpacity,
@@ -954,7 +1420,7 @@ export default function ExploreFeed() {
                     <div
                       style={{
                         height: "400px",
-                        background: "rgba(0,0,0,0.04)",
+                        background: "var(--border)",
                         position: "relative",
                         overflow: "hidden",
                       }}
@@ -983,11 +1449,11 @@ export default function ExploreFeed() {
                           bottom: 14,
                           padding: "6px 10px",
                           borderRadius: 999,
-                          background: "rgba(255,255,255,0.72)",
-                          border: "1px solid rgba(0,0,0,0.12)",
+                          background: "var(--surface)",
+                          border: "1px solid var(--border-strong)",
                           fontSize: 11,
                           fontWeight: 950,
-                          color: "rgba(0,0,0,0.72)",
+                          color: "var(--ink)",
                           backdropFilter: "blur(4px)",
                           display: "flex",
                           gap: 6,
@@ -1015,7 +1481,7 @@ export default function ExploreFeed() {
                         {currentExplore.title}
                       </h2>
 
-                      <div style={{ marginTop: 8, fontSize: 14, color: "rgba(0,0,0,0.72)" }}>
+                      <div style={{ marginTop: 8, fontSize: 14, color: "var(--ink-muted)" }}>
                         {currentExplore.byline ? <span style={{ fontWeight: 800 }}>{cleanText(currentExplore.byline)}</span> : null}
                         {currentExplore.byline && formatMeta(currentExplore.kind, currentExplore.meta) ? (
                           <span style={{ opacity: 0.6 }}> • </span>
@@ -1031,7 +1497,7 @@ export default function ExploreFeed() {
                             marginTop: "12px",
                             fontSize: "15px",
                             lineHeight: 1.6,
-                            color: "rgba(0,0,0,0.75)",
+                            color: "var(--ink-muted)",
                             marginBottom: "12px",
                           }}
                         >
@@ -1053,18 +1519,18 @@ export default function ExploreFeed() {
                             marginTop: "16px",
                             padding: "12px",
                             borderRadius: "6px",
-                            border: "1px solid rgba(0,0,0,0.1)",
-                            backgroundColor: "rgba(0,0,0,0.02)",
+                            border: "1px solid var(--border-strong)",
+                            backgroundColor: "var(--border)",
                             textDecoration: "none",
                             transition: "background-color 0.2s, border-color 0.2s",
                           }}
                           onMouseEnter={(e) => {
-                            e.currentTarget.style.backgroundColor = "rgba(0,0,0,0.04)";
-                            e.currentTarget.style.borderColor = "rgba(0,0,0,0.15)";
+                            e.currentTarget.style.backgroundColor = "var(--border-strong)";
+                            e.currentTarget.style.borderColor = "var(--border-strong)";
                           }}
                           onMouseLeave={(e) => {
-                            e.currentTarget.style.backgroundColor = "rgba(0,0,0,0.02)";
-                            e.currentTarget.style.borderColor = "rgba(0,0,0,0.1)";
+                            e.currentTarget.style.backgroundColor = "var(--border)";
+                            e.currentTarget.style.borderColor = "var(--border-strong)";
                           }}
                         >
                           <div
@@ -1106,40 +1572,22 @@ export default function ExploreFeed() {
                             width: 58,
                             height: 58,
                             borderRadius: 999,
-                            border: "1px solid rgba(0,0,0,0.12)",
+                            border: "1px solid var(--border-strong)",
                             cursor: "pointer",
-                            background: "rgba(255,255,255,0.9)",
+                            background: "var(--surface)",
                             fontWeight: 950,
                             fontSize: "20px",
                           }}
                         >
                           ✕
                         </button>
-                        <span style={{ fontSize: 12, opacity: 0.65, color: "rgba(0,0,0,0.65)" }}>Not my vibe</span>
+                        <span style={{ fontSize: 12, opacity: 0.65, color: "var(--ink-tertiary)" }}>Not my vibe</span>
                       </div>
 
-                      <div style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 6 }}>
-                        <button
-                          onClick={() => {
-                            setEchoContentId(currentExplore.id);
-                            setShowEchoComposer(true);
-                          }}
-                          title="Echo"
-                          style={{
-                            width: 58,
-                            height: 58,
-                            borderRadius: 999,
-                            border: "1px solid rgba(0,0,0,0.12)",
-                            cursor: "pointer",
-                            background: "rgba(255,255,255,0.9)",
-                            fontWeight: 950,
-                            fontSize: "20px",
-                          }}
-                        >
-                          💭
-                        </button>
-                        <span style={{ fontSize: 12, opacity: 0.65, color: "rgba(0,0,0,0.65)" }}>Echo</span>
-                      </div>
+                      <ExploreEchoButton
+                        cardId={currentExplore.id}
+                        onEchoClick={() => setExploreEchoCardId(currentExplore.id)}
+                      />
 
                       <div style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 6 }}>
                         <button
@@ -1149,18 +1597,41 @@ export default function ExploreFeed() {
                             width: 58,
                             height: 58,
                             borderRadius: 999,
-                            border: "1px solid rgba(0,0,0,0.12)",
+                            border: "1px solid var(--border-strong)",
                             cursor: "pointer",
-                            background: "rgba(255,255,255,0.9)",
+                            background: "var(--surface)",
                             fontWeight: 950,
                             fontSize: "20px",
                           }}
                         >
                           ♥
                         </button>
-                        <span style={{ fontSize: 12, opacity: 0.65, color: "rgba(0,0,0,0.65)" }}>This feels like a yes</span>
+                        <span style={{ fontSize: 12, opacity: 0.65, color: "var(--ink-tertiary)" }}>This feels like a yes</span>
                       </div>
                     </div>
+
+                    {/* Inline Echo Composer */}
+                    {exploreEchoCardId === currentExplore.id && (
+                      <div
+                        style={{
+                          padding: "20px",
+                          paddingTop: "20px",
+                          backgroundColor: "var(--border)",
+                        }}
+                      >
+                        <EchoComposer
+                          contentId={currentExplore.id}
+                          inline={true}
+                          onClose={() => setExploreEchoCardId(null)}
+                          onSaved={async () => {
+                            setExploreEchoCardId(null);
+                            showToast("Saved to Timeline");
+                            // Reload explore to refresh state
+                            await loadExplore({ shuffleOnLoad: false });
+                          }}
+                        />
+                      </div>
+                    )}
                   </div>
                 </div>
 
@@ -1172,7 +1643,7 @@ export default function ExploreFeed() {
                       borderRadius: "8px",
                       border: "1px solid var(--border-strong)",
                       background: "var(--surface)",
-                      boxShadow: "0 1px 3px rgba(0,0,0,0.05)",
+                      boxShadow: "var(--shadow-soft)",
                     }}
                   >
                     <div style={{ fontSize: "12px", fontWeight: 600, letterSpacing: "0.5px", opacity: 0.7, marginBottom: "12px" }}>
@@ -1184,6 +1655,104 @@ export default function ExploreFeed() {
               </div>
             ) : (
               <div style={{ maxWidth: "1180px", margin: "0 auto" }}>
+                {/* Search and Quick Filters */}
+                <div style={{ marginBottom: "24px" }}>
+                  {/* Search Input */}
+                  <div style={{ marginBottom: "16px" }}>
+                    <input
+                      type="text"
+                      placeholder="Search by title or domain..."
+                      value={query}
+                      onChange={(e) => setQuery(e.target.value)}
+                      style={{
+                        width: "100%",
+                        maxWidth: "500px",
+                        padding: "10px 16px",
+                        borderRadius: "8px",
+                        border: "1px solid var(--border)",
+                        backgroundColor: "var(--surface)",
+                        color: "var(--ink)",
+                        fontSize: "14px",
+                        outline: "none",
+                      }}
+                      onFocus={(e) => {
+                        e.currentTarget.style.borderColor = "var(--border-strong)";
+                      }}
+                      onBlur={(e) => {
+                        e.currentTarget.style.borderColor = "var(--border)";
+                      }}
+                    />
+                  </div>
+
+                  {/* Quick Filter Chips */}
+                  <div
+                    style={{
+                      display: "flex",
+                      flexWrap: "wrap",
+                      gap: "8px",
+                    }}
+                  >
+                    {[
+                      { id: "fresh", label: "Fresh", emoji: "🆕" },
+                      { id: "tech", label: "Tech", emoji: "💻" },
+                      { id: "culture", label: "Culture", emoji: "🎬" },
+                      { id: "finance", label: "Finance", emoji: "💰" },
+                      { id: "music", label: "Music", emoji: "🎵" },
+                    ].map((filter) => (
+                      <button
+                        key={filter.id}
+                        onClick={() => setQuickFilter(quickFilter === filter.id ? null : filter.id)}
+                        style={{
+                          display: "flex",
+                          alignItems: "center",
+                          gap: "6px",
+                          padding: "8px 14px",
+                          borderRadius: "20px",
+                          border: "1px solid var(--border)",
+                          backgroundColor: quickFilter === filter.id ? "var(--ink)" : "var(--surface)",
+                          color: quickFilter === filter.id ? "var(--bg)" : "var(--ink)",
+                          cursor: "pointer",
+                          fontSize: "13px",
+                          fontWeight: 500,
+                          transition: "all 0.2s",
+                        }}
+                        onMouseEnter={(e) => {
+                          if (quickFilter !== filter.id) {
+                            e.currentTarget.style.backgroundColor = "var(--control-bg)";
+                            e.currentTarget.style.borderColor = "var(--border-strong)";
+                          }
+                        }}
+                        onMouseLeave={(e) => {
+                          if (quickFilter !== filter.id) {
+                            e.currentTarget.style.backgroundColor = "var(--surface)";
+                            e.currentTarget.style.borderColor = "var(--border)";
+                          }
+                        }}
+                      >
+                        <span>{filter.emoji}</span>
+                        <span>{filter.label}</span>
+                      </button>
+                    ))}
+                    {quickFilter && (
+                      <button
+                        onClick={() => setQuickFilter(null)}
+                        style={{
+                          padding: "8px 14px",
+                          borderRadius: "20px",
+                          border: "1px solid var(--border)",
+                          backgroundColor: "var(--surface)",
+                          color: "var(--ink-muted)",
+                          cursor: "pointer",
+                          fontSize: "13px",
+                          fontWeight: 500,
+                        }}
+                      >
+                        Clear
+                      </button>
+                    )}
+                  </div>
+                </div>
+
                 {/* Image-forward grid */}
                 <div
                   style={{
@@ -1192,85 +1761,176 @@ export default function ExploreFeed() {
                     gap: 16,
                   }}
                 >
-                  {filteredExplore.slice(0, 24).map((c) => {
-                    const m = formatMeta(c.kind, c.meta);
-
+                  {filteredExplore.slice(0, exploreDisplayCount).map((c) => {
+                    const isEchoOpen = exploreEchoCardId === c.id;
                     return (
-                      <div
-                        key={c.id}
-                        style={{
-                          borderRadius: "6px",
-                          overflow: "hidden",
-                          background: "rgba(255,255,255,0.6)",
-                          cursor: "pointer",
-                          transition: "transform 0.2s",
-                        }}
-                        onMouseEnter={(e) => {
-                          e.currentTarget.style.transform = "scale(1.02)";
-                        }}
-                        onMouseLeave={(e) => {
-                          e.currentTarget.style.transform = "scale(1)";
-                        }}
-                        onClick={() => {
-                          const idx = filteredExplore.findIndex((x) => x.id === c.id);
-                          if (idx >= 0) {
-                            setExploreMode("swipe");
-                            setExploreCursor(idx);
-                            window.scrollTo({ top: 0, behavior: "smooth" });
-                          }
-                        }}
-                      >
+                      <div key={c.id}>
                         <div
                           style={{
-                            aspectRatio: "3/4",
-                            background: "rgba(0,0,0,0.04)",
-                            position: "relative",
+                            borderRadius: "6px",
                             overflow: "hidden",
+                            background: "var(--surface)",
+                            cursor: "pointer",
+                            transition: "transform 0.2s",
+                            border: "1px solid var(--border)",
+                          }}
+                          onMouseEnter={(e) => {
+                            e.currentTarget.style.transform = "scale(1.02)";
+                          }}
+                          onMouseLeave={(e) => {
+                            e.currentTarget.style.transform = "scale(1)";
+                          }}
+                          onClick={() => {
+                            const idx = filteredExplore.findIndex((x) => x.id === c.id);
+                            if (idx >= 0) {
+                              setExploreMode("swipe");
+                              setExploreCursor(idx);
+                              window.scrollTo({ top: 0, behavior: "smooth" });
+                            }
                           }}
                         >
-                          {c.image_url ? (
-                            <img
-                              src={c.image_url}
-                              alt={c.title}
-                              style={{
-                                width: "100%",
-                                height: "100%",
-                                objectFit: "cover",
-                                display: "block",
-                              }}
-                            />
-                          ) : (
-                            <div style={{ height: "100%", display: "grid", placeItems: "center", fontSize: 32 }}>
-                              {kindEmoji(c.kind)}
-                            </div>
-                          )}
                           <div
                             style={{
-                              position: "absolute",
-                              bottom: 8,
-                              left: 8,
-                              right: 8,
-                              fontSize: 11,
-                              fontWeight: 600,
-                              padding: "6px 8px",
-                              borderRadius: 4,
-                              background: "rgba(255,255,255,0.9)",
-                              color: "var(--ink-muted)",
-                              display: "flex",
-                              gap: 4,
-                              alignItems: "center",
+                              aspectRatio: "3/4",
+                              background: "var(--border)",
+                              position: "relative",
+                              overflow: "hidden",
                             }}
                           >
-                            <span>{kindEmoji(c.kind)}</span>
-                            <span style={{ overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
-                              {cleanText(c.title).slice(0, 30)}
-                            </span>
+                            {c.image_url ? (
+                              <img
+                                src={c.image_url}
+                                alt={c.title}
+                                style={{
+                                  width: "100%",
+                                  height: "100%",
+                                  objectFit: "cover",
+                                  display: "block",
+                                }}
+                              />
+                            ) : (
+                              <div style={{ height: "100%", display: "grid", placeItems: "center", fontSize: 32 }}>
+                                {kindEmoji(c.kind)}
+                              </div>
+                            )}
+                            <div
+                              style={{
+                                position: "absolute",
+                                bottom: 8,
+                                left: 8,
+                                right: 8,
+                                fontSize: 11,
+                                fontWeight: 600,
+                                padding: "6px 8px",
+                                borderRadius: 4,
+                                background: "var(--surface)",
+                                color: "var(--ink)",
+                                display: "flex",
+                                gap: 4,
+                                alignItems: "center",
+                              }}
+                            >
+                              <span>{kindEmoji(c.kind)}</span>
+                              <span style={{ overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+                                {cleanText(c.title).slice(0, 30)}
+                              </span>
+                            </div>
                           </div>
+                          <div
+                            style={{
+                              padding: "8px",
+                              borderTop: "1px solid var(--border)",
+                            }}
+                          >
+                            <button
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                setExploreEchoCardId(isEchoOpen ? null : c.id);
+                              }}
+                              style={{
+                                width: "100%",
+                                padding: "6px",
+                                borderRadius: "4px",
+                                border: "1px solid var(--border-strong)",
+                                background: isEchoOpen ? "var(--border)" : "transparent",
+                                cursor: "pointer",
+                                fontSize: "12px",
+                                color: "var(--ink-muted)",
+                              }}
+                            >
+                              💭 Echo
+                            </button>
+                          </div>
+                          {isEchoOpen && (
+                            <div
+                              style={{
+                                padding: "12px",
+                                paddingTop: "12px",
+                                backgroundColor: "var(--border)",
+                              }}
+                              onClick={(e) => e.stopPropagation()}
+                            >
+                              <EchoComposer
+                                contentId={c.id}
+                                inline={true}
+                                onClose={() => setExploreEchoCardId(null)}
+                                onSaved={async () => {
+                                  setExploreEchoCardId(null);
+                                  showToast("Saved to Timeline");
+                                  // Reload explore to refresh state
+                                  await loadExplore({ shuffleOnLoad: false });
+                                }}
+                              />
+                            </div>
+                          )}
                         </div>
                       </div>
                     );
                   })}
                 </div>
+                {/* Infinite scroll trigger and load more for Explore */}
+                {exploreMode === "browse" && exploreDisplayCount < filteredExplore.length && (
+                  <div ref={exploreLoadMoreRef} style={{ height: "20px", marginTop: "20px" }} />
+                )}
+                {exploreMode === "browse" && exploreLoadingMore && (
+                  <div
+                    style={{
+                      display: "grid",
+                      gridTemplateColumns: "repeat(auto-fill, minmax(200px, 1fr))",
+                      gap: 16,
+                      marginTop: "16px",
+                    }}
+                  >
+                    {[1, 2, 3, 4].map((i) => (
+                      <ExploreCardSkeleton key={`explore-skeleton-${i}`} />
+                    ))}
+                  </div>
+                )}
+                {exploreMode === "browse" && exploreDisplayCount < filteredExplore.length && !exploreLoadingMore && (
+                  <div style={{ textAlign: "center", marginTop: "24px" }}>
+                    <button
+                      onClick={() => {
+                        setExploreLoadingMore(true);
+                        setTimeout(() => {
+                          setExploreDisplayCount((prev) => Math.min(prev + 24, filteredExplore.length));
+                          setExploreLoadingMore(false);
+                        }, 100);
+                      }}
+                      style={{
+                        padding: "10px 20px",
+                        borderRadius: "8px",
+                        border: "1px solid var(--border)",
+                        backgroundColor: "var(--control-bg)",
+                        color: "var(--ink)",
+                        cursor: "pointer",
+                        fontSize: "14px",
+                        fontWeight: 500,
+                      }}
+                    >
+                      Load More
+                    </button>
+                  </div>
+                )}
               </div>
             )}
           </div>
@@ -1317,45 +1977,222 @@ export default function ExploreFeed() {
               </button>
             </div>
 
-            {/* Feed Posts - Tumblr-style vertical feed (single column, text-forward) */}
+            {/* Fresh Toggle */}
+            <div
+              style={{
+                display: "flex",
+                alignItems: "center",
+                gap: "12px",
+                marginBottom: "20px",
+                padding: "12px 16px",
+                borderRadius: "8px",
+                backgroundColor: "var(--control-bg)",
+                border: "1px solid var(--border)",
+              }}
+            >
+              <button
+                onClick={() => setShowFreshOnly(!showFreshOnly)}
+                style={{
+                  padding: "6px 12px",
+                  borderRadius: "6px",
+                  border: "1px solid var(--border)",
+                  backgroundColor: showFreshOnly ? "var(--ink)" : "var(--surface)",
+                  color: showFreshOnly ? "var(--bg)" : "var(--ink)",
+                  cursor: "pointer",
+                  fontSize: "13px",
+                  fontWeight: 500,
+                }}
+              >
+                {showFreshOnly ? "✓ Fresh Only" : "Show Fresh Only"}
+              </button>
+              <span style={{ fontSize: "13px", color: "var(--ink-muted)" }}>
+                {feedSections.length > 0
+                  ? `${feedSections.reduce((sum, s) => sum + s.items.length, 0)} items across ${feedSections.length} sections`
+                  : feedItems.length > 0
+                  ? `${feedItems.length} items`
+                  : ""}
+              </span>
+            </div>
+
+            {/* Feed Posts - Section-based or flat */}
             {loading ? (
               <div>
                 {[1, 2, 3].map((i) => (
                   <FeedPostSkeleton key={i} />
                 ))}
               </div>
+            ) : feedSections.length > 0 ? (
+              // Render sections
+              <div>
+                {feedSections
+                  .filter((section) => !showFreshOnly || section.id === "fresh")
+                  .map((section) => (
+                    <div key={section.id} style={{ marginBottom: "40px" }}>
+                      {/* Section Header */}
+                      <div
+                        style={{
+                          display: "flex",
+                          alignItems: "center",
+                          gap: "12px",
+                          marginBottom: "16px",
+                          paddingBottom: "12px",
+                          borderBottom: "1px solid var(--border)",
+                        }}
+                      >
+                        <h2
+                          style={{
+                            fontSize: "18px",
+                            fontWeight: 600,
+                            margin: 0,
+                            color: "var(--ink)",
+                          }}
+                        >
+                          {section.title}
+                        </h2>
+                        {section.subtitle && (
+                          <span
+                            style={{
+                              fontSize: "13px",
+                              color: "var(--ink-muted)",
+                            }}
+                          >
+                            {section.subtitle}
+                          </span>
+                        )}
+                        <span
+                          style={{
+                            fontSize: "12px",
+                            color: "var(--ink-tertiary)",
+                            marginLeft: "auto",
+                          }}
+                        >
+                          {section.items.length} items
+                        </span>
+                      </div>
+                      {/* Section Items */}
+                      <div>
+                        {section.items.map((it, index) => {
+                          // Calculate badge for this item using all items in the section
+                          const badge = getBadge(
+                            it.published_at,
+                            (it.metadata as any)?.ingested_at,
+                            it.score,
+                            section.items.map((i) => ({
+                              score: i.score,
+                              published_at: i.published_at,
+                              ingested_at: (i.metadata as any)?.ingested_at,
+                            }))
+                          );
+                          return (
+                            <FeedPostTumblr
+                              key={it.id}
+                              item={it}
+                              index={index}
+                              allItems={section.items.map((i) => ({
+                                score: i.score,
+                                published_at: i.published_at,
+                                ingested_at: (i.metadata as any)?.ingested_at,
+                              }))}
+                              badge={badge}
+                            />
+                          );
+                        })}
+                      </div>
+                    </div>
+                  ))}
+                {/* Infinite scroll trigger for Feed sections */}
+                {feedHasMore && (
+                  <div ref={feedLoadMoreRef} style={{ height: "20px", marginTop: "20px" }} />
+                )}
+                {feedLoadingMore && (
+                  <div style={{ marginTop: "20px" }}>
+                    {[1, 2, 3].map((i) => (
+                      <FeedPostSkeleton key={`feed-skeleton-${i}`} />
+                    ))}
+                  </div>
+                )}
+                {feedHasMore && !feedLoadingMore && (
+                  <div style={{ textAlign: "center", marginTop: "24px" }}>
+                    <button
+                      onClick={loadMoreFeed}
+                      style={{
+                        padding: "10px 20px",
+                        borderRadius: "8px",
+                        border: "1px solid var(--border)",
+                        backgroundColor: "var(--control-bg)",
+                        color: "var(--ink)",
+                        cursor: "pointer",
+                        fontSize: "14px",
+                        fontWeight: 500,
+                      }}
+                    >
+                      Load More
+                    </button>
+                  </div>
+                )}
+              </div>
             ) : feedItems.length === 0 ? (
               <div
                 style={{
                   textAlign: "center",
                   padding: "40px 20px",
-                  color: "rgba(0,0,0,0.5)",
+                  color: "var(--ink-muted)",
                 }}
               >
                 <p style={{ fontSize: "15px", marginBottom: "6px" }}>No posts yet</p>
                 <p style={{ fontSize: "13px" }}>Your feed will appear here once content is available.</p>
               </div>
             ) : (
+              // Fallback to flat feed
               <div>
                 {feedItems.map((it, index) => (
-                  <FeedPost key={it.id} item={it} index={index} />
+                  <FeedPostTumblr key={it.id} item={it} index={index} />
                 ))}
+                {/* Infinite scroll trigger for flat feed */}
+                {feedHasMore && (
+                  <div ref={feedLoadMoreRef} style={{ height: "20px", marginTop: "20px" }} />
+                )}
+                {feedLoadingMore && (
+                  <div style={{ marginTop: "20px" }}>
+                    {[1, 2, 3].map((i) => (
+                      <FeedPostSkeleton key={`feed-flat-skeleton-${i}`} />
+                    ))}
+                  </div>
+                )}
+                {feedHasMore && !feedLoadingMore && (
+                  <div style={{ textAlign: "center", marginTop: "24px" }}>
+                    <button
+                      onClick={loadMoreFeed}
+                      style={{
+                        padding: "10px 20px",
+                        borderRadius: "8px",
+                        border: "1px solid var(--border)",
+                        backgroundColor: "var(--control-bg)",
+                        color: "var(--ink)",
+                        cursor: "pointer",
+                        fontSize: "14px",
+                        fontWeight: 500,
+                      }}
+                    >
+                      Load More
+                    </button>
+                  </div>
+                )}
               </div>
             )}
           </div>
         )}
 
-        {/* Echo Composer */}
-        {showEchoComposer && (
-          <EchoComposer
-            contentId={echoContentId}
-            onClose={() => {
-              setShowEchoComposer(false);
-              setEchoContentId(null);
-            }}
-          />
-        )}
+        {/* Echo Composer - removed, now inline in cards */}
       </div>
+
+      <LoginModal
+        isOpen={showLoginModal}
+        onClose={() => setShowLoginModal(false)}
+        title="Sign in to save"
+        message="We'll send you a magic link to sign in."
+        pendingAction={pendingSave ? { type: "save", contentId: pendingSave.contentId, shouldSave: pendingSave.shouldSave } : undefined}
+      />
     </div>
   );
 }

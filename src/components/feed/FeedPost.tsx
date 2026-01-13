@@ -2,6 +2,7 @@ import React, { useState, useEffect } from "react";
 import EchoComposer from "../echo/EchoComposer";
 import { saveLocal, unsaveLocal, isLocallySaved } from "../../data/savedLocal";
 import { supabase } from "../../lib/supabaseClient";
+import { showToast } from "../ui/Toast";
 
 type Source = "rss" | "youtube" | "reddit" | "podcast" | "eventbrite" | "spotify";
 
@@ -434,12 +435,12 @@ export default function FeedPost({ item, index }: FeedPostProps) {
           }}
         >
           <EchoComposer
-            contentId={null}
+            contentId={item.id}
             inline={true}
             onClose={() => setShowEchoComposer(false)}
             onSaved={() => {
               setShowEchoComposer(false);
-              // Optionally trigger a refresh or notification
+              showToast("Saved to Timeline");
             }}
           />
         </div>

@@ -2,6 +2,7 @@
 import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { supabase } from "../lib/supabaseClient";
+import { ensureProfile } from "../data/profileApi";
 
 function sanitizeNext(raw: string | null): string {
   if (!raw) return "/feed";
@@ -81,7 +82,15 @@ export default function AuthCallback() {
           throw new Error("Session not created. Check Supabase Auth redirect URLs.");
         }
 
-        // 4) Go where we were asked to go (or /feed)
+        // 4) Ensure profile exists (auto-create if needed)
+        setMsg("Setting up profile…");
+        try {
+          await ensureProfile();
+        } catch (e) {
+          console.warn("[AuthCallback] Profile creation failed (non-fatal):", e);
+        }
+
+        // 5) Go where we were asked to go (or /feed)
         const rawNext = new URL(window.location.href).searchParams.get("next");
         const next = sanitizeNext(rawNext);
 

@@ -36,16 +36,24 @@ CREATE POLICY "Users can update own profile" ON public.profiles
   FOR UPDATE USING (auth.uid() = id);
 
 -- Create function to automatically create profile when user signs up
+-- Note: This function includes onboarded and interests columns (added in migration 20250120000000)
+-- If those columns don't exist, this will fail - ensure migration 20250120000000 runs first
 CREATE OR REPLACE FUNCTION public.handle_new_user()
 RETURNS trigger AS $$
 BEGIN
-  INSERT INTO public.profiles (id, email, created_at, last_sign_in_at)
+  INSERT INTO public.profiles (id, email, created_at, last_sign_in_at, onboarded, interests)
   VALUES (
     NEW.id,
     NEW.email,
     NEW.created_at,
-    NEW.last_sign_in_at
-  );
+    NEW.last_sign_in_at,
+    false,
+    '{}'::text[]
+  )
+  ON CONFLICT (id) DO UPDATE
+  SET email = EXCLUDED.email,
+      last_sign_in_at = EXCLUDED.last_sign_in_at,
+      updated_at = now();
   RETURN NEW;
 END;
 $$ LANGUAGE plpgsql SECURITY DEFINER;

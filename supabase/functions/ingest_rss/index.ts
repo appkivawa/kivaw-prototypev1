@@ -122,9 +122,11 @@ serve(async (req) => {
 
     const body = await req.json().catch(() => ({}));
     const maxFeeds = typeof body.maxFeeds === "number" ? Math.min(Math.max(body.maxFeeds, 1), 50) : 25;
-    const perFeedLimit = typeof body.perFeedLimit === "number" ? Math.min(Math.max(body.perFeedLimit, 5), 50) : 20;
+    // Per-feed limit: minimum 100 items to increase RSS ingest volume
+    // Maximum 200 to prevent excessive memory usage
+    const perFeedLimit = typeof body.perFeedLimit === "number" ? Math.min(Math.max(body.perFeedLimit, 100), 200) : 100;
 
-    // Accept URLs directly from request body, OR pull from user_sources table
+    // Accept URLs directly from request body, OR pull from rss_sources table, OR pull from user_sources table
     let feeds: string[] = [];
 
     // If URLs are provided in the request body, use those
@@ -142,21 +144,44 @@ serve(async (req) => {
         })
         .slice(0, maxFeeds);
     } else {
-      // Otherwise, pull RSS sources from user_sources table
-      // Assumption: RSS sources stored as:
-      // user_sources: { user_id, source_type: "rss", handle: "<feed_url>", is_enabled: true }
-      const { data: rssSources, error: srcErr } = await supabase
-        .from("user_sources")
-        .select("handle")
-        .eq("source_type", "rss")
-        .eq("is_enabled", true)
+      // Otherwise, pull RSS sources from rss_sources table (default/global sources)
+      // Falls back to user_sources if rss_sources doesn't exist
+      const { data: defaultSources, error: defaultErr } = await supabase
+        .from("rss_sources")
+        .select("url")
+        .eq("active", true)
+        .order("weight", { ascending: false })
         .limit(maxFeeds);
 
-      if (srcErr) return json({ error: srcErr.message }, 500);
+      if (!defaultErr && defaultSources && defaultSources.length > 0) {
+        // Use default RSS sources
+        feeds = (defaultSources ?? [])
+          .map((r: any) => cleanText(String(r.url ?? "")))
+          .filter((url: string) => {
+            try {
+              new URL(url);
+              return true;
+            } catch {
+              return false;
+            }
+          });
+      } else {
+        // Fallback to user_sources table (for backward compatibility)
+        // Assumption: RSS sources stored as:
+        // user_sources: { user_id, source_type: "rss", handle: "<feed_url>", is_enabled: true }
+        const { data: rssSources, error: srcErr } = await supabase
+          .from("user_sources")
+          .select("handle")
+          .eq("source_type", "rss")
+          .eq("is_enabled", true)
+          .limit(maxFeeds);
 
-      feeds = (rssSources ?? [])
-        .map((r: any) => cleanText(String(r.handle ?? "")))
-        .filter(Boolean);
+        if (srcErr) return json({ error: srcErr.message }, 500);
+
+        feeds = (rssSources ?? [])
+          .map((r: any) => cleanText(String(r.handle ?? "")))
+          .filter(Boolean);
+      }
     }
 
     if (!feeds.length) {
@@ -166,7 +191,7 @@ serve(async (req) => {
         feeds: 0,
         note: body.urls 
           ? 'No valid URLs provided in request body.'
-          : 'No enabled RSS sources found in user_sources (source_type="rss").',
+          : 'No active RSS sources found in rss_sources or user_sources tables.',
       });
     }
 
@@ -231,7 +256,6 @@ serve(async (req) => {
             const atomId = cleanText(pickFirst(it.id));
 
             const externalId = guid || atomId || link || `${feedUrl}:${title}`;
-            const sourceItemId = await sha1(`rss|${feedUrl}|${externalId}`);
 
             const author =
               u.kind === "atom"
@@ -241,6 +265,9 @@ serve(async (req) => {
             const published =
               toIsoDate(it.pubDate ?? it.published ?? it.updated ?? it["dc:date"]) ??
               null;
+
+            // Store ingested_at timestamp for items missing published_at
+            const ingestedAt = new Date().toISOString();
 
             const summaryRaw =
               it["content:encoded"] ??
@@ -260,17 +287,18 @@ serve(async (req) => {
             // IMPORTANT: your social_feed uses this
             const follow_key = `rss:${feedUrl}`;
 
-            // NOTE: Do NOT insert into generated column "source"
+            // Use source column (not source_type) and external_id for upsert
+            // ingested_at column stores when item was ingested (fallback for published_at)
             rows.push({
-              source_type: "rss",
-              source_item_id: sourceItemId,
+              source: "rss",
               external_id: externalId,
               url: link || feedUrl,
               title,
               summary: summary ? summary.slice(0, 1200) : null,
               author: author || null,
               image_url: imageUrl || null,
-              published_at: published,
+              published_at: published, // Keep null if missing, ingested_at will be used as fallback
+              ingested_at: ingestedAt, // Store ingested timestamp for fallback when published_at is missing
               tags,
               topics,
               metadata: {
@@ -291,10 +319,23 @@ serve(async (req) => {
           continue;
         }
 
-        // Upsert by (source_type, source_item_id) — you should have a unique index for this.
+        // Deduplicate within batch BEFORE upserting to prevent ON CONFLICT double-update errors
+        // Key by (source, external_id) which matches the unique constraint
+        const dedupeMap = new Map<string, typeof rows[0]>();
+        for (const row of rows) {
+          const key = `${row.source}:${row.external_id}`;
+          // If duplicate exists, prefer the one with published_at (more complete data)
+          const existing = dedupeMap.get(key);
+          if (!existing || (!existing.published_at && row.published_at)) {
+            dedupeMap.set(key, row);
+          }
+        }
+        const uniqueRows = Array.from(dedupeMap.values());
+
+        // Upsert by (source, external_id) — unique index exists on these columns
         const { data: upData, error: upErr } = await supabase
           .from("feed_items")
-          .upsert(rows, { onConflict: "source_type,source_item_id" })
+          .upsert(uniqueRows, { onConflict: "source,external_id" })
           .select("id");
 
         if (upErr) {
@@ -304,6 +345,11 @@ serve(async (req) => {
 
         upserted = upData?.length ?? 0;
         totalUpserted += upserted;
+        
+        // Log deduplication stats for debugging
+        if (rows.length !== uniqueRows.length) {
+          console.log(`[ingest_rss] Deduplicated ${rows.length - uniqueRows.length} duplicate items from ${feedUrl}`);
+        }
 
         feedResults.push({
           feedUrl,

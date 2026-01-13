@@ -106,6 +106,24 @@ export async function createEcho(input: {
 
   const { error } = await supabase.from("echoes").insert(payload);
   if (error) throw error;
+
+  // Also save the item if contentId is provided
+  if (input.contentId) {
+    await supabase
+      .from("saved_items")
+      .upsert(
+        [
+          {
+            user_id: uid,
+            content_id: input.contentId,
+          },
+        ],
+        { onConflict: "user_id,content_id" }
+      )
+      .catch(() => {
+        // Ignore errors - item might already be saved or table might not exist
+      });
+  }
 }
 
 export async function listMyEchoes(limit = 100) {
@@ -145,6 +163,42 @@ export async function deleteEcho(echoId: string) {
   const { error } = await supabase.from("echoes").delete().eq("id", echoId).eq("user_id", uid);
 
   if (error) throw error;
+}
+
+/**
+ * Get a single echo by content_id for the current user
+ */
+export async function getEchoByContentId(contentId: string): Promise<EchoWithContent | null> {
+  const uid = await getUserId();
+  if (!uid) return null;
+
+  if (!isValidUUID(contentId)) {
+    return null;
+  }
+
+  const { data, error } = await supabase
+    .from("echoes")
+    .select("id,user_id,content_id,usage_tag,note,shared_to_waves,created_at,content_items(id,kind,title,image_url)")
+    .eq("user_id", uid)
+    .eq("content_id", contentId)
+    .order("created_at", { ascending: false })
+    .limit(1)
+    .maybeSingle();
+
+  if (error) {
+    console.error("Error fetching echo by content_id:", error);
+    return null;
+  }
+
+  if (!data) return null;
+
+  // Normalize content_items
+  const row = {
+    ...data,
+    content_items: Array.isArray(data.content_items) ? data.content_items[0] ?? null : data.content_items ?? null,
+  };
+
+  return row as EchoWithContent;
 }
 
 /**
