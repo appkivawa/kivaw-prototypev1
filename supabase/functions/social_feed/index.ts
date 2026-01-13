@@ -4,22 +4,47 @@ import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 // ============================================================
 // CORS
 // ============================================================
-const corsHeaders = {
-  "Access-Control-Allow-Origin": "*",
-  "Access-Control-Allow-Headers":
-    "authorization, x-client-info, apikey, content-type",
-  "Access-Control-Allow-Methods": "GET, POST, OPTIONS",
-  "Access-Control-Max-Age": "86400",
-};
+function getAllowedOrigin(req: Request): string {
+  // Get allowed origins from env or default to wildcard
+  const allowed = Deno.env.get("ALLOWED_ORIGINS");
+  if (allowed) {
+    const origins = allowed.split(",").map((o) => o.trim());
+    const requestOrigin = req.headers.get("origin");
+    // If request has origin and it's in allowed list, use it
+    if (requestOrigin && origins.includes(requestOrigin)) {
+      return requestOrigin;
+    }
+    // Otherwise allow all for development
+    return "*";
+  }
+  // Default: allow all origins (for development)
+  // In production, set ALLOWED_ORIGINS to your domain
+  return "*";
+}
+
+function getCorsHeaders(req: Request) {
+  return {
+    "Access-Control-Allow-Origin": getAllowedOrigin(req),
+    "Access-Control-Allow-Headers":
+      "authorization, x-client-info, apikey, content-type",
+    "Access-Control-Allow-Methods": "GET, POST, OPTIONS",
+    "Access-Control-Max-Age": "86400",
+  };
+}
 
 function handleCors(req: Request): Response | null {
   if (req.method === "OPTIONS") {
-    return new Response(null, { status: 204, headers: corsHeaders });
+    return new Response(null, { status: 204, headers: getCorsHeaders(req) });
   }
   return null;
 }
 
-function jsonResponse(body: unknown, status = 200): Response {
+function jsonResponse(body: unknown, status = 200, req?: Request): Response {
+  const corsHeaders = req ? getCorsHeaders(req) : {
+    "Access-Control-Allow-Origin": "*",
+    "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
+    "Access-Control-Allow-Methods": "GET, POST, OPTIONS",
+  };
   return new Response(JSON.stringify(body), {
     status,
     headers: { ...corsHeaders, "Content-Type": "application/json" },
@@ -125,11 +150,13 @@ serve(async (req) => {
 
   // handy smoke test
   if (req.method === "GET") {
-    return jsonResponse({ ok: true, fn: "social_feed" });
+    return jsonResponse({ ok: true, fn: "social_feed" }, 200, req);
   }
 
   try {
     // Validate required environment variables
+    // Note: SUPABASE_URL and SUPABASE_ANON_KEY are auto-provided by Supabase
+    // but we validate them exist for safety
     const SUPABASE_URL = Deno.env.get("SUPABASE_URL");
     const SUPABASE_ANON_KEY = Deno.env.get("SUPABASE_ANON_KEY");
 
@@ -141,16 +168,28 @@ serve(async (req) => {
       console.error("[social_feed] Missing required environment variables:", missing);
       return jsonResponse(
         {
+          feed: [],
+          fresh: [],
+          today: [],
           error: `Missing required environment variables: ${missing.join(", ")}`,
-          message: "Please configure SUPABASE_URL and SUPABASE_ANON_KEY in the Supabase dashboard under Edge Functions secrets.",
+          message: "SUPABASE_URL and SUPABASE_ANON_KEY should be auto-provided by Supabase. If you see this error, check your Edge Function deployment.",
+          debug: {
+            authed: false,
+            candidates: 0,
+            returned: 0,
+            error: `Missing: ${missing.join(", ")}`,
+          },
         },
-        500
+        500,
+        req
       );
     }
 
-    // IMPORTANT:
-    // - Pass through Authorization header so supabase.auth.getUser() works.
-    // - Also pass apikey for completeness.
+    // IMPORTANT: Use ANON_KEY with user auth headers to respect RLS
+    // - This allows the function to work with Row Level Security policies
+    // - User queries (preferences, sources, actions) are scoped to the authenticated user
+    // - Public queries (feed_items) work for both authenticated and anonymous users
+    // - If you need to bypass RLS, use SUPABASE_SERVICE_ROLE_KEY instead (not recommended)
     const authHeader = req.headers.get("Authorization") ?? "";
     const supabase = createClient(SUPABASE_URL, SUPABASE_ANON_KEY, {
       global: {
@@ -161,23 +200,41 @@ serve(async (req) => {
       },
     });
 
-    // Parse body
-    const body = req.method === "POST" ? await req.json().catch(() => ({})) : {};
-    const limit = typeof body.limit === "number" ? Math.min(Math.max(body.limit, 10), 120) : 60;
+    // Parse body with timeout protection
+    let body: any = {};
+    try {
+      if (req.method === "POST") {
+        // Add timeout for body parsing (5 seconds)
+        const bodyPromise = req.json();
+        const timeoutPromise = new Promise((_, reject) =>
+          setTimeout(() => reject(new Error("Request body parsing timeout")), 5000)
+        );
+        body = await Promise.race([bodyPromise, timeoutPromise]);
+      }
+    } catch (parseErr: any) {
+      console.warn("[social_feed] Body parse error:", parseErr?.message);
+      body = {}; // Continue with empty body
+    }
 
+    const limit = typeof body.limit === "number" ? Math.min(Math.max(body.limit, 10), 120) : 60;
     const types: Source[] = Array.isArray(body.types) ? body.types : [];
     const query = cleanText(body.query ?? "");
-
     const days = typeof body.days === "number" ? Math.min(Math.max(body.days, 1), 365) : DEFAULT_DAYS;
     const sinceIso = new Date(Date.now() - 1000 * 60 * 60 * 24 * days).toISOString();
 
     // Auth (optional - never return 401 for logged-out users)
+    // Wrap in try/catch to isolate auth errors
     let userId: string | null = null;
-    const { data: userData, error: userErr } = await supabase.auth.getUser();
-
-    // Only set userId if we have a valid user session
-    if (!userErr && userData?.user) {
-      userId = userData.user.id;
+    try {
+      const { data: userData, error: userErr } = await supabase.auth.getUser();
+      // Only set userId if we have a valid user session
+      if (!userErr && userData?.user) {
+        userId = userData.user.id;
+      }
+    } catch (authErr: any) {
+      // Auth errors are non-fatal - continue as logged-out user
+      console.warn("[social_feed] Auth check error (non-fatal):", authErr?.message);
+      userId = null;
     }
 
     // Defaults for logged-out users OR fallback for missing prefs row
@@ -189,12 +246,14 @@ serve(async (req) => {
     };
 
     // User-based data (only fetch if logged in)
+    // Use per-query error isolation so one failing query doesn't break everything
     let followKeys = new Set<string>();
     const actionMap = new Map<string, string[]>();
 
     if (userId) {
       // Fetch user preferences, followed sources, and item actions
-      const [{ data: prefRow }, { data: follows }, { data: actions }] = await Promise.all([
+      // Each query is isolated - if one fails, others continue
+      const [prefResult, followsResult, actionsResult] = await Promise.allSettled([
         supabase
           .from("user_preferences")
           .select("prefs")
@@ -211,37 +270,65 @@ serve(async (req) => {
           .eq("user_id", userId),
       ]);
 
-      // Use user prefs if available, otherwise keep defaults
-      prefs = (prefRow?.prefs as Prefs) ?? prefs;
+      // Handle preferences (isolated error handling)
+      if (prefResult.status === "fulfilled" && !prefResult.value.error && prefResult.value.data) {
+        prefs = (prefResult.value.data.prefs as Prefs) ?? prefs;
+      } else if (prefResult.status === "rejected") {
+        console.warn("[social_feed] User preferences query failed (non-fatal):", prefResult.reason);
+      }
 
-      // Build set of followed source handles
-      followKeys = new Set((follows ?? []).map((f) => `${String(f.source_type)}:${String(f.handle)}`));
+      // Handle follows (isolated error handling)
+      if (followsResult.status === "fulfilled" && !followsResult.value.error && followsResult.value.data) {
+        followKeys = new Set((followsResult.value.data ?? []).map((f: any) => `${String(f.source_type)}:${String(f.handle)}`));
+      } else if (followsResult.status === "rejected") {
+        console.warn("[social_feed] User sources query failed (non-fatal):", followsResult.reason);
+      }
 
-      // Build map of item actions for scoring
-      for (const a of actions ?? []) {
-        const id = String((a as any).item_id);
-        const arr = actionMap.get(id) ?? [];
-        arr.push(String((a as any).action));
-        actionMap.set(id, arr);
+      // Handle actions (isolated error handling)
+      if (actionsResult.status === "fulfilled" && !actionsResult.value.error && actionsResult.value.data) {
+        for (const a of actionsResult.value.data ?? []) {
+          const id = String((a as any).item_id);
+          const arr = actionMap.get(id) ?? [];
+          arr.push(String((a as any).action));
+          actionMap.set(id, arr);
+        }
+      } else if (actionsResult.status === "rejected") {
+        console.warn("[social_feed] User actions query failed (non-fatal):", actionsResult.reason);
       }
     }
     // If userId is null (logged out), skip user queries and use defaults above
 
     // ============================================================
-    // Fetch candidate rows
+    // Fetch candidate rows with timeout protection
     // ============================================================
     // ✅ Fix: use published_at for time filtering.
     // If published_at is null, we'll still allow the row through if created_at is recent (via OR).
-    let qx = supabase
-      .from("feed_items")
-      .select("id,source,external_id,url,title,summary,author,image_url,published_at,tags,topics,metadata,created_at,ingested_at")
-      .or(`published_at.gte.${sinceIso},and(published_at.is.null,created_at.gte.${sinceIso})`)
-      .order("published_at", { ascending: false, nullsFirst: false })
-      .limit(400);
+    let rows: any[] = [];
+    let rowsErr: any = null;
 
-    if (types.length) qx = qx.in("source", types);
+    try {
+      // Add timeout for database query (10 seconds)
+      let qx = supabase
+        .from("feed_items")
+        .select("id,source,external_id,url,title,summary,author,image_url,published_at,tags,topics,metadata,created_at,ingested_at")
+        .or(`published_at.gte.${sinceIso},and(published_at.is.null,created_at.gte.${sinceIso})`)
+        .order("published_at", { ascending: false, nullsFirst: false })
+        .limit(400);
 
-    const { data: rows, error: rowsErr } = await qx;
+      if (types.length) qx = qx.in("source", types);
+
+      const queryPromise = qx;
+      const timeoutPromise = new Promise<{ data: null; error: { message: string; code: string } }>((resolve) =>
+        setTimeout(() => resolve({ data: null, error: { message: "Database query timeout", code: "TIMEOUT" } }), 10000)
+      );
+
+      const result = await Promise.race([queryPromise, timeoutPromise]);
+      rows = result.data ?? [];
+      rowsErr = result.error ?? null;
+    } catch (queryErr: any) {
+      console.error("[social_feed] Query execution error:", queryErr);
+      rowsErr = queryErr;
+    }
     if (rowsErr) {
       console.error("[social_feed] Query error:", rowsErr);
       // If table doesn't exist, return empty feed with helpful error
@@ -261,7 +348,8 @@ serve(async (req) => {
               code: rowsErr.code,
             },
           },
-          200
+          200,
+          req
         );
       }
       return jsonResponse(
@@ -280,21 +368,34 @@ serve(async (req) => {
             code: rowsErr.code,
           },
         },
-        500
+        500,
+        req
       );
     }
 
     // Build map of RSS feed URLs to weights for quick lookup
+    // Isolated error handling - if this fails, continue without weights
     const rssWeightMap = new Map<string, number>();
-    const { data: rssSources } = await supabase
-      .from("rss_sources")
-      .select("url, weight")
-      .eq("active", true);
-    
-    if (rssSources) {
-      for (const src of rssSources) {
-        rssWeightMap.set(src.url, src.weight ?? 1);
+    try {
+      const rssQueryPromise = supabase
+        .from("rss_sources")
+        .select("url, weight")
+        .eq("active", true);
+      
+      const timeoutPromise = new Promise<{ data: null; error: null }>((resolve) =>
+        setTimeout(() => resolve({ data: null, error: null }), 5000)
+      );
+
+      const rssResult = await Promise.race([rssQueryPromise, timeoutPromise]);
+      
+      if (rssResult.data) {
+        for (const src of rssResult.data) {
+          rssWeightMap.set(src.url, src.weight ?? 1);
+        }
       }
+    } catch (rssErr: any) {
+      // Non-fatal - continue without RSS weights
+      console.warn("[social_feed] RSS sources query failed (non-fatal):", rssErr?.message);
     }
 
     let items: FeedItem[] = (rows ?? []).map((r: any) => {
@@ -412,23 +513,27 @@ serve(async (req) => {
       })
       .slice(0, 50);
 
-    return jsonResponse({
-      feed: scored,
-      fresh: freshItems.slice(0, 50),
-      today: todayItems.slice(0, 50),
-      debug: {
-        authed: Boolean(userId),
-        days,
-        sinceIso,
-        limit,
-        types,
-        query: query ? true : false,
-        candidates: items.length,
-        returned: scored.length,
-        freshCount: freshItems.length,
-        todayCount: todayItems.length,
+    return jsonResponse(
+      {
+        feed: scored,
+        fresh: freshItems.slice(0, 50),
+        today: todayItems.slice(0, 50),
+        debug: {
+          authed: Boolean(userId),
+          days,
+          sinceIso,
+          limit,
+          types,
+          query: query ? true : false,
+          candidates: items.length,
+          returned: scored.length,
+          freshCount: freshItems.length,
+          todayCount: todayItems.length,
+        },
       },
-    });
+      200,
+      req
+    );
   } catch (e: any) {
     // Log full error details to console for Supabase logs
     console.error("[social_feed] Unhandled error:", {
@@ -460,7 +565,8 @@ serve(async (req) => {
           stack: import.meta.env.DEV ? e?.stack : undefined,
         },
       },
-      500
+      500,
+      req
     );
   }
 });
