@@ -130,6 +130,55 @@ async function ingestRss(source: SourceRow): Promise<FeedItemUpsert[]> {
 
       if (!title || !link || !guid) continue;
 
+      // Derive tags from RSS categories and title/summary
+      function normalizeTag(tag: string | null | undefined): string | null {
+        if (!tag || typeof tag !== "string") return null;
+        let normalized = tag.trim().toLowerCase();
+        if (!normalized) return null;
+        normalized = normalized.replace(/[\s_]+/g, "-");
+        normalized = normalized.replace(/[^a-z0-9\-\.]/g, "");
+        normalized = normalized.replace(/^[\-\.]+|[\-\.]+$/g, "");
+        if (normalized.length < 2 || normalized.length > 50) return null;
+        return normalized;
+      }
+      
+      function normalizeTags(tags: (string | null | undefined)[]): string[] {
+        const normalized = tags.map(normalizeTag).filter((tag): tag is string => tag !== null);
+        return Array.from(new Set(normalized));
+      }
+      
+      function extractKeywordsFromText(text: string | null | undefined, maxKeywords = 5): string[] {
+        if (!text || typeof text !== "string") return [];
+        const clean = text.replace(/<[^>]*>/g, " ").replace(/\s+/g, " ").trim();
+        if (!clean) return [];
+        const stopWords = new Set(["the", "a", "an", "and", "or", "but", "in", "on", "at", "to", "for", "of", "with", "by", "from", "as", "is", "was", "are", "were", "be", "been", "being", "have", "has", "had", "do", "does", "did", "will", "would", "could", "should", "may", "might", "must", "can", "this", "that", "these", "those", "it", "its", "they", "them", "their", "what", "which", "who", "when", "where", "why", "how", "all", "each", "every", "some", "any", "no", "not", "only", "just", "more", "most", "very", "too", "so", "than", "then", "there", "here", "up", "down", "out", "off", "over", "under", "again", "further", "once", "twice"]);
+        const words = clean.toLowerCase().split(/\s+/).map((w) => w.replace(/[^a-z0-9]/g, "")).filter((w) => w.length >= 3 && !stopWords.has(w));
+        const freq = new Map<string, number>();
+        for (const word of words) freq.set(word, (freq.get(word) || 0) + 1);
+        const sorted = Array.from(freq.entries()).sort((a, b) => {
+          if (b[1] !== a[1]) return b[1] - a[1];
+          return a[0].localeCompare(b[0]);
+        }).slice(0, maxKeywords).map(([word]) => word);
+        return normalizeTags(sorted);
+      }
+      
+      // Extract categories from RSS item
+      const categories: string[] = [];
+      const categoryEls = it.querySelectorAll("category");
+      for (const catEl of categoryEls) {
+        const catText = cleanText(getText(catEl));
+        if (catText) categories.push(catText);
+      }
+      
+      // Derive tags: categories first, then keyword extraction
+      let derivedTags = normalizeTags(categories);
+      if (derivedTags.length < 3) {
+        const text = [title, desc].filter(Boolean).join(" ");
+        const keywords = extractKeywordsFromText(text, 5);
+        derivedTags = Array.from(new Set([...derivedTags, ...keywords])).slice(0, 10);
+      }
+      if (derivedTags.length === 0) derivedTags = ["rss"];
+
       out.push({
         source_type: "rss",
         source_id: source.id,
@@ -140,7 +189,7 @@ async function ingestRss(source: SourceRow): Promise<FeedItemUpsert[]> {
         author,
         image_url: null,
         published_at: pubDate,
-        tags: null,
+        tags: derivedTags, // Always set tags (mandatory)
         raw: { sourceTitle: source.title },
       });
     }
@@ -157,6 +206,55 @@ async function ingestRss(source: SourceRow): Promise<FeedItemUpsert[]> {
 
       if (!title || !link || !id) continue;
 
+      // Derive tags for Atom entries (same logic as RSS)
+      function normalizeTag(tag: string | null | undefined): string | null {
+        if (!tag || typeof tag !== "string") return null;
+        let normalized = tag.trim().toLowerCase();
+        if (!normalized) return null;
+        normalized = normalized.replace(/[\s_]+/g, "-");
+        normalized = normalized.replace(/[^a-z0-9\-\.]/g, "");
+        normalized = normalized.replace(/^[\-\.]+|[\-\.]+$/g, "");
+        if (normalized.length < 2 || normalized.length > 50) return null;
+        return normalized;
+      }
+      
+      function normalizeTags(tags: (string | null | undefined)[]): string[] {
+        const normalized = tags.map(normalizeTag).filter((tag): tag is string => tag !== null);
+        return Array.from(new Set(normalized));
+      }
+      
+      function extractKeywordsFromText(text: string | null | undefined, maxKeywords = 5): string[] {
+        if (!text || typeof text !== "string") return [];
+        const clean = text.replace(/<[^>]*>/g, " ").replace(/\s+/g, " ").trim();
+        if (!clean) return [];
+        const stopWords = new Set(["the", "a", "an", "and", "or", "but", "in", "on", "at", "to", "for", "of", "with", "by", "from", "as", "is", "was", "are", "were", "be", "been", "being", "have", "has", "had", "do", "does", "did", "will", "would", "could", "should", "may", "might", "must", "can", "this", "that", "these", "those", "it", "its", "they", "them", "their", "what", "which", "who", "when", "where", "why", "how", "all", "each", "every", "some", "any", "no", "not", "only", "just", "more", "most", "very", "too", "so", "than", "then", "there", "here", "up", "down", "out", "off", "over", "under", "again", "further", "once", "twice"]);
+        const words = clean.toLowerCase().split(/\s+/).map((w) => w.replace(/[^a-z0-9]/g, "")).filter((w) => w.length >= 3 && !stopWords.has(w));
+        const freq = new Map<string, number>();
+        for (const word of words) freq.set(word, (freq.get(word) || 0) + 1);
+        const sorted = Array.from(freq.entries()).sort((a, b) => {
+          if (b[1] !== a[1]) return b[1] - a[1];
+          return a[0].localeCompare(b[0]);
+        }).slice(0, maxKeywords).map(([word]) => word);
+        return normalizeTags(sorted);
+      }
+      
+      // Extract categories from Atom entry
+      const categories: string[] = [];
+      const categoryEls = en.querySelectorAll("category");
+      for (const catEl of categoryEls) {
+        const catTerm = catEl.getAttribute("term");
+        if (catTerm) categories.push(catTerm);
+      }
+      
+      // Derive tags
+      let derivedTags = normalizeTags(categories);
+      if (derivedTags.length < 3) {
+        const text = [title, summary].filter(Boolean).join(" ");
+        const keywords = extractKeywordsFromText(text, 5);
+        derivedTags = Array.from(new Set([...derivedTags, ...keywords])).slice(0, 10);
+      }
+      if (derivedTags.length === 0) derivedTags = ["rss"];
+
       out.push({
         source_type: "rss",
         source_id: source.id,
@@ -167,7 +265,7 @@ async function ingestRss(source: SourceRow): Promise<FeedItemUpsert[]> {
         author,
         image_url: null,
         published_at: updated,
-        tags: null,
+        tags: derivedTags, // Always set tags (mandatory)
         raw: { sourceTitle: source.title },
       });
     }
@@ -249,7 +347,18 @@ async function ingestReddit(source: SourceRow): Promise<FeedItemUpsert[]> {
       null;
 
     const subreddit = p.subreddit ? `r/${p.subreddit}` : null;
-    const tags = subreddit ? [subreddit] : null;
+    // Normalize subreddit tag
+    function normalizeTag(tag: string | null | undefined): string | null {
+      if (!tag || typeof tag !== "string") return null;
+      let normalized = tag.trim().toLowerCase();
+      if (!normalized) return null;
+      normalized = normalized.replace(/[\s_]+/g, "-");
+      normalized = normalized.replace(/[^a-z0-9\-\.]/g, "");
+      normalized = normalized.replace(/^[\-\.]+|[\-\.]+$/g, "");
+      if (normalized.length < 2 || normalized.length > 50) return null;
+      return normalized;
+    }
+    const tags = subreddit ? [normalizeTag(subreddit)].filter((t): t is string => t !== null) : ["reddit"];
 
     if (!title || !url || !id) continue;
 
@@ -317,7 +426,7 @@ async function ingestPodcast(source: SourceRow): Promise<FeedItemUpsert[]> {
       author,
       image_url,
       published_at: pubDate,
-      tags: ["Podcast"],
+        tags: ["podcast"], // Normalized tag
       raw: { sourceTitle: source.title },
     });
   }

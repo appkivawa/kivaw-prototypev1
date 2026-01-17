@@ -494,7 +494,7 @@ serve(async (req) => {
     // ============================================================
     console.log(`[Sync] Complete: ${inserted} inserted, ${updated} updated, ${errorsCount} errors`);
     
-    return jsonResponse({
+    const result = {
       inserted,
       updated,
       errorsCount,
@@ -506,13 +506,72 @@ serve(async (req) => {
         total_after_dedupe: totalAfterDedupe,
         duplicates_removed: duplicatesRemoved,
       },
-    });
+    };
+
+    // Log successful run to job_runs
+    try {
+      const summaryMessage = `inserted=${inserted} updated=${updated} errors=${errorsCount}`;
+      
+      await supabase
+        .from("job_runs")
+        .upsert(
+          {
+            job_name: "sync_external_content",
+            last_run_at: new Date().toISOString(),
+            status: "success",
+            error_message: summaryMessage,
+            result_summary: {
+              inserted,
+              updated,
+              errorsCount,
+              tmdb_movies: tmdbMoviesCount,
+              tmdb_tv: tmdbTVCount,
+              open_library_read: openLibraryCount,
+              total_fetched: totalFetched,
+              total_after_dedupe: totalAfterDedupe,
+              duplicates_removed: duplicatesRemoved,
+            },
+          },
+          { onConflict: "job_name" }
+        );
+    } catch (logErr) {
+      console.error("[sync-external-content] Error logging to job_runs:", logErr);
+      // Don't fail the request if logging fails
+    }
+    
+    return jsonResponse(result);
 
   } catch (error) {
+    const errorMessage = error instanceof Error ? error.message : "Unknown error";
     console.error("Error in sync-external-content:", error);
+    
+    // Log error to job_runs
+    try {
+      const supabaseUrl = Deno.env.get("SUPABASE_URL");
+      const supabaseServiceKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY");
+      if (supabaseUrl && supabaseServiceKey) {
+        const supabase = createClient(supabaseUrl, supabaseServiceKey);
+        await supabase
+          .from("job_runs")
+          .upsert(
+            {
+              job_name: "sync_external_content",
+              last_run_at: new Date().toISOString(),
+              status: "error",
+              error_message: errorMessage,
+              result_summary: null,
+            },
+            { onConflict: "job_name" }
+          );
+      }
+    } catch (logErr) {
+      console.error("[sync-external-content] Error logging error to job_runs:", logErr);
+      // Don't fail the request if logging fails
+    }
+    
     return jsonResponse(
       {
-        error: error instanceof Error ? error.message : "Unknown error",
+        error: errorMessage,
       },
       500
     );

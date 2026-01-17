@@ -41,6 +41,7 @@ export default function RSSIngestTrigger() {
       // In that case, either set INGEST_SECRET to empty or create a backend proxy
       const { data, error: invokeError } = await supabase.functions.invoke("ingest_rss", {
         body: {
+          user_id: session.user.id,
           maxFeeds: 50, // Process up to 50 feeds
           perFeedLimit: 100, // Fetch up to 100 items per feed
         },

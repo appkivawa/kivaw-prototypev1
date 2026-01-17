@@ -4,7 +4,8 @@ import { BrowserRouter } from "react-router-dom";
 import App from "./App";
 
 // global styles
-import "./styles/theme.css";
+import "./index.css"; /* Design token system */
+import "./styles/theme.css"; /* Legacy theme (kept for backward compatibility) */
 import "./styles/coral.css";
 import "./ui/ui.css";
 import "./ui/polish.css";

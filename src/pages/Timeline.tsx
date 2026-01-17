@@ -8,6 +8,12 @@ import TimelineCalendar from "../components/timeline/TimelineCalendar";
 import TimelineEmptyState from "../components/timeline/TimelineEmptyState";
 import { ToastContainer } from "../components/ui/Toast";
 import LoginModal from "../components/auth/LoginModal";
+import Container from "../ui/Container";
+import Card from "../ui/Card";
+import Button from "../ui/Button";
+import SectionHeader from "../ui/SectionHeader";
+import EmptyState from "../ui/EmptyState";
+import "../styles/timeline.css";
 
 // Unified saved item type that can be either content_item or feed_item
 export type SavedItem = {
@@ -266,124 +272,51 @@ function TimelineContent() {
   const items = viewMode === "echo" ? echoes : savedItems;
 
   return (
-    <div
-      style={{
-        minHeight: "100vh",
-        backgroundColor: "var(--bg)",
-        padding: "20px 16px",
-      }}
-    >
-      <div style={{ maxWidth: "1200px", margin: "0 auto" }}>
-        {/* Header with toggle - tighter */}
-        <div style={{ marginBottom: "24px" }}>
-          <div
-            style={{
-              display: "flex",
-              justifyContent: "space-between",
-              alignItems: "center",
-              gap: "16px",
-              flexWrap: "wrap",
-              marginBottom: "20px",
-            }}
-          >
-            <h1
-              style={{
-                fontSize: "48px",
-                fontWeight: 700,
-                margin: 0,
-                color: "var(--ink)",
-                letterSpacing: "-0.02em",
-                lineHeight: 1.1,
-              }}
-            >
-              Timeline
-            </h1>
-
-            {/* Toggle */}
-            <div
-              style={{
-                display: "flex",
-                gap: "24px",
-                alignItems: "baseline",
-              }}
-            >
+    <div className="timeline-page">
+      <Container maxWidth="xl" className="timeline-container">
+        {/* Header with toggle */}
+        <SectionHeader
+          title="Timeline"
+          actions={
+            <div className="timeline-mode-toggle">
               <button
                 onClick={() => handleViewModeChange("echo")}
-                style={{
-                  padding: 0,
-                  border: "none",
-                  background: "transparent",
-                  cursor: "pointer",
-                  fontWeight: viewMode === "echo" ? 600 : 400,
-                  fontSize: "16px",
-                  color: viewMode === "echo" ? "var(--ink)" : "var(--ink-muted)",
-                  textDecoration: viewMode === "echo" ? "underline" : "none",
-                  textUnderlineOffset: "4px",
-                  transition: "all 0.2s",
-                }}
+                className={`timeline-mode-btn ${viewMode === "echo" ? "active" : ""}`}
               >
                 Echo
               </button>
               <button
                 onClick={() => handleViewModeChange("saved")}
-                style={{
-                  padding: 0,
-                  border: "none",
-                  background: "transparent",
-                  cursor: "pointer",
-                  fontWeight: viewMode === "saved" ? 600 : 400,
-                  fontSize: "16px",
-                  color: viewMode === "saved" ? "var(--ink)" : "var(--ink-muted)",
-                  textDecoration: viewMode === "saved" ? "underline" : "none",
-                  textUnderlineOffset: "4px",
-                  transition: "all 0.2s",
-                }}
+                className={`timeline-mode-btn ${viewMode === "saved" ? "active" : ""}`}
               >
                 Saved
               </button>
             </div>
-          </div>
-        </div>
+          }
+          level={1}
+        />
 
         {/* Search (Echoes only) */}
         {viewMode === "echo" && (
-          <div style={{ marginBottom: "20px" }}>
+          <div className="timeline-search">
             <input
               type="text"
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
               placeholder="Search Echoes..."
-              style={{
-                width: "100%",
-                maxWidth: "400px",
-                padding: "10px 16px",
-                borderRadius: "8px",
-                border: "1px solid var(--border-strong)",
-                background: "var(--surface)",
-                fontSize: "14px",
-                color: "var(--ink)",
-              }}
+              className="timeline-search-input"
             />
           </div>
         )}
 
         {error && (
-          <div
-            style={{
-              padding: "16px",
-              borderRadius: "8px",
-              border: "1px solid rgba(239, 68, 68, 0.3)",
-              backgroundColor: "rgba(239, 68, 68, 0.05)",
-              color: "rgba(239, 68, 68, 0.9)",
-              marginBottom: "24px",
-            }}
-          >
+          <Card variant="danger" className="timeline-error">
             {error}
-          </div>
+          </Card>
         )}
 
         {loading ? (
-          <div style={{ textAlign: "center", padding: "48px", color: "var(--ink-tertiary)" }}>Loading...</div>
+          <div className="timeline-loading">Loading...</div>
         ) : items.length === 0 ? (
           <TimelineEmptyState viewMode={viewMode} />
         ) : (
@@ -396,7 +329,7 @@ function TimelineContent() {
             searchQuery={searchQuery}
           />
         )}
-      </div>
+      </Container>
     </div>
   );
 }

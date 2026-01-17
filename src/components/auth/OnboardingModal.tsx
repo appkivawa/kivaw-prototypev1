@@ -2,10 +2,14 @@
 import { useState, useEffect } from "react";
 import { supabase } from "../../lib/supabaseClient";
 import { showToast } from "../ui/Toast";
+import Button from "../../ui/Button";
+import Tag from "../../ui/Tag";
+import Card from "../../ui/Card";
+import "../../ui/ui.css";
 
 type OnboardingModalProps = {
   isOpen: boolean;
-  onComplete: () => void;
+  onComplete: (savedInterests: string[]) => void;
   onClose?: () => void;
   initialInterests?: string[];
 };
@@ -72,22 +76,65 @@ export default function OnboardingModal({
       // Use upsert to handle case where profile might not exist yet
       // Ensure interests is a proper array (text[]) and onboarded is boolean
       const interestsArray = selectedTags.length > 0 ? selectedTags : [];
-      const { error } = await supabase
+      const { error: upsertError } = await supabase
         .from("profiles")
         .upsert(
           {
             id: session.user.id,
             email: session.user.email || null,
-            interests: interestsArray, // Ensure it's always an array
-            onboarded: true, // Set to true when user completes onboarding
+            interests: interestsArray, // text[] array
+            onboarded: true, // boolean: true when user completes onboarding
             updated_at: new Date().toISOString(),
           },
           { onConflict: "id" }
         );
 
-      if (error) {
-        console.error("Error saving profile:", error);
-        throw error;
+      if (upsertError) {
+        console.error("Error upserting profile:", upsertError);
+        throw upsertError;
+      }
+
+      // Verification read: ensure the values we saved match what's in the database
+      const { data: verifyData, error: verifyError } = await supabase
+        .from("profiles")
+        .select("interests, onboarded")
+        .eq("id", session.user.id)
+        .single();
+
+      if (verifyError) {
+        // If read fails due to RLS, it's a security/permission issue
+        if (verifyError.code === "42501" || verifyError.message?.includes("permission") || verifyError.message?.includes("RLS")) {
+          throw new Error(
+            "Could not verify saved preferences due to permission restrictions. " +
+            "Please refresh the page and try again, or contact support if this persists."
+          );
+        }
+        console.error("Error verifying profile save:", verifyError);
+        throw new Error("Failed to verify saved preferences. Please try again.");
+      }
+
+      // Verify the saved values match what we tried to save
+      if (!verifyData) {
+        throw new Error("Profile not found after save. Please refresh and try again.");
+      }
+
+      const savedInterests = Array.isArray(verifyData.interests) ? verifyData.interests : [];
+      const savedOnboarded = verifyData.onboarded === true;
+
+      // Check if interests match (compare arrays)
+      const interestsMatch = 
+        savedInterests.length === interestsArray.length &&
+        savedInterests.every((tag) => interestsArray.includes(tag));
+
+      if (!savedOnboarded || !interestsMatch) {
+        console.warn("Saved values don't match expected:", {
+          expected: { interests: interestsArray, onboarded: true },
+          actual: { interests: savedInterests, onboarded: savedOnboarded },
+        });
+        throw new Error(
+          "Preferences saved but verification failed. Please refresh and try again, " +
+          "or contact support if this persists."
+        );
       }
 
       showToast(initialInterests.length > 0 ? "Interests updated!" : "Welcome to Kivaw!");
@@ -96,160 +143,68 @@ export default function OnboardingModal({
     } catch (e: any) {
       console.error("Error saving onboarding:", e);
       showToast(e?.message || "Failed to save preferences");
+      // Keep modal open on error so user can retry
     } finally {
       setSaving(false);
     }
   }
 
   return (
-    <div
-      style={{
-        position: "fixed",
-        top: 0,
-        left: 0,
-        right: 0,
-        bottom: 0,
-        backgroundColor: "rgba(0, 0, 0, 0.5)",
-        display: "flex",
-        alignItems: "center",
-        justifyContent: "center",
-        zIndex: 1001,
-        padding: "20px",
-      }}
-    >
-      <div
-        style={{
-          backgroundColor: "var(--surface)",
-          borderRadius: "12px",
-          padding: "32px",
-          maxWidth: "600px",
-          width: "100%",
-          maxHeight: "80vh",
-          overflowY: "auto",
-          boxShadow: "var(--shadow)",
-          border: "1px solid var(--border-strong)",
-        }}
-      >
-        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "8px" }}>
-          <h2
-            style={{
-              fontSize: "28px",
-              fontWeight: 600,
-              margin: 0,
-              color: "var(--ink)",
-            }}
-          >
+    <div className="onboarding-modal-overlay">
+      <Card className="onboarding-modal-content" variant="elevated">
+        <div className="onboarding-modal-header">
+          <h2 className="onboarding-modal-title">
             {initialInterests.length > 0 ? "Edit Interests" : "Welcome to Kivaw!"}
           </h2>
           {onClose && (
-            <button
-              onClick={onClose}
-              style={{
-                background: "none",
-                border: "none",
-                fontSize: "24px",
-                color: "var(--ink-muted)",
-                cursor: "pointer",
-                padding: "4px 8px",
-                lineHeight: 1,
-              }}
-              aria-label="Close"
+            <button 
+              onClick={onClose} 
+              className="onboarding-modal-close" 
+              aria-label="Close" 
+              type="button"
             >
               ×
             </button>
           )}
         </div>
-        <p
-          style={{
-            fontSize: "16px",
-            color: "var(--ink-muted)",
-            margin: "0 0 32px",
-            textAlign: "center",
-          }}
-        >
+        
+        <p className="onboarding-modal-subtitle">
           Select your interests to personalize your experience
         </p>
 
-        <div
-          style={{
-            display: "flex",
-            flexWrap: "wrap",
-            gap: "10px",
-            marginBottom: "32px",
-          }}
-        >
-          {INTEREST_TAGS.map((tag) => {
-            const isSelected = selectedTags.includes(tag);
-            return (
-              <button
-                key={tag}
-                onClick={() => toggleTag(tag)}
-                style={{
-                  padding: "8px 16px",
-                  borderRadius: "20px",
-                  border: `1px solid ${isSelected ? "var(--ink)" : "var(--border-strong)"}`,
-                  background: isSelected ? "var(--ink)" : "var(--control-bg)",
-                  color: isSelected ? "var(--bg)" : "var(--ink-muted)",
-                  cursor: "pointer",
-                  fontSize: "14px",
-                  fontWeight: isSelected ? 600 : 400,
-                  transition: "all 0.2s",
-                }}
-              >
-                {tag}
-              </button>
-            );
-          })}
+        <div className="onboarding-modal-tags">
+          {INTEREST_TAGS.map((tag) => (
+            <Tag
+              key={tag}
+              label={tag}
+              selected={selectedTags.includes(tag)}
+              onClick={() => toggleTag(tag)}
+            />
+          ))}
         </div>
 
-        <div style={{ display: "flex", gap: "12px" }}>
+        <div className="onboarding-modal-footer">
           {onClose && (
-            <button
-              onClick={onClose}
-              style={{
-                padding: "12px 16px",
-                borderRadius: "8px",
-                border: "1px solid var(--border)",
-                background: "var(--control-bg)",
-                color: "var(--ink)",
-                cursor: "pointer",
-                fontWeight: 500,
-                fontSize: "14px",
-              }}
-            >
+            <Button onClick={onClose} variant="secondary" type="button" size="md">
               Cancel
-            </button>
+            </Button>
           )}
-          <button
+          <Button
             onClick={handleSave}
             disabled={saving || selectedTags.length === 0}
-            style={{
-              flex: 1,
-              padding: "12px 16px",
-              borderRadius: "8px",
-              border: "none",
-              background: saving || selectedTags.length === 0 ? "var(--border-strong)" : "var(--ink)",
-              color: saving || selectedTags.length === 0 ? "var(--ink-tertiary)" : "var(--bg)",
-              cursor: saving || selectedTags.length === 0 ? "not-allowed" : "pointer",
-              fontWeight: 600,
-              fontSize: "14px",
-            }}
+            variant="primary"
+            fullWidth={!onClose}
+            type="button"
+            size="md"
           >
             {saving ? "Saving…" : initialInterests.length > 0 ? "Save" : "Continue"}
-          </button>
+          </Button>
         </div>
 
-        <p
-          style={{
-            fontSize: "13px",
-            color: "var(--ink-tertiary)",
-            margin: "16px 0 0",
-            textAlign: "center",
-          }}
-        >
+        <p className="onboarding-modal-note">
           You can change these later in your preferences
         </p>
-      </div>
+      </Card>
     </div>
   );
 }

@@ -207,8 +207,8 @@ export default function FilterRail({
                     padding: "6px 12px",
                     borderRadius: "20px",
                     border: "1px solid var(--border-strong)",
-                    background: moodFilter === mood.value ? "var(--ink)" : "transparent",
-                    color: moodFilter === mood.value ? "var(--bg)" : "var(--ink-muted)",
+                    background: moodFilter === mood.value ? "var(--accent-gradient)" : "transparent",
+                    color: moodFilter === mood.value ? "#ffffff" : "var(--text-muted)",
                     cursor: "pointer",
                     fontSize: "13px",
                     fontWeight: moodFilter === mood.value ? 600 : 500,
@@ -263,4 +263,5 @@ export default function FilterRail({
     </>
   );
 }
+
 

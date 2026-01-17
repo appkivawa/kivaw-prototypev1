@@ -1,0 +1,154 @@
+/* Waves Page Styles - Clean Editorial Studio Aesthetic */
+
+.waves-page {
+  min-height: 100vh;
+  background: var(--bg-primary);
+  padding: 48px 0;
+}
+
+.waves-container {
+  padding-top: 0;
+}
+
+.waves-loading {
+  text-align: center;
+  padding: 80px 24px;
+  color: var(--text-muted);
+}
+
+.waves-error {
+  margin-bottom: 32px;
+}
+
+.waves-list {
+  display: flex;
+  flex-direction: column;
+  gap: 32px;
+}
+
+/* Wave Card */
+.wave-card {
+  max-width: 680px;
+  margin: 0 auto;
+  padding: 28px;
+  border-radius: var(--radius-lg);
+  border: 1px solid var(--border);
+  background: var(--surface);
+  box-shadow: none;
+  transition: all 0.2s ease;
+  animation: fadeInUp 0.4s ease-out both;
+}
+
+.wave-card:hover {
+  border-color: var(--border-strong);
+  box-shadow: 0 4px 12px var(--shadow-black-06);
+  transform: translateY(-2px);
+}
+
+.wave-header {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-bottom: 20px;
+}
+
+.wave-avatar,
+.wave-avatar-placeholder {
+  width: 40px;
+  height: 40px;
+  border-radius: 50%;
+  flex-shrink: 0;
+}
+
+.wave-avatar {
+  object-fit: cover;
+  border: 1px solid var(--border);
+}
+
+.wave-avatar-placeholder {
+  background: var(--surface-2);
+  border: 1px solid var(--border);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 18px;
+  color: var(--text-primary);
+  font-weight: 500;
+}
+
+.wave-user-info {
+  flex: 1;
+  min-width: 0;
+}
+
+.wave-username {
+  font-size: 14px;
+  font-weight: 500;
+  color: var(--text-primary);
+  margin-bottom: 4px;
+  line-height: 1.4;
+}
+
+.wave-time {
+  font-size: 13px;
+  color: var(--text-muted);
+  line-height: 1.4;
+}
+
+.wave-note {
+  font-size: 16px;
+  line-height: 1.6;
+  color: var(--text-primary);
+  margin-bottom: 24px;
+}
+
+.wave-content {
+  padding: 20px;
+  border-radius: var(--radius-md);
+  background: var(--surface-2);
+  border: 1px solid var(--border);
+}
+
+.wave-content-inner {
+  display: flex;
+  gap: 16px;
+}
+
+.wave-content-image {
+  width: 80px;
+  height: 80px;
+  border-radius: var(--radius-md);
+  object-fit: cover;
+  flex-shrink: 0;
+  border: 1px solid var(--border);
+}
+
+.wave-content-text {
+  flex: 1;
+  min-width: 0;
+}
+
+.wave-content-title {
+  font-size: 15px;
+  font-weight: 500;
+  color: var(--text-primary);
+  margin-bottom: 4px;
+  line-height: 1.4;
+}
+
+.wave-content-kind {
+  font-size: 13px;
+  color: var(--text-muted);
+  line-height: 1.4;
+}
+
+@keyframes fadeInUp {
+  from {
+    opacity: 0;
+    transform: translateY(20px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}

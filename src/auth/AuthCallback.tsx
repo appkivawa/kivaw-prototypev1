@@ -48,8 +48,20 @@ export default function AuthCallback() {
         const code = url.searchParams.get("code");
         if (code) {
           setMsg("Confirming code…");
-          const { error } = await supabase.auth.exchangeCodeForSession(window.location.href);
-          if (error) throw error;
+          const { error } = await supabase.auth.exchangeCodeForSession(code);
+          if (error) {
+            // If JWT signature error, it's likely a stale token or instance mismatch
+            if (error.message?.includes("JWT") || error.message?.includes("signature") || error.message?.includes("invalid")) {
+              throw new Error(
+                "Invalid magic link. This usually means:\n" +
+                "1. The link expired or was already used\n" +
+                "2. Supabase was restarted (get a new link)\n" +
+                "3. Frontend is connected to a different Supabase instance\n\n" +
+                "Please request a new magic link."
+              );
+            }
+            throw error;
+          }
 
           url.searchParams.delete("code");
           window.history.replaceState({}, document.title, url.pathname + url.search);
@@ -69,7 +81,19 @@ export default function AuthCallback() {
           }
 
           const { error } = await supabase.auth.setSession({ access_token, refresh_token });
-          if (error) throw error;
+          if (error) {
+            // If JWT signature error, it's likely a stale token or instance mismatch
+            if (error.message?.includes("JWT") || error.message?.includes("signature")) {
+              throw new Error(
+                "Invalid magic link. This usually means:\n" +
+                "1. The link expired or was already used\n" +
+                "2. Supabase was restarted (get a new link)\n" +
+                "3. Frontend is connected to a different Supabase instance\n\n" +
+                "Please request a new magic link."
+              );
+            }
+            throw error;
+          }
 
           url.hash = "";
           window.history.replaceState({}, document.title, url.pathname + url.search);

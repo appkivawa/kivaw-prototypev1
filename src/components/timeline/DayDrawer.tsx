@@ -64,7 +64,7 @@ export default function DayDrawer({
           left: 0,
           right: 0,
           bottom: 0,
-          backgroundColor: "rgba(0,0,0,0.5)",
+          backgroundColor: "var(--overlay)",
           zIndex: 1000,
           display: "flex",
           alignItems: "flex-end",
@@ -79,7 +79,7 @@ export default function DayDrawer({
             borderRadius: "20px 20px 0 0",
             padding: "20px",
             overflowY: "auto",
-            boxShadow: "0 -4px 20px rgba(0,0,0,0.2)",
+            boxShadow: "0 -4px 20px var(--shadow-black-12)",
           }}
           onClick={(e) => e.stopPropagation()}
         >
@@ -132,7 +132,7 @@ export default function DayDrawer({
         width: "420px",
         backgroundColor: "var(--surface)",
         borderLeft: "1px solid var(--border)",
-        boxShadow: "-4px 0 20px rgba(0,0,0,0.1)",
+        boxShadow: "-4px 0 20px var(--shadow-black-08)",
         zIndex: 100,
         display: "flex",
         flexDirection: "column",
@@ -313,16 +313,16 @@ export default function DayDrawer({
                       style={{
                         background: "none",
                         border: "none",
-                        color: "rgba(239, 68, 68, 0.6)",
+                        color: "var(--danger-text)",
                         cursor: "pointer",
                         fontSize: "12px",
                         padding: "4px 0",
                       }}
                       onMouseEnter={(e) => {
-                        e.currentTarget.style.color = "rgba(239, 68, 68, 0.8)";
+                        e.currentTarget.style.color = "var(--danger-text)";
                       }}
                       onMouseLeave={(e) => {
-                        e.currentTarget.style.color = "rgba(239, 68, 68, 0.6)";
+                        e.currentTarget.style.color = "var(--danger-text)";
                       }}
                     >
                       Delete
@@ -434,13 +434,13 @@ export default function DayDrawer({
                       style={{
                         background: "none",
                         border: "none",
-                        color: "rgba(239, 68, 68, 0.5)",
+                        color: "var(--danger-text)",
                         cursor: "pointer",
                         fontSize: "12px",
                         padding: "4px 0",
                       }}
                       onMouseEnter={(e) => {
-                        e.currentTarget.style.color = "rgba(239, 68, 68, 0.8)";
+                        e.currentTarget.style.color = "var(--danger-text)";
                       }}
                       onMouseLeave={(e) => {
                         e.currentTarget.style.color = "rgba(239, 68, 68, 0.5)";

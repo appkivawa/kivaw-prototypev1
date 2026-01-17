@@ -123,16 +123,16 @@ export default function TimelineSavedItem({ item, onRemove }: TimelineSavedItemP
               style={{
                 background: "none",
                 border: "none",
-                color: "rgba(239, 68, 68, 0.5)",
+                color: "var(--danger-text)",
                 cursor: "pointer",
                 fontSize: "13px",
                 padding: "0",
               }}
               onMouseEnter={(e) => {
-                e.currentTarget.style.color = "rgba(239, 68, 68, 0.8)";
+                e.currentTarget.style.color = "var(--danger-text)";
               }}
               onMouseLeave={(e) => {
-                e.currentTarget.style.color = "rgba(239, 68, 68, 0.5)";
+                e.currentTarget.style.color = "var(--danger-text)";
               }}
             >
               Remove
@@ -164,4 +164,5 @@ export default function TimelineSavedItem({ item, onRemove }: TimelineSavedItemP
     </article>
   );
 }
+
 

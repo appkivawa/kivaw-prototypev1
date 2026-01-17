@@ -212,7 +212,7 @@ export default function FeedPostTumblr({ item, index, allItems = [], badge: prov
             top: 0,
             bottom: 0,
             width: "4px",
-            backgroundColor: "var(--ink)",
+            background: "var(--accent-gradient)",
             borderRadius: "2px",
             zIndex: 1,
           }}
@@ -271,8 +271,8 @@ export default function FeedPostTumblr({ item, index, allItems = [], badge: prov
                     style={{
                       padding: "2px 6px",
                       borderRadius: "4px",
-                      backgroundColor: "rgba(34, 197, 94, 0.1)",
-                      color: "rgba(34, 197, 94, 0.8)",
+                      backgroundColor: "var(--success)",
+                      color: "var(--success-text)",
                       fontSize: "11px",
                       fontWeight: 500,
                     }}
@@ -346,7 +346,7 @@ export default function FeedPostTumblr({ item, index, allItems = [], badge: prov
                     width: "64px",
                     height: "64px",
                     borderRadius: "50%",
-                    backgroundColor: "rgba(0, 0, 0, 0.7)",
+                    backgroundColor: "var(--overlay-strong)",
                     display: "flex",
                     alignItems: "center",
                     justifyContent: "center",
@@ -389,8 +389,8 @@ export default function FeedPostTumblr({ item, index, allItems = [], badge: prov
               justifyContent: "center",
               fontSize: "48px",
               fontWeight: 700,
-              color: "rgba(255, 255, 255, 0.9)",
-              textShadow: "0 2px 4px rgba(0,0,0,0.2)",
+              color: "var(--bg-primary)",
+              textShadow: "0 2px 4px var(--shadow-black-12)",
             }}
           >
             {getDomainInitial(item.url)}

@@ -1,427 +1,471 @@
 // pages/feed.tsx
-import React, { useEffect, useRef, useState } from "react";
+import React, { useEffect, useRef, useState, useCallback, useMemo } from "react";
 import { supabase } from "../lib/supabaseClient";
-import FeedPost from "../components/feed/FeedPost";
+import { useSession } from "../auth/useSession";
+import ContentCard, { ContentCardItem } from "../components/feed/ContentCard";
 import FeedPostSkeleton from "../components/feed/FeedPostSkeleton";
+import FeedUpdateStatus from "../components/feed/FeedUpdateStatus";
+import Container from "../ui/Container";
+import Card from "../ui/Card";
+import Button from "../ui/Button";
+import SectionHeader from "../ui/SectionHeader";
+import EmptyState from "../ui/EmptyState";
+import Tag from "../ui/Tag";
 import "../styles/feed.css";
 
-type Source = "rss" | "youtube" | "reddit" | "podcast" | "eventbrite" | "spotify";
+const FEED_CACHE_KEY = "kivaw_feed_cache";
+const REFETCH_INTERVAL_MS = 90 * 1000; // 90 seconds
 
-type FeedItem = {
-  id: string;
-  source: Source;
-  external_id: string;
-  url: string;
-  title: string;
-  summary?: string | null;
-  author?: string | null;
-  image_url?: string | null;
-  published_at?: string | null;
-  tags?: string[] | null;
-  topics?: string[] | null;
-  metadata?: Record<string, unknown>;
-  score?: number;
+type FeedCache = {
+  items: ContentCardItem[];
+  timestamp: number;
 };
 
-type FeedResponse = { feed: FeedItem[]; debug?: Record<string, unknown> };
-type ViewMode = "1col" | "2col" | "swipe";
-
 export default function Feed() {
-  const [items, setItems] = useState<FeedItem[]>([]);
+  const { session, isAuthed } = useSession();
+  const [items, setItems] = useState<ContentCardItem[]>([]);
   const [loading, setLoading] = useState(true);
   const [err, setErr] = useState("");
-  const [debug, setDebug] = useState<Record<string, unknown> | null>(null);
-  const [viewMode, setViewMode] = useState<ViewMode>("1col");
-  const [swipeIndex, setSwipeIndex] = useState(0);
-  const [isDragging, setIsDragging] = useState(false);
-  const [dragStartX, setDragStartX] = useState(0);
-  const [dragOffset, setDragOffset] = useState(0);
-  const [isAnimating, setIsAnimating] = useState(false);
-  const [animDir, setAnimDir] = useState<"left" | "right">("right");
-  const [showDebug, setShowDebug] = useState(false);
   const [lastUpdated, setLastUpdated] = useState<Date | null>(null);
+  const [searchQuery, setSearchQuery] = useState("");
+  const [contentKindFilter, setContentKindFilter] = useState<string>("all");
 
   const loadingRef = useRef(false);
+  const abortControllerRef = useRef<AbortController | null>(null);
+  const intervalRef = useRef<NodeJS.Timeout | null>(null);
+  const observerTarget = useRef<HTMLDivElement | null>(null);
 
-  async function load() {
+  // Load cached feed from localStorage
+  function loadCachedFeed(): FeedCache | null {
+    try {
+      const cached = localStorage.getItem(FEED_CACHE_KEY);
+      if (!cached) return null;
+
+      const parsed: FeedCache = JSON.parse(cached);
+      const age = Date.now() - parsed.timestamp;
+
+      if (age < FEED_CACHE_EXPIRY_MS) {
+        return parsed;
+      }
+
+      localStorage.removeItem(FEED_CACHE_KEY);
+      return null;
+    } catch {
+      return null;
+    }
+  }
+
+  // Save feed to cache
+  function saveFeedToCache(items: ContentCardItem[]) {
+    try {
+      const cache: FeedCache = {
+        items,
+        timestamp: Date.now(),
+      };
+      localStorage.setItem(FEED_CACHE_KEY, JSON.stringify(cache));
+    } catch (e) {
+      console.warn("[Feed] Failed to cache feed:", e);
+    }
+  }
+
+  const load = useCallback(
+    async (showStale = false) => {
     if (loadingRef.current) return;
+      if (!isAuthed || !session?.user?.id) {
+        setErr("Please sign in to view your personalized feed");
+        setLoading(false);
+        return;
+      }
+
+      // Cancel any in-flight request
+      if (abortControllerRef.current) {
+        abortControllerRef.current.abort();
+      }
+
+      // Create new AbortController for this request
+      const abortController = new AbortController();
+      abortControllerRef.current = abortController;
+
+      // Load from cache instantly if available (stale-while-revalidate)
+      if (showStale) {
+        const cached = loadCachedFeed();
+        if (cached && cached.items.length > 0) {
+          setItems(cached.items);
+          // Calculate last updated from max published_at/created_at
+          const maxDate = cached.items.reduce((max, item) => {
+            const published = item.published_at ? new Date(item.published_at).getTime() : 0;
+            const created = item.created_at ? new Date(item.created_at).getTime() : 0;
+            const itemMax = Math.max(published, created);
+            return Math.max(max, itemMax);
+          }, 0);
+          if (maxDate > 0) {
+            setLastUpdated(new Date(maxDate));
+          }
+          setLoading(false);
+        }
+      } else {
     loadingRef.current = true;
     setLoading(true);
+      }
+
     setErr("");
 
     try {
-      const { data, error } = await supabase.functions.invoke<FeedResponse>("social_feed", {
-        body: { limit: 50 },
-      });
+        // Call RPC function in background
+        // p_use_fallback: null = auto-detect based on tags coverage (< 60% = fallback)
+        const { data, error } = await supabase.rpc("get_personal_feed", {
+          p_user: session.user.id,
+          p_limit: 50,
+          p_use_fallback: null, // Auto-detect: use ILIKE fallback if tags coverage < 60%
+        });
+
+        // Check if request was aborted
+        if (abortController.signal.aborted) {
+          return;
+        }
 
       if (error) {
-        console.error("[social_feed invoke error]", error);
-        const status = (error as any).status ?? "no-status";
-        const msg = (error as any).message ?? "no-message";
-        throw new Error(`social_feed failed (${status}): ${msg}`);
-      }
+          console.error("[get_personal_feed error]", error);
+          throw new Error(error.message || "Failed to load feed");
+        }
 
-      if (!data?.feed) throw new Error("Invalid feed response (missing feed array).");
+        if (!data || !Array.isArray(data)) {
+          throw new Error("Invalid feed response");
+        }
 
-      setItems(data.feed);
-      setDebug(data.debug ?? null);
-      setLastUpdated(new Date());
-    } catch (e: any) {
-      console.error("[Feed load error]", e);
-      setErr(e?.message ?? "Failed to load feed");
-    } finally {
-      setLoading(false);
-      loadingRef.current = false;
-    }
-  }
+        // Calculate last updated from max published_at/created_at
+        const maxDate = data.reduce((max, item) => {
+          const published = item.published_at ? new Date(item.published_at).getTime() : 0;
+          const created = item.created_at ? new Date(item.created_at).getTime() : 0;
+          const itemMax = Math.max(published, created);
+          return Math.max(max, itemMax);
+        }, 0);
 
-  // Helper to format "X min ago"
-  function formatTimeAgo(date: Date | null): string {
-    if (!date) return "Never";
-    const now = new Date();
-    const diffMs = now.getTime() - date.getTime();
-    const diffMins = Math.floor(diffMs / (1000 * 60));
-    if (diffMins < 1) return "Just now";
-    if (diffMins === 1) return "1 min ago";
-    return `${diffMins} min ago`;
-  }
-
-  // Polling: refresh every 3 minutes while page is open
-  useEffect(() => {
-    const intervalId = setInterval(() => {
-      if (!loadingRef.current) {
-        load();
-      }
-    }, 3 * 60 * 1000); // 3 minutes
-
-    return () => clearInterval(intervalId);
-  }, []);
-
-  // Swipe functionality
-  const SWIPE_THRESHOLD = 110;
-  const currentItem = items[swipeIndex] ?? null;
-  const nextItem = items[swipeIndex + 1] ?? null;
-
-  function getClientX(e: MouseEvent | TouchEvent): number {
-    if ("touches" in e) return e.touches[0]?.clientX ?? 0;
-    return e.clientX;
-  }
-
-  function handleSwipe(dir: "left" | "right") {
-    if (!currentItem || isAnimating) return;
-    setAnimDir(dir);
-    setIsAnimating(true);
-    setTimeout(() => {
-      setSwipeIndex((i) => Math.min(i + 1, items.length - 1));
-      setIsAnimating(false);
-      setIsDragging(false);
-      setDragOffset(0);
-    }, 240);
-  }
-
-  function handleDragStart(e: React.MouseEvent | React.TouchEvent) {
-    if (!currentItem || isAnimating || viewMode !== "swipe") return;
-    const clientX = getClientX(e.nativeEvent);
-    setIsDragging(true);
-    setDragStartX(clientX);
-    setDragOffset(0);
-  }
-
-  useEffect(() => {
-    if (!isDragging || !currentItem || viewMode !== "swipe") return;
-
-    function handleMove(e: MouseEvent | TouchEvent) {
-      if ("touches" in e) e.preventDefault();
-      const clientX = getClientX(e);
-      setDragOffset(clientX - dragStartX);
-    }
-
-    function handleEnd() {
-      const abs = Math.abs(dragOffset);
-      if (abs >= SWIPE_THRESHOLD) {
-        handleSwipe(dragOffset < 0 ? "left" : "right");
-        return;
-      }
-      setIsDragging(false);
-      setDragOffset(0);
-      setDragStartX(0);
-    }
-
-    window.addEventListener("mousemove", handleMove);
-    window.addEventListener("mouseup", handleEnd);
-    window.addEventListener("touchmove", handleMove, { passive: false });
-    window.addEventListener("touchend", handleEnd);
-
-    return () => {
-      window.removeEventListener("mousemove", handleMove);
-      window.removeEventListener("mouseup", handleEnd);
-      window.removeEventListener("touchmove", handleMove);
-      window.removeEventListener("touchend", handleEnd);
-    };
-  }, [isDragging, dragStartX, dragOffset, currentItem, isAnimating, viewMode]);
-
-  // Keyboard shortcuts for swipe mode
-  useEffect(() => {
-    function handleKeyDown(e: KeyboardEvent) {
-      if (
-        e.target instanceof HTMLInputElement ||
-        e.target instanceof HTMLTextAreaElement ||
-        (e.target instanceof HTMLElement && e.target.isContentEditable)
-      )
-        return;
-
-      if (viewMode === "swipe") {
-        if (e.key === "ArrowLeft") {
-          e.preventDefault();
-          handleSwipe("left");
-        } else if (e.key === "ArrowRight") {
-          e.preventDefault();
-          handleSwipe("right");
+        setItems(data);
+        if (maxDate > 0) {
+          setLastUpdated(new Date(maxDate));
+        } else {
+          setLastUpdated(new Date());
+        }
+        saveFeedToCache(data);
+      } catch (e: any) {
+        // Don't show error if request was aborted
+        if (abortController.signal.aborted) {
+          return;
+        }
+        console.error("[Feed load error]", e);
+        // Only set error if we don't have cached data
+        // Check if we have items from stale cache
+        const hasCachedData = loadCachedFeed()?.items.length > 0;
+        if (!hasCachedData) {
+          setErr(e?.message ?? "Failed to load feed");
+        }
+      } finally {
+        if (!abortController.signal.aborted) {
+          setLoading(false);
+          loadingRef.current = false;
         }
       }
-    }
+    },
+    [isAuthed, session]
+  );
 
-    window.addEventListener("keydown", handleKeyDown);
-    return () => window.removeEventListener("keydown", handleKeyDown);
-  }, [viewMode, currentItem, isAnimating]);
-
-  // Swipe visual state - single computed transform
-  const rotation = viewMode === "swipe" ? dragOffset * 0.06 : 0;
-  const opacity = viewMode === "swipe" ? Math.max(0.35, 1 - Math.abs(dragOffset) / 320) : 1;
-  const swipeLabel = viewMode === "swipe" && dragOffset > 40 ? "LIKE" : viewMode === "swipe" && dragOffset < -40 ? "PASS" : "";
-  const swipeLabelOpacity = viewMode === "swipe" ? Math.min(1, Math.abs(dragOffset) / 140) : 0;
-  const animX = animDir === "right" ? 420 : -420;
-  const swipeTransform = isAnimating
-    ? `translateX(${animX}px) rotate(${animDir === "right" ? 8 : -8}deg)`
-    : viewMode === "swipe"
-    ? `translateX(calc(-50% + ${dragOffset}px)) rotate(${rotation}deg)`
-    : "translateX(-50%)";
-  const transition = isDragging ? "none" : "transform 240ms ease, opacity 240ms ease";
-
+  // Initial load: show stale data instantly, then revalidate
   useEffect(() => {
-    load();
+    if (isAuthed && session?.user?.id) {
+      // Load stale data instantly
+      load(true);
+      // Then revalidate in background
+      load(false);
+    }
+  }, [isAuthed, session, load]);
+
+  // Stale-while-revalidate: refetch on interval (90s)
+  useEffect(() => {
+    if (!isAuthed || !session?.user?.id) return;
+
+    intervalRef.current = setInterval(() => {
+      if (!loadingRef.current) {
+        load(false);
+      }
+    }, REFETCH_INTERVAL_MS);
+
+    return () => {
+      if (intervalRef.current) {
+        clearInterval(intervalRef.current);
+        intervalRef.current = null;
+      }
+    };
+  }, [isAuthed, session, load]);
+
+  // Stale-while-revalidate: refetch on window focus
+  useEffect(() => {
+    if (!isAuthed || !session?.user?.id) return;
+
+    const handleFocus = () => {
+      if (!loadingRef.current) {
+        load(false);
+      }
+    };
+
+    window.addEventListener("focus", handleFocus);
+    return () => {
+      window.removeEventListener("focus", handleFocus);
+    };
+  }, [isAuthed, session, load]);
+
+  // Cleanup on unmount
+  useEffect(() => {
+    return () => {
+      if (abortControllerRef.current) {
+        abortControllerRef.current.abort();
+      }
+      if (intervalRef.current) {
+        clearInterval(intervalRef.current);
+      }
+    };
   }, []);
+
+  // Filter items by content_kind and search query
+  const filteredItems = useMemo(() => {
+    return items.filter((item) => {
+      // Filter by content_kind
+      if (contentKindFilter !== "all" && item.content_kind !== contentKindFilter) {
+        return false;
+      }
+
+      // Filter by search query
+      if (searchQuery.trim()) {
+        const query = searchQuery.toLowerCase();
+        const searchableText = [
+          item.title,
+          item.summary,
+          ...(item.tags || []),
+          ...(item.topics || []),
+        ]
+          .filter(Boolean)
+          .join(" ")
+          .toLowerCase();
+        if (!searchableText.includes(query)) {
+          return false;
+        }
+      }
+
+      return true;
+    });
+  }, [items, contentKindFilter, searchQuery]);
+
+  // Get unique content kinds from items
+  const availableContentKinds = useMemo(() => {
+    const kinds = new Set<string>();
+    items.forEach((item) => {
+      if (item.content_kind) {
+        kinds.add(item.content_kind);
+      }
+    });
+    return Array.from(kinds).sort();
+  }, [items]);
+
+  // Format time ago helper
+  const formatTimeAgo = useCallback((date: Date): string => {
+    const now = Date.now();
+    const diffMs = now - date.getTime();
+    const diffSecs = Math.floor(diffMs / 1000);
+    const diffMins = Math.floor(diffSecs / 60);
+
+    if (diffSecs < 10) return "just now";
+    if (diffSecs < 60) return `${diffSecs}s ago`;
+    if (diffMins < 60) return `${diffMins}m ago`;
+    const hrs = Math.floor(diffMins / 60);
+    if (hrs < 24) return `${hrs}h ago`;
+    const days = Math.floor(hrs / 24);
+    return `${days}d ago`;
+  }, []);
+
+  if (!isAuthed) {
+  return (
+      <div className="feed-page">
+        <Container maxWidth="xl">
+          <EmptyState
+            title="Sign in to view your feed"
+            message="Your personalized feed is waiting for you."
+            action={{
+              label: "Sign in",
+              onClick: () => {
+                // Navigate to auth - this will be handled by the app router
+                window.location.href = "/";
+              },
+            }}
+          />
+        </Container>
+      </div>
+    );
+  }
 
   return (
     <div className="feed-page">
-      <div className="feed-container">
-        {/* Header */}
-        <header className="feed-header">
-          <div className="feed-header-content">
-            <h1 className="feed-title">Your Feed</h1>
-            <p className="feed-subtitle">One scroll. Everything you care about.</p>
+      <Container maxWidth="xl">
+        <div className="feed-layout">
+          {/* Left Rail */}
+          <aside className="feed-rail">
+            <Card variant="default" className="feed-rail-card">
+              <div className="feed-rail-label">PROFILE</div>
+              <div className="feed-rail-title">Studio feed</div>
+              <div className="feed-rail-desc">
+                Personalized content based on your interests.
           </div>
+            </Card>
 
-          <div className="feed-header-actions" style={{ display: "flex", gap: "32px", alignItems: "baseline" }}>
-            {/* View Mode Selector */}
-            <div style={{ display: "flex", gap: "24px", alignItems: "baseline" }}>
-              <button
-                onClick={() => setViewMode("1col")}
-                style={{
-                  padding: 0,
-                  border: "none",
-                  background: "transparent",
-                  cursor: "pointer",
-                  fontWeight: viewMode === "1col" ? 600 : 400,
-                  fontSize: "14px",
-                  color: viewMode === "1col" ? "var(--ink)" : "var(--ink-muted)",
-                  textDecoration: viewMode === "1col" ? "underline" : "none",
-                  textUnderlineOffset: "3px",
+            <Card variant="default" className="feed-rail-card">
+              <div className="feed-rail-label">TUNE YOUR MIX</div>
+              <div className="feed-rail-desc">
+                Add signals to personalize your feed.
+        </div>
+              <Button
+                onClick={() => {
+                  // Navigate to profile/settings
+                  window.location.href = "/profile";
                 }}
+                variant="secondary"
+                size="sm"
+                style={{ marginTop: "12px", width: "100%" }}
               >
-                1 Col
-              </button>
-              <button
-                onClick={() => setViewMode("2col")}
-                style={{
-                  padding: 0,
-                  border: "none",
-                  background: "transparent",
-                  cursor: "pointer",
-                  fontWeight: viewMode === "2col" ? 600 : 400,
-                  fontSize: "14px",
-                  color: viewMode === "2col" ? "var(--ink)" : "var(--ink-muted)",
-                  textDecoration: viewMode === "2col" ? "underline" : "none",
-                  textUnderlineOffset: "3px",
-                }}
-              >
-                2 Col
-              </button>
-              <button
-                onClick={() => setViewMode("swipe")}
-                style={{
-                  padding: 0,
-                  border: "none",
-                  background: "transparent",
-                  cursor: "pointer",
-                  fontWeight: viewMode === "swipe" ? 600 : 400,
-                  fontSize: "14px",
-                  color: viewMode === "swipe" ? "var(--ink)" : "var(--ink-muted)",
-                  textDecoration: viewMode === "swipe" ? "underline" : "none",
-                  textUnderlineOffset: "3px",
-                }}
-              >
-                Swipe
-              </button>
-            </div>
+                Add signals
+              </Button>
+            </Card>
+          </aside>
 
-            {lastUpdated && (
-              <span
-                style={{
-                  fontSize: "13px",
-                  color: "var(--ink-muted)",
-                  marginRight: "8px",
-                }}
-              >
-                Updated {formatTimeAgo(lastUpdated)}
-              </span>
-            )}
-            <button
-              onClick={load}
-              disabled={loading}
+          {/* Main Feed */}
+          <main className="feed-main">
+            <SectionHeader
+              title="Feed"
+              subtitle={
+                <div style={{ display: "flex", flexDirection: "column", gap: "4px" }}>
+                  <div style={{ display: "flex", alignItems: "center", gap: "8px", flexWrap: "wrap" }}>
+                    <span>A single, quiet place for everything that actually interests you.</span>
+                    {lastUpdated && (
+                      <span style={{ fontSize: "12px", color: "var(--text-muted)" }}>
+                        Updated {formatTimeAgo(lastUpdated)}
+                      </span>
+                    )}
+                  </div>
+                  <FeedUpdateStatus jobName="rss_ingest" staleThresholdMinutes={30} />
+                </div>
+              }
+              level={1}
+            />
+
+            {/* Controls */}
+            <div className="feed-controls" style={{ marginTop: "24px", marginBottom: "24px" }}>
+              <div className="feed-control-row">
+                <input
+                  type="text"
+                  placeholder="Search your feed…"
+                  value={searchQuery}
+                  onChange={(e) => setSearchQuery(e.target.value)}
+                  className="feed-search"
               style={{
-                padding: "6px 12px",
-                border: "1px solid var(--border)",
-                background: loading ? "var(--bg-secondary)" : "var(--bg-primary)",
-                color: loading ? "var(--text-muted)" : "var(--text-primary)",
-                cursor: loading ? "not-allowed" : "pointer",
-                fontWeight: 400,
-                fontSize: "13px",
-                borderRadius: "6px",
-                transition: "all 0.2s",
-              }}
-              title="Refresh feed"
-            >
-              {loading ? "Refreshing..." : "🔄 Refresh"}
-            </button>
-
-            {debug && (
-              <button onClick={() => setShowDebug(!showDebug)} className="btn btn-secondary">
-                {showDebug ? "Hide" : "Show"} Debug
-              </button>
-            )}
-          </div>
-        </header>
-
-        {/* Error Message */}
-        {err && (
-          <div className="feed-error">
-            <strong>Error:</strong> {err}
-            <div className="feed-error-detail">Check the console for more details.</div>
-          </div>
-        )}
-
-        {/* Debug Panel */}
-        {debug && (
-          <div className="debug-panel">
-            <button
-              onClick={() => setShowDebug(!showDebug)}
-              className="debug-panel-header"
-              type="button"
-            >
-              <span>Debug Info</span>
-              <span>{showDebug ? "−" : "+"}</span>
-            </button>
-            {showDebug && (
-              <div className="debug-panel-content">
-                <pre>{JSON.stringify(debug, null, 2)}</pre>
+                    flex: 1,
+                    padding: "10px 14px",
+                    borderRadius: "8px",
+                    border: "1px solid var(--border-subtle)",
+                    fontSize: "14px",
+                    background: "var(--surface)",
+                  }}
+                />
               </div>
-            )}
-          </div>
-        )}
+              <div className="feed-control-row" style={{ marginTop: "12px", display: "flex", gap: "8px", flexWrap: "wrap" }}>
+                <Tag
+                  label="All"
+                  selected={contentKindFilter === "all"}
+                  onClick={() => setContentKindFilter("all")}
+                />
+                {availableContentKinds.map((kind) => (
+                  <Tag
+                    key={kind}
+                    label={kind.charAt(0).toUpperCase() + kind.slice(1)}
+                    selected={contentKindFilter === kind}
+                    onClick={() => setContentKindFilter(kind)}
+                  />
+                ))}
+              </div>
+              </div>
 
-        {/* Feed Posts */}
-        {loading ? (
-          <div>
-            {[1, 2, 3].map((i) => (
-              <FeedPostSkeleton key={i} />
-            ))}
-          </div>
-        ) : items.length === 0 ? (
-          <div className="feed-empty">
-            <p className="feed-empty-title">No posts yet</p>
-            <p className="feed-empty-text">Your feed will appear here once content is available.</p>
-          </div>
-        ) : viewMode === "swipe" ? (
-          <div className="feed-swipe-container">
-            {/* Next card (behind) */}
-            {nextItem && (
-              <div className="feed-swipe-next">
-                <div className="feed-post-frame">
-                  <div className="feed-post-content">
-                    <FeedPost item={nextItem} index={swipeIndex + 1} />
-                  </div>
+            {/* Error Message */}
+            {err && (
+              <Card className="feed-error-card" variant="outlined" style={{ marginBottom: "24px", padding: "20px" }}>
+                <div style={{ marginBottom: "12px" }}>
+                  <strong>Error:</strong> {err}
                 </div>
-              </div>
+                <Button onClick={() => load()} variant="secondary" size="sm">
+                  Try again
+                </Button>
+              </Card>
             )}
-            {/* Current card (on top) */}
-            {currentItem && (
-              <div
-                className="feed-swipe-current"
-                onMouseDown={handleDragStart}
-                onTouchStart={handleDragStart}
-                style={{
-                  transform: swipeTransform,
-                  opacity,
-                  transition,
-                  cursor: isDragging ? "grabbing" : "grab",
-                }}
-              >
-                {swipeLabel && (
-                  <div
-                    className={`feed-swipe-label ${swipeLabel === "LIKE" ? "like" : "pass"}`}
-                    style={{ opacity: swipeLabelOpacity }}
-                  >
-                    {swipeLabel}
-                  </div>
+
+            {/* Feed Content */}
+            {loading && items.length === 0 ? (
+              <div className="feed-skeletons">
+                {[1, 2, 3].map((i) => (
+                  <FeedPostSkeleton key={i} />
+                ))}
+              </div>
+            ) : filteredItems.length === 0 ? (
+              <EmptyState
+                title={searchQuery || contentKindFilter !== "all" ? "No matches" : "Your feed is empty"}
+                message={
+                  searchQuery || contentKindFilter !== "all"
+                    ? "Try adjusting your filters or search query."
+                    : "Add signals to personalize your feed, or check back later."
+                }
+                action={
+                  searchQuery || contentKindFilter !== "all"
+                    ? {
+                        label: "Clear filters",
+                        onClick: () => {
+                          setSearchQuery("");
+                          setContentKindFilter("all");
+                        },
+                      }
+                    : {
+                        label: "Tune your mix",
+                        onClick: () => {
+                          window.location.href = "/profile";
+                        },
+                      }
+                }
+              />
+            ) : (
+              <>
+                {/* Featured Item */}
+                {filteredItems.length > 0 && (
+                  <Card className="feed-featured-card" variant="elevated" style={{ marginBottom: "32px" }}>
+                    <ContentCard item={filteredItems[0]} index={0} featured />
+                  </Card>
                 )}
-                <div className="feed-post-frame">
-                  <div className="feed-post-content">
-                    <FeedPost item={currentItem} index={swipeIndex} />
-                  </div>
-                </div>
-              </div>
-            )}
-            {/* Swipe Actions */}
-            <div className="feed-swipe-actions">
-              <button
-                onClick={() => handleSwipe("left")}
-                disabled={!currentItem || isAnimating}
-                className="btn-swipe btn-swipe-pass"
-              >
-                Pass
-              </button>
-              <button
-                onClick={() => handleSwipe("right")}
-                disabled={!currentItem || isAnimating}
-                className="btn-swipe btn-swipe-like"
-              >
-                Like
-              </button>
-            </div>
-          </div>
-        ) : viewMode === "2col" ? (
-          <div className="feed-list-2col">
-            {items.map((it, index) => (
-              <div key={it.id} className="feed-post-frame">
-                <div className="feed-post-content">
-                  <FeedPost item={it} index={index} />
-                </div>
-              </div>
-            ))}
-          </div>
-        ) : (
-          <div className="feed-list-1col">
-            {items.map((it, index) => (
-              <div key={it.id} className="feed-post-frame">
-                <div className="feed-post-content">
-                  <FeedPost item={it} index={index} />
-                </div>
-              </div>
-            ))}
-          </div>
-        )}
+
+                {/* Grid of remaining items */}
+                {filteredItems.length > 1 && (
+                  <div
+                    className="feed-section-items"
+                style={{
+                      display: "grid",
+                      gridTemplateColumns: "repeat(auto-fill, minmax(320px, 1fr))",
+                      gap: "24px",
+                    }}
+                  >
+                    {filteredItems.slice(1).map((item, index) => (
+                      <Card key={item.id} className="feed-section-item">
+                        <ContentCard item={item} index={index + 1} />
+                      </Card>
+        ))}
       </div>
+                )}
+              </>
+            )}
+          </main>
+        </div>
+      </Container>
     </div>
   );
 }

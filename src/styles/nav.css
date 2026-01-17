@@ -1,0 +1,211 @@
+/* Top Navigation - Clean Editorial Studio Aesthetic */
+
+.topnav {
+  position: sticky;
+  top: 0;
+  z-index: 1000;
+  background: var(--surface);
+  border-bottom: 1px solid var(--border);
+  backdrop-filter: blur(8px);
+  -webkit-backdrop-filter: blur(8px);
+}
+
+.topnav__inner {
+  display: grid;
+  grid-template-columns: auto 1fr auto;
+  align-items: center;
+  gap: 24px;
+  padding: 16px 24px;
+  max-width: 1200px;
+  margin: 0 auto;
+}
+
+@media (min-width: 768px) {
+  .topnav__inner {
+    padding: 16px 40px;
+  }
+}
+
+/* Brand/Logo */
+.brand {
+  background: none;
+  border: none;
+  padding: 0;
+  cursor: pointer;
+  font-family: inherit;
+  font-size: 20px;
+  font-weight: 700;
+  color: var(--text-primary);
+  text-decoration: none;
+  transition: opacity 0.2s ease;
+  letter-spacing: -0.01em;
+}
+
+.brand:hover {
+  opacity: 0.7;
+}
+
+/* Desktop Navigation Links */
+.navlinks--desktop {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+  justify-content: center;
+}
+
+.navlink {
+  padding: 8px 16px;
+  border-radius: var(--radius-full);
+  color: var(--text-secondary);
+  text-decoration: none;
+  font-size: 14px;
+  font-weight: 400;
+  transition: all 0.2s ease;
+  border: 1px solid transparent;
+  background: transparent;
+}
+
+.navlink:hover {
+  color: var(--text-primary);
+  background: var(--surface-2);
+}
+
+.navlink.active {
+  color: var(--text-primary);
+  font-weight: 500;
+  background: var(--surface-2);
+  border-color: var(--border);
+}
+
+/* Right Side Actions */
+.topnav__right {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  justify-self: end;
+}
+
+.topnav-profile-btn {
+  width: 36px;
+  height: 36px;
+  border-radius: 50%;
+  border: 1px solid var(--border);
+  background: var(--surface);
+  color: var(--text-primary);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 14px;
+  font-weight: 500;
+  cursor: pointer;
+  padding: 0;
+  transition: all 0.2s ease;
+}
+
+.topnav-profile-btn:hover {
+  background: var(--surface-2);
+  border-color: var(--border-strong);
+  transform: none;
+}
+
+.topnav-theme-toggle {
+  width: 32px;
+  height: 32px;
+  padding: 0;
+  border: none;
+  background: transparent;
+  color: var(--text-secondary);
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 18px;
+  transition: color 0.2s ease;
+  border-radius: var(--radius-sm);
+}
+
+.topnav-theme-toggle:hover {
+  color: var(--text-primary);
+  background: var(--surface-2);
+}
+
+.nav-cta-btn {
+  padding: 10px 20px;
+  border-radius: var(--radius-md);
+  border: none;
+  background: var(--accent-gradient);
+  color: #ffffff;
+  font-weight: 500;
+  font-size: 14px;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  font-family: inherit;
+  box-shadow: 0 2px 8px rgba(255, 159, 107, 0.25);
+}
+
+.nav-cta-btn:hover {
+  background: linear-gradient(135deg, #FFB085 0%, #FFC9A3 100%);
+  transform: translateY(-1px);
+  box-shadow: 0 4px 12px rgba(255, 159, 107, 0.35);
+}
+
+/* Mobile Tab Bar */
+.tabbar {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(0, 1fr));
+  gap: 0;
+  border-top: 1px solid var(--border);
+  background: var(--surface);
+  padding: 8px 0;
+}
+
+@media (min-width: 1024px) {
+  .tabbar {
+    display: none;
+  }
+}
+
+.tabbar__item {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.tabbar__btn {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
+  padding: 8px 12px;
+  border: none;
+  background: transparent;
+  color: var(--text-muted);
+  text-decoration: none;
+  font-size: 11px;
+  font-weight: 400;
+  cursor: pointer;
+  transition: color 0.2s ease;
+  width: 100%;
+  border-radius: var(--radius-sm);
+}
+
+.tabbar__btn:hover {
+  color: var(--text-primary);
+  background: var(--surface-2);
+}
+
+.tabbar__btn.active {
+  color: var(--text-primary);
+  font-weight: 500;
+}
+
+.tabbar__icon {
+  font-size: 20px;
+  line-height: 1;
+}
+
+.tabbar__label {
+  font-size: 11px;
+  line-height: 1.2;
+}
+

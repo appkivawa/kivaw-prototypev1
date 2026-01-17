@@ -77,3 +77,6 @@ CREATE POLICY "Admins can delete admin_users"
 -- Add comment
 COMMENT ON FUNCTION public.is_user_admin(UUID) IS 'Checks if a user is in admin_users table. Uses SECURITY DEFINER to bypass RLS and prevent recursion.';
 
+
+
+

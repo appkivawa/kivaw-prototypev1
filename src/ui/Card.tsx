@@ -1,20 +1,17 @@
 import React from "react";
 
-export default function Card({
-  children,
-  className = "",
-  style,
-  onClick,
-}: {
+type CardProps = {
   children: React.ReactNode;
   className?: string;
-  style?: React.CSSProperties;
   onClick?: () => void;
-}) {
+  variant?: "default" | "elevated" | "outlined";
+};
+
+export default function Card({ children, className = "", onClick, variant = "default" }: CardProps) {
+  const variantClass = variant !== "default" ? `card-${variant}` : "";
   return (
     <section 
-      className={`card ${className}`} 
-      style={style}
+      className={`card ${variantClass} ${className}`.trim()}
       onClick={onClick}
       role={onClick ? "button" : undefined}
       tabIndex={onClick ? 0 : undefined}

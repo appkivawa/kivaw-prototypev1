@@ -3,8 +3,12 @@ import { useEffect, useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import Card from "../ui/Card";
 import ItemCard from "../ui/ItemCard";
-import PageHeader from "../ui/PageHeader";
+import SectionHeader from "../ui/SectionHeader";
+import Container from "../ui/Container";
+import Button from "../ui/Button";
+import EmptyState from "../ui/EmptyState";
 import { supabase } from "../lib/supabaseClient";
+import "../styles/saved.css";
 
 import type { ContentItem } from "../data/contentApi";
 import { isPublicDiscoverableContentItem } from "../utils/contentFilters";
@@ -251,75 +255,97 @@ export default function Saved() {
   const canSync = isAuthed && localIds.some((id) => !accountIds.includes(id));
 
   return (
-    <div className="page coral-page-content">
-      <PageHeader title="Saved" subtitle='Your stash of "this matters".' />
+    <div className="saved-page">
+      <Container maxWidth="xl" className="saved-container">
+        <SectionHeader
+          title="Saved"
+          subtitle='Your stash of "this matters".'
+          level={1}
+        />
 
-      <div className="center-wrap">
         {/* Top actions */}
-        <Card className="center card-pad" style={{ marginBottom: 14 }}>
-          <div style={{ display: "flex", justifyContent: "space-between", gap: 12, flexWrap: "wrap" }}>
-            <div style={{ display: "flex", gap: 10, flexWrap: "wrap" }}>
-              <span className="muted" style={{ fontWeight: 800 }}>
-                Local: {localCount}
+        <Card className="saved-actions">
+          <div className="saved-actions-content">
+            <div className="saved-stats-info">
+              <span className="saved-stat-label">
+                Local: <strong>{localCount}</strong>
               </span>
-              <span className="muted" style={{ fontWeight: 800 }}>
-                Account: {isAuthed ? accountCount : "—"}
+              <span className="saved-stat-label">
+                Account: <strong>{isAuthed ? accountCount : "—"}</strong>
               </span>
-              <span className="muted" style={{ opacity: 0.7 }}>
+              <span className="saved-stat-label saved-stat-muted">
                 Source: {lastLoadedSource}
               </span>
             </div>
 
-            <div style={{ display: "flex", gap: 10, flexWrap: "wrap" }}>
+            <div className="saved-actions-buttons">
               {!isAuthed ? (
-                <button
-                  className="btn"
+                <Button
                   type="button"
                   onClick={() => navigate("/login", { state: { from: "/saved" } })}
+                  variant="primary"
+                  size="sm"
                 >
                   Sign in to sync →
-                </button>
+                </Button>
               ) : (
                 <>
-                  <button className="btn" type="button" onClick={syncLocalToAccount} disabled={!canSync}>
+                  <Button
+                    type="button"
+                    onClick={syncLocalToAccount}
+                    disabled={!canSync}
+                    variant="secondary"
+                    size="sm"
+                  >
                     {canSync ? "Sync local → account" : "Synced"}
-                  </button>
-                  <button className="btn" type="button" onClick={clearAccount}>
+                  </Button>
+                  <Button
+                    type="button"
+                    onClick={clearAccount}
+                    variant="secondary"
+                    size="sm"
+                  >
                     Clear account
-                  </button>
+                  </Button>
                 </>
               )}
 
-              <button className="btn" type="button" onClick={resetLocal}>
+              <Button
+                type="button"
+                onClick={resetLocal}
+                variant="secondary"
+                size="sm"
+              >
                 Reset local
-              </button>
+              </Button>
 
-              <button className="btn" type="button" onClick={loadSaved}>
+              <Button
+                type="button"
+                onClick={loadSaved}
+                variant="secondary"
+                size="sm"
+              >
                 Refresh
-              </button>
+              </Button>
             </div>
           </div>
         </Card>
 
         {loading ? (
-          <Card className="center card-pad">
-            <p className="muted">Loading…</p>
-          </Card>
+          <div className="saved-loading">Loading…</div>
         ) : err ? (
-          <Card className="center card-pad">
-            <p className="muted">{err}</p>
+          <Card variant="danger" className="saved-error">
+            {err}
           </Card>
         ) : visibleItems.length === 0 ? (
-          <div className="saved-empty-state">
-            <div className="saved-empty-icon">💜</div>
-            <h2 className="saved-empty-title">Nothing saved yet</h2>
-            <p className="saved-empty-text">
-              Save anything you like — it’ll live here (even if you’re not signed in).
-            </p>
-            <button className="saved-empty-cta" type="button" onClick={() => navigate("/explore")}>
-              Explore →
-            </button>
-          </div>
+          <EmptyState
+            title="Nothing saved yet"
+            message="Save anything you like — it'll live here (even if you're not signed in)."
+            action={{
+              label: "Explore →",
+              onClick: () => navigate("/explore"),
+            }}
+          />
         ) : (
           <>
             {/* Stats */}
@@ -352,22 +378,24 @@ export default function Saved() {
             {/* Toolbar */}
             <Card className="saved-toolbar">
               <div className="saved-toolbar-left">
-                <button
-                  className={`saved-view-btn ${viewMode === "grid" ? "saved-view-btn-active" : ""}`}
+                <Button
                   type="button"
                   onClick={() => setViewMode("grid")}
+                  variant={viewMode === "grid" ? "primary" : "secondary"}
+                  size="sm"
                   aria-label="Grid view"
                 >
                   ⬜
-                </button>
-                <button
-                  className={`saved-view-btn ${viewMode === "list" ? "saved-view-btn-active" : ""}`}
+                </Button>
+                <Button
                   type="button"
                   onClick={() => setViewMode("list")}
+                  variant={viewMode === "list" ? "primary" : "secondary"}
+                  size="sm"
                   aria-label="List view"
                 >
                   ☰
-                </button>
+                </Button>
               </div>
 
               <div className="saved-toolbar-right">
@@ -385,14 +413,14 @@ export default function Saved() {
             </Card>
 
             {/* Items */}
-            <Card className="center card-pad">
+            <Card>
               {internalCount > 0 ? (
-                <div className="echo-empty" style={{ marginBottom: 12 }}>
+                <div className="saved-internal-notice">
                   Hidden internal items: {internalCount}
                 </div>
               ) : null}
 
-              <div className={viewMode === "grid" ? "kivaw-rec-grid" : "saved-list-view"}>
+              <div className={viewMode === "grid" ? "saved-grid" : "saved-list-view"}>
                 {sortedItems.map((it) => {
                   const isBusy = busyId === it.id;
 
@@ -435,7 +463,7 @@ export default function Saved() {
             </Card>
           </>
         )}
-      </div>
+      </Container>
     </div>
   );
 }

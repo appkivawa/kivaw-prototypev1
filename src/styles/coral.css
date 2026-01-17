@@ -11,7 +11,7 @@
 /* Coral color variables - shared across themes */
 :root {
   --coral-pink: #FF6B9D;
-  --coral-orange: #FF8E53;
+  --coral-orange: #FF9F6B;
   --coral-purple: #C084FC;
   --coral-gradient: linear-gradient(135deg, var(--coral-pink) 0%, var(--coral-orange) 100%);
 }
@@ -36,13 +36,13 @@ html:not([data-theme]) {
 
 /* ========== LIGHT MODE ========== */
 html[data-theme="light"] {
-  --coral-text-primary: #1a1a1a;
-  --coral-text-muted: #4a4a4a;
-  --coral-text-tertiary: #6a6a6a;
+  --coral-text-primary: #2C2416;
+  --coral-text-muted: #4A3D2E;
+  --coral-text-tertiary: #8B7A6B;
   --coral-surface: rgba(255, 255, 255, 0.5);
   --coral-surface-hover: rgba(255, 255, 255, 0.65);
-  --coral-border: rgba(0, 0, 0, 0.15);
-  --coral-border-hover: rgba(0, 0, 0, 0.22);
+  --coral-border: rgba(44, 36, 22, 0.15);
+  --coral-border-hover: rgba(44, 36, 22, 0.22);
   /* Button text color for light mode - dark coral/maroon for visibility */
   --coral-btn-text: #8B1A3D;
   /* Detail panel for light mode */
@@ -53,7 +53,7 @@ html[data-theme="light"] {
 
 /* Link colors in light mode */
 html[data-theme="light"] a:not(.coral-nav-link):not(.coral-footer-link):not(.coral-btn) {
-  color: #1a1a1a;
+  color: #2C2416;
   text-decoration: underline;
   text-decoration-color: rgba(255, 107, 157, 0.4);
   transition: color 0.2s ease, text-decoration-color 0.2s ease;
@@ -186,7 +186,7 @@ html[data-theme="light"] .coral-header {
 }
 
 html[data-theme="light"] .coral-nav-link.active {
-  background: rgba(0, 0, 0, 0.04);
+  background: rgba(44, 36, 22, 0.04);
   border: 1px solid rgba(255, 107, 157, 0.3);
 }
 
@@ -211,7 +211,7 @@ html[data-theme="light"] .coral-nav-link.active {
   font-size: 14px;
   cursor: pointer;
   transition: all 0.2s ease;
-  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+  box-shadow: 0 2px 8px rgba(44, 36, 22, 0.1);
   font-family: inherit;
 }
 
@@ -219,7 +219,7 @@ html[data-theme="light"] .coral-nav-link.active {
   background: var(--coral-surface-hover);
   border-color: var(--coral-border-hover);
   transform: translateY(-2px);
-  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.2);
+  box-shadow: 0 4px 12px rgba(44, 36, 22, 0.2);
 }
 
 /* Light mode: Continue button uses coral gradient */
@@ -231,7 +231,7 @@ html[data-theme="light"] .coral-nav-cta {
 }
 
 html[data-theme="light"] .coral-nav-cta:hover {
-  background: linear-gradient(135deg, #ff7ba8 0%, #ff9a6a 100%);
+  background: var(--text-primary);
   box-shadow: 0 4px 12px rgba(255, 107, 157, 0.4);
   transform: translateY(-2px);
 }
@@ -431,7 +431,7 @@ html[data-theme="light"] .coral-nav-cta:hover {
   background: var(--coral-surface-hover);
   border-color: var(--coral-border-hover);
   transform: translateY(-4px);
-  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.3);
+  box-shadow: 0 8px 24px rgba(44, 36, 22, 0.3);
 }
 
 .coral-mood-icon {
@@ -481,7 +481,7 @@ html[data-theme="light"] .coral-nav-cta:hover {
   background: var(--coral-surface-hover);
   border-color: var(--coral-border-hover);
   transform: translateY(-4px);
-  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.3);
+  box-shadow: 0 8px 24px rgba(44, 36, 22, 0.3);
 }
 
 .coral-step-number {
@@ -553,7 +553,7 @@ html[data-theme="light"] .coral-nav-cta:hover {
   background: var(--coral-surface-hover);
   border-color: var(--coral-border-hover);
   transform: translateY(-2px);
-  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
+  box-shadow: 0 4px 12px rgba(44, 36, 22, 0.3);
 }
 
 /* Page content wrapper */

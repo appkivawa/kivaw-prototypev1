@@ -3,6 +3,7 @@ import { NavLink, useNavigate, useLocation } from "react-router-dom";
 import { useTheme } from "../theme/ThemeContext";
 import { supabase } from "../lib/supabaseClient";
 import { getMyProfile } from "../data/profileApi";
+import "../styles/nav.css";
 
 export default function TopNav() {
   const nav = useNavigate();
@@ -72,25 +73,25 @@ export default function TopNav() {
   }
 
   return (
-    <header className="topnav coral-header">
-      <div className="topnav__inner coral-nav">
-        <button className="brand coral-brand" onClick={() => nav("/")} aria-label="Go home">
+    <header className="topnav">
+      <div className="topnav__inner">
+        <button className="brand" onClick={() => nav("/")} aria-label="Go home">
           KIVAW
         </button>
 
         {/* Desktop nav */}
-        <nav className="navlinks navlinks--desktop coral-nav-links">
+        <nav className="navlinks navlinks--desktop">
           <NavLink
             to="/"
             end
-            className={({ isActive }) => `navlink coral-nav-link ${isActive ? "active" : ""}`}
+            className={({ isActive }) => `navlink ${isActive ? "active" : ""}`}
           >
             Home
           </NavLink>
 
           <NavLink
             to="/feed"
-            className={({ isActive }) => `navlink coral-nav-link ${isActive ? "active" : ""}`}
+            className={({ isActive }) => `navlink ${isActive ? "active" : ""}`}
           >
             Discover
           </NavLink>
@@ -99,14 +100,14 @@ export default function TopNav() {
             <>
               <NavLink
                 to="/timeline"
-                className={({ isActive }) => `navlink coral-nav-link ${isActive ? "active" : ""}`}
+                className={({ isActive }) => `navlink ${isActive ? "active" : ""}`}
               >
                 Timeline
               </NavLink>
 
               <NavLink
                 to="/waves"
-                className={({ isActive }) => `navlink coral-nav-link ${isActive ? "active" : ""}`}
+                className={({ isActive }) => `navlink ${isActive ? "active" : ""}`}
               >
                 Waves
               </NavLink>
@@ -114,40 +115,19 @@ export default function TopNav() {
           )}
         </nav>
 
-        <div className="topnav__right" style={{ display: "flex", alignItems: "center", gap: "12px" }}>
+        <div className="topnav__right">
           {isSignedIn && (
             <button
               onClick={() => nav("/profile")}
               type="button"
-              style={{
-                width: "36px",
-                height: "36px",
-                borderRadius: "50%",
-                border: "1px solid var(--border)",
-                backgroundColor: "var(--control-bg)",
-                color: "var(--ink)",
-                display: "flex",
-                alignItems: "center",
-                justifyContent: "center",
-                fontSize: "14px",
-                fontWeight: 600,
-                cursor: "pointer",
-                padding: 0,
-                transition: "transform 0.2s",
-              }}
-              onMouseEnter={(e) => {
-                e.currentTarget.style.transform = "scale(1.05)";
-              }}
-              onMouseLeave={(e) => {
-                e.currentTarget.style.transform = "scale(1)";
-              }}
+              className="topnav-profile-btn"
               aria-label="Profile"
               title="Profile"
             >
               {userInitial}
             </button>
           )}
-          <button className="nav-cta-btn coral-nav-cta" onClick={handleAuthClick} type="button">
+          <button className="nav-cta-btn" onClick={handleAuthClick} type="button">
             {isSignedIn ? "Sign out" : "Continue"}
           </button>
 
@@ -156,28 +136,7 @@ export default function TopNav() {
             type="button"
             aria-label={theme === "dark" ? "Switch to light mode" : "Switch to dark mode"}
             title={theme === "dark" ? "Switch to light mode" : "Switch to dark mode"}
-            style={{
-              width: "32px",
-              height: "32px",
-              padding: 0,
-              border: "none",
-              background: "transparent",
-              color: "var(--text-secondary)",
-              cursor: "pointer",
-              display: "flex",
-              alignItems: "center",
-              justifyContent: "center",
-              fontSize: "18px",
-              transition: "color 0.2s, transform 0.2s",
-            }}
-            onMouseEnter={(e) => {
-              e.currentTarget.style.color = "var(--text-primary)";
-              e.currentTarget.style.transform = "scale(1.1)";
-            }}
-            onMouseLeave={(e) => {
-              e.currentTarget.style.color = "var(--text-secondary)";
-              e.currentTarget.style.transform = "scale(1)";
-            }}
+              className="topnav-theme-toggle"
           >
             {theme === "dark" ? "☀" : "☾"}
           </button>

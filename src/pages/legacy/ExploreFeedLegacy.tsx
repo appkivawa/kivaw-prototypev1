@@ -1,16 +1,23 @@
 import React, { useEffect, useMemo, useRef, useState } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
-import { supabase } from "../lib/supabaseClient";
-import { saveLocal, unsaveLocal, isLocallySaved } from "../data/savedLocal";
-import { showToast } from "../components/ui/Toast";
-import FeedPostTumblr from "../components/feed/FeedPostTumblr";
-import FeedPostSkeleton from "../components/feed/FeedPostSkeleton";
-import ExploreCardSkeleton from "../components/explore/ExploreCardSkeleton";
-import { useSession } from "../auth/useSession";
-import LoginModal from "../components/auth/LoginModal";
-import { getBadge } from "../utils/badgeHelpers";
-import { ExploreEchoButton } from "../components/explore/ExploreEchoButton";
-import EchoComposer from "../components/echo/EchoComposer";
+  import { supabase } from "../../lib/supabaseClient";
+  import { saveLocal, unsaveLocal, isLocallySaved } from "../../data/savedLocal";
+  import { showToast } from "../../components/ui/Toast";
+import FeedPostTumblr from "../../components/feed/FeedPostTumblr";
+import FeedPostSkeleton from "../../components/feed/FeedPostSkeleton";
+import ExploreCardSkeleton from "../../components/explore/ExploreCardSkeleton";
+import FeedUpdateStatus from "../../components/feed/FeedUpdateStatus";
+import { useSession } from "../../auth/useSession";
+import LoginModal from "../../components/auth/LoginModal";
+import { getBadge } from "../../utils/badgeHelpers";
+import { ExploreEchoButton } from "../../components/explore/ExploreEchoButton";
+import EchoComposer from "../../components/echo/EchoComposer";
+import Container from "../../ui/Container";
+import Card from "../../ui/Card";
+import Button from "../../ui/Button";
+import SectionHeader from "../../ui/SectionHeader";
+import EmptyState from "../../ui/EmptyState";
+import "../../styles/explore-feed.css";
 
 // ============================================================
 // Types
@@ -273,7 +280,7 @@ function useExploreSave() {
   async function handleSave(contentId: string, shouldSave: boolean) {
     if (!isAuthed) {
       // Store pending action and show login modal
-      const { storePendingAction } = await import("../utils/pendingActions");
+        const { storePendingAction } = await import("../../utils/pendingActions");
       storePendingAction({ type: "save", contentId, shouldSave });
       setPendingSave({ contentId, shouldSave });
       setShowLoginModal(true);
@@ -466,12 +473,14 @@ export default function ExploreFeed() {
       const thirtyDaysAgo = new Date(now.getTime() - 30 * 24 * 60 * 60 * 1000).toISOString();
 
       // Query feed_items for sections
-      // Use created_at for ordering (more reliable), then sort client-side by coalesce(published_at, ingested_at)
+      // Filter by is_discoverable=true and order by score desc, published_at desc
       // Don't filter too aggressively - get more items to allow better client-side filtering
       const { data: allItems, error: itemsError } = await supabase
         .from("feed_items")
-        .select("id,source,external_id,url,title,summary,author,image_url,published_at,tags,topics,metadata,ingested_at")
-        .order("created_at", { ascending: false }) // Order by created_at to get recent items
+        .select("id,source,external_id,url,title,summary,author,image_url,published_at,tags,topics,metadata,ingested_at,score")
+        .eq("is_discoverable", true)
+        .order("score", { ascending: false, nullsFirst: false })
+        .order("published_at", { ascending: false, nullsFirst: false })
         .limit(1000); // Get more items to allow better client-side filtering
 
       if (itemsError) {
@@ -875,7 +884,9 @@ export default function ExploreFeed() {
       const newOffset = feedOffset + 500;
       const { data: moreItems, error: itemsError } = await supabase
         .from("feed_items")
-        .select("id,source,external_id,url,title,summary,author,image_url,published_at,tags,topics,metadata,ingested_at")
+        .select("id,source,external_id,url,title,summary,author,image_url,published_at,tags,topics,metadata,ingested_at,score")
+        .eq("is_discoverable", true)
+        .order("score", { ascending: false, nullsFirst: false })
         .order("published_at", { ascending: false, nullsFirst: false })
         .range(feedOffset, newOffset - 1);
 
@@ -1090,85 +1101,33 @@ export default function ExploreFeed() {
   };
 
   return (
-    <div
-      style={{
-        minHeight: "100vh",
-        backgroundColor: "var(--bg)",
-        padding: pageMode === "feed" ? "20px 16px" : "24px 16px",
-      }}
-    >
-      <div style={{ maxWidth: pageMode === "feed" ? "680px" : "1400px", margin: "0 auto" }}>
+    <div className="explore-feed-page" style={{ minHeight: "100vh", backgroundColor: "var(--bg)" }}>
+      <Container maxWidth={pageMode === "feed" ? "md" : "xl"} className="explore-feed-container">
         {/* Mode Toggle */}
-        <div
-          style={{
-            display: "flex",
-            justifyContent: "center",
-            marginBottom: pageMode === "feed" ? "24px" : "32px",
-          }}
-        >
-          <div
-            style={{
-              display: "flex",
-              gap: "24px",
-              alignItems: "baseline",
-            }}
-          >
+        <div className="explore-feed-mode-toggle">
+          <div className="explore-feed-mode-buttons">
             <button
               onClick={() => handleModeChange("explore")}
-              style={{
-                padding: 0,
-                border: "none",
-                background: "transparent",
-                cursor: "pointer",
-                fontWeight: pageMode === "explore" ? 600 : 400,
-                fontSize: "16px",
-                color: pageMode === "explore" ? "var(--text-primary)" : "var(--text-muted)",
-                textDecoration: pageMode === "explore" ? "underline" : "none",
-                textUnderlineOffset: "4px",
-                transition: "all 0.2s",
-              }}
+              className={`explore-feed-mode-btn ${pageMode === "explore" ? "active" : ""}`}
             >
               Explore
             </button>
             <button
               onClick={() => handleModeChange("feed")}
-              style={{
-                padding: 0,
-                border: "none",
-                background: "transparent",
-                cursor: "pointer",
-                fontWeight: pageMode === "feed" ? 600 : 400,
-                fontSize: "16px",
-                color: pageMode === "feed" ? "var(--text-primary)" : "var(--text-muted)",
-                textDecoration: pageMode === "feed" ? "underline" : "none",
-                textUnderlineOffset: "4px",
-                transition: "all 0.2s",
-              }}
+              className={`explore-feed-mode-btn ${pageMode === "feed" ? "active" : ""}`}
             >
               Feed
             </button>
           </div>
           
           {/* Refresh button and timestamp */}
-          <div
-            style={{
-              display: "flex",
-              alignItems: "center",
-              gap: "12px",
-              marginLeft: "auto",
-            }}
-          >
+          <div className="explore-feed-actions">
             {lastUpdated && (
-              <span
-                style={{
-                  fontSize: "13px",
-                  color: "var(--text-muted)",
-                }}
-              >
+              <span className="explore-feed-updated">
                 Updated {formatTimeAgo(lastUpdated)}
               </span>
             )}
-            <button
+            <Button
               onClick={() => {
                 if (pageMode === "explore") {
                   loadExplore({ shuffleOnLoad: false });
@@ -1177,190 +1136,98 @@ export default function ExploreFeed() {
                 }
               }}
               disabled={loading}
-              style={{
-                padding: "6px 12px",
-                border: "1px solid var(--border)",
-                background: loading ? "var(--bg-secondary)" : "var(--bg-primary)",
-                color: loading ? "var(--text-muted)" : "var(--text-primary)",
-                cursor: loading ? "not-allowed" : "pointer",
-                fontSize: "13px",
-                borderRadius: "6px",
-                transition: "all 0.2s",
-              }}
+              variant="secondary"
+              size="sm"
               title="Refresh content"
             >
               {loading ? "Refreshing..." : "🔄 Refresh"}
-            </button>
+            </Button>
           </div>
         </div>
 
         {/* Error Message */}
         {err && (
-          <div
-            style={{
-              marginBottom: "20px",
-              padding: "12px 16px",
-              borderRadius: "6px",
-              border: "1px solid rgba(239, 68, 68, 0.2)",
-              backgroundColor: "rgba(239, 68, 68, 0.1)",
-              color: "rgba(239, 68, 68, 0.9)",
-              fontSize: "14px",
-            }}
-          >
+          <Card className="explore-feed-error" variant="danger">
             <strong>Error:</strong> {err}
-          </div>
+          </Card>
         )}
 
         {/* EXPLORE MODE */}
         {pageMode === "explore" && (
           <div>
-            {/* Header - tighter spacing */}
-            <div
-              style={{
-                display: "flex",
-                justifyContent: "space-between",
-                gap: 16,
-                flexWrap: "wrap",
-                marginBottom: "24px",
-                maxWidth: "1180px",
-                margin: "0 auto 24px",
-              }}
-            >
-              <div>
-                <h1
-                  style={{
-                    fontSize: "48px",
-                    fontWeight: 700,
-                    margin: 0,
-                    marginBottom: "8px",
-                    color: "var(--ink)",
-                    letterSpacing: "-0.02em",
-                    lineHeight: 1.1,
-                  }}
-                >
-                  Explore
-                </h1>
-                <div style={{ marginTop: 12, display: "flex", gap: 16, alignItems: "center", flexWrap: "wrap" }}>
-                  <span
-                    style={{
-                      fontSize: 12,
-                      fontWeight: 400,
-                      color: "var(--ink-tertiary)",
-                      textTransform: "uppercase",
-                      letterSpacing: "0.05em",
-                    }}
-                  >
-                    {toneLabels[tone]}
-                  </span>
-                  <div style={{ display: "flex", gap: 12, flexWrap: "wrap", fontSize: 11, color: "var(--ink-tertiary)" }}>
-                    <span>Matches: <strong>{matchCount}</strong></span>
-                    <span>Passes: <strong>{passCount}</strong></span>
+            {/* Header */}
+            <SectionHeader
+              title="Explore"
+              subtitle={
+                <div style={{ display: "flex", flexDirection: "column", gap: "4px" }}>
+                  <div>
+                    <span className="explore-tone-label">{toneLabels[tone]}</span>
+                    <span className="explore-stats">
+                      Matches: <strong>{matchCount}</strong> • Passes: <strong>{passCount}</strong>
+                    </span>
                   </div>
+                  <FeedUpdateStatus jobName="movies_ingest" staleThresholdMinutes={480} />
                 </div>
-              </div>
+              }
+              actions={
+                <>
+                  <input
+                    value={query}
+                    onChange={(e) => setQuery(e.target.value)}
+                    placeholder="Search…"
+                    className="explore-search-input"
+                  />
+                  <Button
+                    type="button"
+                    onClick={() => {
+                      setExploreCards((c) => shuffle(c));
+                      setExploreCursor(0);
+                    }}
+                    variant="secondary"
+                    size="sm"
+                  >
+                    Shuffle
+                  </Button>
+                  <Button
+                    type="button"
+                    onClick={() => loadExplore({ shuffleOnLoad: true })}
+                    variant="secondary"
+                    size="sm"
+                  >
+                    Refresh
+                  </Button>
+                </>
+              }
+              level={1}
+            />
 
-              <div style={{ display: "flex", gap: 8, alignItems: "center", flexWrap: "wrap" }}>
-                <input
-                  value={query}
-                  onChange={(e) => setQuery(e.target.value)}
-                  placeholder="Search…"
-                  style={{
-                    width: 200,
-                    maxWidth: "72vw",
-                    padding: "8px 12px",
-                    borderRadius: 8,
-                    border: "1px solid var(--border-strong)",
-                    outline: "none",
-                    background: "var(--control-bg)",
-                    fontSize: "13px",
-                  }}
-                />
-                <button
-                  type="button"
-                  onClick={() => {
-                    setExploreCards((c) => shuffle(c));
-                    setExploreCursor(0);
-                  }}
-                  style={{
-                    padding: "8px 12px",
-                    borderRadius: 8,
-                    border: "1px solid var(--border-strong)",
-                    background: "var(--control-bg)",
-                    cursor: "pointer",
-                    fontWeight: 600,
-                    fontSize: "13px",
-                  }}
-                >
-                  Shuffle
-                </button>
-                <button
-                  type="button"
-                  onClick={() => loadExplore({ shuffleOnLoad: true })}
-                  style={{
-                    padding: "8px 12px",
-                    borderRadius: 8,
-                    border: "1px solid var(--border-strong)",
-                    background: "var(--control-bg)",
-                    cursor: "pointer",
-                    fontWeight: 600,
-                    fontSize: "13px",
-                  }}
-                >
-                  Refresh
-                </button>
-              </div>
-            </div>
-
-            {/* Mode switch - tighter */}
-            <div style={{ display: "flex", gap: 8, flexWrap: "wrap", maxWidth: "1180px", margin: "0 auto 20px" }}>
-              <button
+            {/* Mode switch */}
+            <div className="explore-mode-switch">
+              <Button
                 type="button"
                 onClick={() => setExploreMode("browse")}
-                style={{
-                  fontSize: 12,
-                  fontWeight: exploreMode === "browse" ? 600 : 500,
-                  padding: "6px 12px",
-                  borderRadius: 6,
-                  border: "1px solid var(--border-strong)",
-                  background: exploreMode === "browse" ? "var(--border)" : "transparent",
-                  cursor: "pointer",
-                }}
+                variant={exploreMode === "browse" ? "primary" : "secondary"}
+                size="sm"
               >
                 Browse
-              </button>
-              <button
+              </Button>
+              <Button
                 type="button"
                 onClick={() => setExploreMode("swipe")}
-                style={{
-                  fontSize: 12,
-                  fontWeight: exploreMode === "swipe" ? 600 : 500,
-                  padding: "6px 12px",
-                  borderRadius: 6,
-                  border: "1px solid var(--border-strong)",
-                  background: exploreMode === "swipe" ? "var(--border)" : "transparent",
-                  cursor: "pointer",
-                }}
+                variant={exploreMode === "swipe" ? "primary" : "secondary"}
+                size="sm"
               >
                 Swipe
-              </button>
+              </Button>
             </div>
 
             {loading ? (
-              <div style={{ textAlign: "center", padding: "48px", color: "var(--ink-tertiary)" }}>Loading…</div>
+              <div className="explore-loading">Loading…</div>
             ) : filteredExplore.length === 0 ? (
-              <div
-                style={{
-                  maxWidth: "680px",
-                  margin: "0 auto",
-                  padding: 14,
-                  borderRadius: 14,
-                  border: "1px solid var(--border-strong)",
-                  background: "var(--control-bg)",
-                  opacity: 0.9,
-                }}
-              >
-                Nothing matches your filters/search. Try clearing search or switching filters.
-              </div>
+              <EmptyState
+                title="No matches found"
+                message="Nothing matches your filters/search. Try clearing search or switching filters."
+              />
             ) : exploreMode === "swipe" && currentExplore ? (
               <div
                 style={{
@@ -1625,7 +1492,7 @@ export default function ExploreFeed() {
                             <span
                               style={{
                                 fontSize: "13px",
-                                color: "rgba(0,0,0,0.6)",
+                                color: "var(--text-secondary)",
                                 fontWeight: 500,
                               }}
                             >
@@ -1634,7 +1501,7 @@ export default function ExploreFeed() {
                             <span
                               style={{
                                 fontSize: "13px",
-                                color: "rgba(0,0,0,0.5)",
+                                color: "var(--text-muted)",
                               }}
                             >
                               Open ↗
@@ -1731,7 +1598,7 @@ export default function ExploreFeed() {
                     <div style={{ fontSize: "12px", fontWeight: 600, letterSpacing: "0.5px", opacity: 0.7, marginBottom: "12px" }}>
                       QUICK PICKS
                     </div>
-                    <div style={{ fontSize: "12px", color: "rgba(0,0,0,0.5)" }}>Coming soon</div>
+                    <div style={{ fontSize: "12px", color: "var(--text-muted)" }}>Coming soon</div>
                   </div>
                 </div>
               </div>
@@ -2025,80 +1892,39 @@ export default function ExploreFeed() {
         {/* FEED MODE - Text-forward, Tumblr-style */}
         {pageMode === "feed" && (
           <div>
-            {/* Minimal header */}
-            <div
-              style={{
-                display: "flex",
-                justifyContent: "space-between",
-                alignItems: "center",
-                marginBottom: "20px",
-              }}
-            >
-              <h1
-                style={{
-                  fontSize: "24px",
-                  fontWeight: 700,
-                  margin: 0,
-                  color: "rgba(0,0,0,0.9)",
-                }}
-              >
-                Feed
-              </h1>
-              <button
-                onClick={loadFeed}
-                disabled={loading}
-                style={{
-                  padding: "6px 12px",
-                  borderRadius: 6,
-                  border: "1px solid rgba(0,0,0,0.08)",
-                  background: loading ? "rgba(0,0,0,0.05)" : "rgba(255,255,255,0.8)",
-                  cursor: loading ? "not-allowed" : "pointer",
-                  fontWeight: 500,
-                  fontSize: "13px",
-                  color: "rgba(0,0,0,0.7)",
-                  opacity: loading ? 0.6 : 1,
-                }}
-              >
-                {loading ? "Refreshing..." : "Refresh"}
-              </button>
-            </div>
+            {/* Header */}
+            <SectionHeader
+              title="Feed"
+              actions={
+                <Button
+                  onClick={loadFeed}
+                  disabled={loading}
+                  variant="secondary"
+                  size="sm"
+                >
+                  {loading ? "Refreshing..." : "Refresh"}
+                </Button>
+              }
+              level={1}
+            />
 
             {/* Fresh Toggle */}
-            <div
-              style={{
-                display: "flex",
-                alignItems: "center",
-                gap: "12px",
-                marginBottom: "20px",
-                padding: "12px 16px",
-                borderRadius: "8px",
-                backgroundColor: "var(--control-bg)",
-                border: "1px solid var(--border)",
-              }}
-            >
-              <button
+            <Card className="feed-fresh-toggle">
+              <Button
                 onClick={() => setShowFreshOnly(!showFreshOnly)}
-                style={{
-                  padding: "6px 12px",
-                  borderRadius: "6px",
-                  border: "1px solid var(--border)",
-                  backgroundColor: showFreshOnly ? "var(--ink)" : "var(--surface)",
-                  color: showFreshOnly ? "var(--bg)" : "var(--ink)",
-                  cursor: "pointer",
-                  fontSize: "13px",
-                  fontWeight: 500,
-                }}
+                variant={showFreshOnly ? "primary" : "secondary"}
+                size="sm"
               >
                 {showFreshOnly ? "✓ Fresh Only" : "Show Fresh Only"}
-              </button>
-              <span style={{ fontSize: "13px", color: "var(--ink-muted)" }}>
+              </Button>
+              <span className="feed-item-count">
                 {feedSections.length > 0
                   ? `${feedSections.reduce((sum, s) => sum + s.items.length, 0)} items across ${feedSections.length} sections`
                   : feedItems.length > 0
                   ? `${feedItems.length} items`
                   : ""}
               </span>
-            </div>
+            </Card>
 
             {/* Feed Posts - Section-based or flat */}
             {loading ? (
@@ -2198,36 +2024,18 @@ export default function ExploreFeed() {
                   </div>
                 )}
                 {feedHasMore && !feedLoadingMore && (
-                  <div style={{ textAlign: "center", marginTop: "24px" }}>
-                    <button
-                      onClick={loadMoreFeed}
-                      style={{
-                        padding: "10px 20px",
-                        borderRadius: "8px",
-                        border: "1px solid var(--border)",
-                        backgroundColor: "var(--control-bg)",
-                        color: "var(--ink)",
-                        cursor: "pointer",
-                        fontSize: "14px",
-                        fontWeight: 500,
-                      }}
-                    >
+                  <div className="feed-load-more-wrapper">
+                    <Button onClick={loadMoreFeed} variant="secondary" size="md">
                       Load More
-                    </button>
+                    </Button>
                   </div>
                 )}
               </div>
             ) : feedItems.length === 0 ? (
-              <div
-                style={{
-                  textAlign: "center",
-                  padding: "40px 20px",
-                  color: "var(--ink-muted)",
-                }}
-              >
-                <p style={{ fontSize: "15px", marginBottom: "6px" }}>No posts yet</p>
-                <p style={{ fontSize: "13px" }}>Your feed will appear here once content is available.</p>
-              </div>
+              <EmptyState
+                title="No posts yet"
+                message="Your feed will appear here once content is available."
+              />
             ) : (
               // Fallback to flat feed
               <div>
@@ -2246,22 +2054,10 @@ export default function ExploreFeed() {
                   </div>
                 )}
                 {feedHasMore && !feedLoadingMore && (
-                  <div style={{ textAlign: "center", marginTop: "24px" }}>
-                    <button
-                      onClick={loadMoreFeed}
-                      style={{
-                        padding: "10px 20px",
-                        borderRadius: "8px",
-                        border: "1px solid var(--border)",
-                        backgroundColor: "var(--control-bg)",
-                        color: "var(--ink)",
-                        cursor: "pointer",
-                        fontSize: "14px",
-                        fontWeight: 500,
-                      }}
-                    >
+                  <div className="feed-load-more-wrapper">
+                    <Button onClick={loadMoreFeed} variant="secondary" size="md">
                       Load More
-                    </button>
+                    </Button>
                   </div>
                 )}
               </div>
@@ -2270,7 +2066,7 @@ export default function ExploreFeed() {
         )}
 
         {/* Echo Composer - removed, now inline in cards */}
-      </div>
+      </Container>
 
       <LoginModal
         isOpen={showLoginModal}

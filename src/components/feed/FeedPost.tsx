@@ -25,6 +25,7 @@ export type FeedPostItem = {
 type FeedPostProps = {
   item: FeedPostItem;
   index: number;
+  featured?: boolean;
 };
 
 const SOURCE_ICONS: Record<Source, string> = {
@@ -77,7 +78,7 @@ function isVideoUrl(url: string, metadata?: Record<string, unknown>): boolean {
   return lower.includes("youtube.com") || lower.includes("youtu.be") || lower.includes("vimeo.com");
 }
 
-export default function FeedPost({ item, index }: FeedPostProps) {
+export default function FeedPost({ item, index, featured = false }: FeedPostProps) {
   const [imageLoaded, setImageLoaded] = useState(false);
   const [imageError, setImageError] = useState(false);
   const [expanded, setExpanded] = useState(false);
@@ -150,13 +151,8 @@ export default function FeedPost({ item, index }: FeedPostProps) {
 
   return (
     <article
-      className="feed-post"
+      className={`feed-post ${featured ? "feed-post-featured" : "feed-post-grid"}`}
       style={{
-        maxWidth: "680px",
-        width: "100%",
-        margin: "0 auto",
-        padding: "0 0 32px 0",
-        borderBottom: index === 0 ? "none" : "1px solid var(--border)",
         animation: `fadeInUp 0.3s ease-out ${index * 0.03}s both`,
       }}
     >
@@ -245,7 +241,7 @@ export default function FeedPost({ item, index }: FeedPostProps) {
                     width: "64px",
                     height: "64px",
                     borderRadius: "50%",
-                    backgroundColor: "rgba(0, 0, 0, 0.7)",
+                    backgroundColor: "var(--overlay-strong)",
                     display: "flex",
                     alignItems: "center",
                     justifyContent: "center",
@@ -286,12 +282,13 @@ export default function FeedPost({ item, index }: FeedPostProps) {
         {/* Title - emphasized */}
         {item.title && (
           <h2
+            className={featured ? "feed-post-title-featured" : "feed-post-title"}
             style={{
-              fontSize: "20px",
-              fontWeight: 600,
-              lineHeight: 1.4,
-              marginBottom: hasSummary ? "10px" : "8px",
-              color: "var(--ink)",
+              fontSize: featured ? "32px" : "20px",
+              fontWeight: featured ? 700 : 600,
+              lineHeight: featured ? 1.3 : 1.4,
+              marginBottom: hasSummary ? (featured ? "16px" : "10px") : (featured ? "12px" : "8px"),
+              color: "var(--text-primary)",
             }}
           >
             <a
@@ -317,11 +314,12 @@ export default function FeedPost({ item, index }: FeedPostProps) {
         {/* Summary - text-forward */}
         {hasSummary && (
           <div
+            className={featured ? "feed-post-summary-featured" : "feed-post-summary"}
             style={{
-              fontSize: "15px",
-              lineHeight: 1.6,
-              color: "var(--ink-muted)",
-              marginBottom: "12px",
+              fontSize: featured ? "18px" : "15px",
+              lineHeight: featured ? 1.7 : 1.6,
+              color: "var(--text-secondary)",
+              marginBottom: featured ? "16px" : "12px",
             }}
           >
             {displaySummary}
@@ -344,9 +342,34 @@ export default function FeedPost({ item, index }: FeedPostProps) {
           </div>
         )}
 
+        {/* Tags */}
+        {(item.tags && item.tags.length > 0) && (
+          <div className="feed-post-tags" style={{ marginTop: featured ? "16px" : "12px", marginBottom: featured ? "16px" : "12px" }}>
+            {item.tags.slice(0, featured ? 8 : 4).map((tag, i) => (
+              <span
+                key={i}
+                className="feed-post-tag"
+                style={{
+                  display: "inline-block",
+                  padding: featured ? "6px 12px" : "4px 10px",
+                  marginRight: "8px",
+                  marginBottom: "6px",
+                  borderRadius: "16px",
+                  fontSize: featured ? "13px" : "12px",
+                  backgroundColor: "var(--surface-2)",
+                  color: "var(--text-secondary)",
+                  border: "1px solid var(--border)",
+                }}
+              >
+                {tag}
+              </span>
+            ))}
+          </div>
+        )}
+
         {/* Source link - minimal */}
         {item.url && (
-          <div style={{ marginTop: "8px", fontSize: "13px", color: "rgba(0,0,0,0.5)" }}>
+          <div className="feed-post-source" style={{ marginTop: "8px", fontSize: "13px", color: "var(--text-muted)" }}>
             <a
               href={item.url}
               target="_blank"
@@ -415,7 +438,7 @@ export default function FeedPost({ item, index }: FeedPostProps) {
             transition: "color 0.2s",
           }}
           onMouseEnter={(e) => {
-            e.currentTarget.style.color = "rgba(0,0,0,0.8)";
+            e.currentTarget.style.color = "var(--text-primary)";
           }}
           onMouseLeave={(e) => {
             e.currentTarget.style.color = showEchoComposer ? "var(--ink-muted)" : "var(--ink-tertiary)";

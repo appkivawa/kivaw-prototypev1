@@ -95,8 +95,8 @@ export default function TimelineEchoPost({ echo, onDelete }: TimelineEchoPostPro
               style={{
                 padding: "2px 6px",
                 borderRadius: "4px",
-                backgroundColor: "rgba(34, 197, 94, 0.1)",
-                color: "rgba(34, 197, 94, 0.8)",
+                backgroundColor: "var(--success)",
+                color: "var(--success-text)",
                 fontSize: "11px",
                 fontWeight: 500,
               }}
@@ -252,16 +252,16 @@ export default function TimelineEchoPost({ echo, onDelete }: TimelineEchoPostPro
           style={{
             background: "none",
             border: "none",
-            color: "rgba(239, 68, 68, 0.6)",
+            color: "var(--danger-text)",
             cursor: "pointer",
             fontSize: "12px",
             padding: "4px 0",
           }}
           onMouseEnter={(e) => {
-            e.currentTarget.style.color = "rgba(239, 68, 68, 0.8)";
+            e.currentTarget.style.color = "var(--danger-text)";
           }}
           onMouseLeave={(e) => {
-            e.currentTarget.style.color = "rgba(239, 68, 68, 0.6)";
+            e.currentTarget.style.color = "var(--danger-text)";
           }}
         >
           Delete

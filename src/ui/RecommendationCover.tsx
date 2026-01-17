@@ -33,27 +33,27 @@ export default function RecommendationCover({
     // Simple hash of title to pick a variant within the type's color family
     const hash = title.split("").reduce((acc, char) => acc + char.charCodeAt(0), 0);
     
-    // Type-specific gradient families for visual variety
+    // Type-specific gradient families - warm beige/cream tones
     const gradientFamilies: Record<string, string[]> = {
       watch: [
-        "linear-gradient(135deg, #fce7f3 0%, #f3e8ff 50%, #e0e7ff 100%)",
-        "linear-gradient(135deg, #fef3c7 0%, #fde68a 50%, #fcd34d 100%)",
-        "linear-gradient(135deg, #dbeafe 0%, #bfdbfe 50%, #93c5fd 100%)",
+        "linear-gradient(135deg, #F5F0EA 0%, #E8E0D6 50%, #D4C4B0 100%)",
+        "linear-gradient(135deg, #FAF8F4 0%, #F0EAE0 50%, #E8E0D6 100%)",
+        "linear-gradient(135deg, #E8E0D6 0%, #D4C4B0 50%, #C4B09A 100%)",
       ],
       read: [
-        "linear-gradient(135deg, #fef3c7 0%, #fde68a 50%, #fcd34d 100%)",
-        "linear-gradient(135deg, #fef2f2 0%, #fee2e2 50%, #fecaca 100%)",
-        "linear-gradient(135deg, #f0fdf4 0%, #dcfce7 50%, #bbf7d0 100%)",
+        "linear-gradient(135deg, #FAF8F4 0%, #F0EAE0 50%, #E8E0D6 100%)",
+        "linear-gradient(135deg, #F5F0EA 0%, #E8E0D6 50%, #D4C4B0 100%)",
+        "linear-gradient(135deg, #F0EAE0 0%, #E8E0D6 50%, #D4C4B0 100%)",
       ],
       event: [
-        "linear-gradient(135deg, #dbeafe 0%, #bfdbfe 50%, #93c5fd 100%)",
-        "linear-gradient(135deg, #e0e7ff 0%, #c7d2fe 50%, #a5b4fc 100%)",
-        "linear-gradient(135deg, #dbeafe 0%, #bfdbfe 50%, #60a5fa 100%)",
+        "linear-gradient(135deg, #E8E0D6 0%, #D4C4B0 50%, #C4B09A 100%)",
+        "linear-gradient(135deg, #F0EAE0 0%, #E8E0D6 50%, #D4C4B0 100%)",
+        "linear-gradient(135deg, #E8E0D6 0%, #D4C4B0 50%, #C4B09A 100%)",
       ],
       listen: [
-        "linear-gradient(135deg, #e9d5ff 0%, #ddd6fe 50%, #c4b5fd 100%)",
-        "linear-gradient(135deg, #f3e8ff 0%, #e9d5ff 50%, #d8b4fe 100%)",
-        "linear-gradient(135deg, #faf5ff 0%, #f3e8ff 50%, #e9d5ff 100%)",
+        "linear-gradient(135deg, #F5F0EA 0%, #E8E0D6 50%, #D4C4B0 100%)",
+        "linear-gradient(135deg, #FAF8F4 0%, #F0EAE0 50%, #E8E0D6 100%)",
+        "linear-gradient(135deg, #F0EAE0 0%, #E8E0D6 50%, #D4C4B0 100%)",
       ],
     };
     

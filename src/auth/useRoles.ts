@@ -70,6 +70,7 @@ export function useRoles() {
     const now = Date.now();
 
     if (cached && cacheTime && now - cacheTime < CACHE_DURATION) {
+      // Logs removed in production for security
       if (import.meta.env.DEV) {
         console.log("[useRoles] Using cached roles for user:", userId);
         console.log("[useRoles] Cached role keys:", cached.map((r) => r.key));
@@ -175,6 +176,7 @@ export function useRoles() {
           .map((ur: any) => {
             // The query uses "role:roles!..." so the property is "role" (singular)
             const role = ur.role as { id: string; key: string; name: string } | null;
+            // Log removed in production for security
             if (import.meta.env.DEV && role) {
               console.log("[useRoles] Extracted role:", role.key, role);
             }
@@ -186,6 +188,7 @@ export function useRoles() {
       // Check admin status directly from query result
       const isAdminFromQuery = (data ?? []).some((r: any) => r.role?.key === "admin");
 
+      // Logs removed in production for security
       if (import.meta.env.DEV) {
         console.log("[useRoles] Admin check from query result:", isAdminFromQuery);
         console.log("[useRoles] Extracted roles:", userRoles);
@@ -422,6 +425,7 @@ export function useRoles() {
   // Memoized isAdmin check
   const isAdminValue = useMemo(() => {
     const result = checkIsAdmin(roleKeys);
+    // Log removed in production for security
     if (import.meta.env.DEV) {
       console.log("[useRoles] isAdmin check:", { roleKeys, result, rpcAdminCheck });
     }
@@ -431,6 +435,7 @@ export function useRoles() {
   // Memoized isOps check
   const isOpsValue = useMemo(() => {
     const result = checkIsOps(roleKeys);
+    // Log removed in production for security
     if (import.meta.env.DEV) {
       console.log("[useRoles] isOps check:", { roleKeys, result });
     }
@@ -446,6 +451,7 @@ export function useRoles() {
   const hasAnyRoleFn = useCallback(
     (allow: RoleKey[]): boolean => {
       const result = hasAnyRole(roleKeys, allow);
+      // Log removed in production for security
       if (import.meta.env.DEV) {
         console.log("[useRoles] hasAnyRole check:", { roleKeys, allow, result });
       }

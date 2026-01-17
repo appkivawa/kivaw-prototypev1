@@ -5,6 +5,13 @@ import { getMyProfile } from "../data/profileApi";
 import { supabase } from "../lib/supabaseClient";
 import LoginModal from "../components/auth/LoginModal";
 import OnboardingModal from "../components/auth/OnboardingModal";
+import Container from "../ui/Container";
+import Card from "../ui/Card";
+import Button from "../ui/Button";
+import SectionHeader from "../ui/SectionHeader";
+import Tag from "../ui/Tag";
+import EmptyState from "../ui/EmptyState";
+import "../styles/profile.css";
 
 type ProfileData = {
   id: string;
@@ -135,228 +142,173 @@ export default function Profile() {
 
   if (sessionLoading || loading) {
     return (
-      <div style={{ padding: "40px 20px", textAlign: "center" }}>
-        <p style={{ color: "var(--ink-muted)" }}>Loading...</p>
-      </div>
+      <Container maxWidth="xl" className="profile-loading">
+        <p className="meta-text">Loading...</p>
+      </Container>
     );
   }
 
   if (!isAuthed || !session?.user) {
     return (
-      <div style={{ padding: "40px 20px", maxWidth: "600px", margin: "0 auto" }}>
-        <h1 style={{ fontSize: "28px", fontWeight: 600, marginBottom: "16px", color: "var(--ink)" }}>
-          Profile
-        </h1>
-        <div
-          style={{
-            padding: "24px",
-            borderRadius: "12px",
-            border: "1px solid var(--border)",
-            backgroundColor: "var(--surface)",
-          }}
-        >
-          <p style={{ marginBottom: "16px", color: "var(--ink-muted)" }}>
+      <Container maxWidth="md" className="profile-unauth">
+        <SectionHeader title="Profile" level={1} />
+        <Card>
+          <p className="meta-text" style={{ marginBottom: "16px" }}>
             Please sign in to view your profile.
           </p>
-          <button
-            onClick={() => setShowLoginModal(true)}
-            style={{
-              padding: "10px 20px",
-              borderRadius: "8px",
-              border: "none",
-              backgroundColor: "var(--accent)",
-              color: "var(--bg)",
-              cursor: "pointer",
-              fontSize: "14px",
-              fontWeight: 500,
-            }}
-          >
+          <Button onClick={() => setShowLoginModal(true)} variant="primary" size="md">
             Sign In
-          </button>
-        </div>
+          </Button>
+        </Card>
         <LoginModal
           isOpen={showLoginModal}
           onClose={() => setShowLoginModal(false)}
           title="Sign in to view profile"
           message="We'll send you a magic link to sign in."
         />
-      </div>
+      </Container>
     );
   }
 
   const user = session.user;
   const interests = profile?.interests || [];
+  const userInitial = user.email?.charAt(0).toUpperCase() || "?";
 
   return (
-    <div style={{ padding: "40px 20px", maxWidth: "800px", margin: "0 auto" }}>
-      <h1 style={{ fontSize: "28px", fontWeight: 600, marginBottom: "24px", color: "var(--ink)" }}>
-        Profile
-      </h1>
-
-      <div
-        style={{
-          display: "flex",
-          flexDirection: "column",
-          gap: "24px",
-        }}
-      >
-        {/* User Info Section */}
-        <div
-          style={{
-            padding: "24px",
-            borderRadius: "12px",
-            border: "1px solid var(--border)",
-            backgroundColor: "var(--surface)",
-          }}
-        >
-          <h2 style={{ fontSize: "18px", fontWeight: 600, marginBottom: "16px", color: "var(--ink)" }}>
-            Account
-          </h2>
-          <div style={{ display: "flex", flexDirection: "column", gap: "12px" }}>
-            <div>
-              <strong style={{ display: "inline-block", width: "80px", color: "var(--ink-muted)" }}>
-                Email:
-              </strong>
-              <span style={{ color: "var(--ink)" }}>{user.email || "(no email)"}</span>
+    <div className="profile-page">
+      <Container maxWidth="xl" className="profile-container">
+        {/* Profile Header - Editorial Style */}
+        <div className="profile-header">
+          <div className="profile-avatar-wrapper">
+            <div className="profile-avatar">
+              {userInitial}
             </div>
+            <div className="profile-status-indicator" />
+          </div>
+          
+          <div className="profile-header-content">
+            <div className="profile-badge">PRO MEMBER</div>
+            <h1 className="profile-name">{user.email?.split("@")[0] || "User"}</h1>
+            <div className="profile-stats">
+              <div className="profile-stat">
+                <strong>{stats.echoesCount}</strong> Echoes
+              </div>
+              <div className="profile-stat">
+                <strong>{stats.savedCount}</strong> Saved
+              </div>
+              <div className="profile-stat">
+                <strong>{interests.length}</strong> Interests
+              </div>
+            </div>
+          </div>
+
+          <div className="profile-header-actions">
+            <Button onClick={handleEditInterests} variant="primary" size="md">
+              Edit Profile
+            </Button>
           </div>
         </div>
 
-        {/* Stats Section */}
-        <div
-          style={{
-            padding: "24px",
-            borderRadius: "12px",
-            border: "1px solid var(--border)",
-            backgroundColor: "var(--surface)",
-          }}
-        >
-          <h2 style={{ fontSize: "18px", fontWeight: 600, marginBottom: "16px", color: "var(--ink)" }}>
-            Activity
-          </h2>
-          <div
-            style={{
-              display: "flex",
-              gap: "24px",
-              flexWrap: "wrap",
-            }}
-          >
-            <div>
-              <div style={{ fontSize: "24px", fontWeight: 700, color: "var(--ink)" }}>
-                {stats.echoesCount}
-              </div>
-              <div style={{ fontSize: "14px", color: "var(--ink-muted)", marginTop: "4px" }}>
-                Echoes
-              </div>
-            </div>
-            <div>
-              <div style={{ fontSize: "24px", fontWeight: 700, color: "var(--ink)" }}>
-                {stats.savedCount}
-              </div>
-              <div style={{ fontSize: "14px", color: "var(--ink-muted)", marginTop: "4px" }}>
-                Saved
-              </div>
-            </div>
-          </div>
-        </div>
+        {/* Navigation Tabs */}
+        <nav className="profile-tabs">
+          <button className="profile-tab active">Overview</button>
+          <button className="profile-tab">Collections</button>
+          <button className="profile-tab">Liked Media</button>
+          <button className="profile-tab">Reviews</button>
+          <button className="profile-tab">Settings</button>
+        </nav>
 
-        {/* Interests Section */}
-        <div
-          style={{
-            padding: "24px",
-            borderRadius: "12px",
-            border: "1px solid var(--border)",
-            backgroundColor: "var(--surface)",
-          }}
-        >
-          <div
-            style={{
-              display: "flex",
-              justifyContent: "space-between",
-              alignItems: "center",
-              marginBottom: "16px",
-            }}
-          >
-            <h2 style={{ fontSize: "18px", fontWeight: 600, color: "var(--ink)" }}>Interests</h2>
-            <button
-              onClick={handleEditInterests}
-              style={{
-                padding: "6px 12px",
-                borderRadius: "6px",
-                border: "1px solid var(--border)",
-                backgroundColor: "var(--control-bg)",
-                color: "var(--ink)",
-                cursor: "pointer",
-                fontSize: "13px",
-                fontWeight: 500,
-              }}
-            >
-              Edit
-            </button>
-          </div>
-          {interests.length > 0 ? (
-            <div
-              style={{
-                display: "flex",
-                flexWrap: "wrap",
-                gap: "8px",
-              }}
-            >
-              {interests.map((interest) => (
-                <span
-                  key={interest}
-                  style={{
-                    padding: "6px 12px",
-                    borderRadius: "16px",
-                    backgroundColor: "var(--control-bg)",
-                    color: "var(--ink)",
-                    fontSize: "13px",
-                    fontWeight: 500,
-                    border: "1px solid var(--border)",
-                  }}
-                >
-                  {interest}
-                </span>
-              ))}
+        {/* Main Content Grid */}
+        <div className="profile-content-grid">
+          {/* Left Column - Featured Collections */}
+          <div className="profile-main-content">
+            <SectionHeader
+              title="Featured Collections"
+              actions={<a href="#" className="profile-view-all">View All</a>}
+              level={2}
+            />
+            
+            <div className="profile-collections-grid">
+              {/* Collection cards would go here - placeholder for now */}
+              <Card className="profile-collection-card">
+                <div className="profile-collection-image">
+                  <div className="profile-collection-placeholder">📚</div>
+                </div>
+                <h3 className="profile-collection-title">My Echoes</h3>
+                <p className="profile-collection-meta">{stats.echoesCount} Items • Echoes</p>
+              </Card>
+              
+              <Card className="profile-collection-card">
+                <div className="profile-collection-image">
+                  <div className="profile-collection-placeholder">💾</div>
+                </div>
+                <h3 className="profile-collection-title">Saved Items</h3>
+                <p className="profile-collection-meta">{stats.savedCount} Items • Saved</p>
+              </Card>
+
+              <Card className="profile-collection-card profile-collection-new">
+                <div className="profile-collection-image">
+                  <div className="profile-collection-placeholder">+</div>
+                </div>
+                <h3 className="profile-collection-title">New Collection</h3>
+                <p className="profile-collection-meta">Create custom list</p>
+              </Card>
             </div>
-          ) : (
-            <p style={{ color: "var(--ink-muted)", fontSize: "14px" }}>
-              No interests selected.{" "}
-              <button
-                onClick={handleEditInterests}
-                style={{
-                  background: "none",
-                  border: "none",
-                  color: "var(--accent)",
-                  cursor: "pointer",
-                  textDecoration: "underline",
-                  fontSize: "14px",
-                  padding: 0,
-                }}
-              >
-                Add some
-              </button>
-            </p>
-          )}
+          </div>
+
+          {/* Right Column - Sidebar */}
+          <aside className="profile-sidebar">
+            {/* Recently Played */}
+            <SectionHeader title="Recently Played" level={3} />
+            <div className="profile-recent-list">
+              {stats.echoesCount > 0 ? (
+                <div className="profile-recent-item">
+                  <div className="profile-recent-thumbnail">🎵</div>
+                  <div className="profile-recent-content">
+                    <div className="profile-recent-title">Your Echoes</div>
+                    <div className="profile-recent-meta">Echoes • {stats.echoesCount} items</div>
+                    <div className="profile-recent-time">Recently</div>
+                  </div>
+                </div>
+              ) : (
+                <p className="meta-text">No recent activity</p>
+              )}
+            </div>
+
+            {/* Saved for Later */}
+            <SectionHeader title="Saved for Later" level={3} />
+            <Card className="profile-saved-card">
+              <div className="profile-saved-icon">📌</div>
+              <div className="profile-saved-content">
+                <strong>{stats.savedCount} Items Saved</strong>
+                <p className="meta-text">Catch up on your saved content</p>
+                <Button onClick={() => navigate("/saved")} variant="primary" size="sm" className="profile-saved-button">
+                  View Watchlist
+                </Button>
+              </div>
+            </Card>
+
+            {/* Interests */}
+            <SectionHeader title="Interests" level={3} />
+            {interests.length > 0 ? (
+              <div className="profile-interests">
+                {interests.map((interest) => (
+                  <Tag key={interest} label={interest} variant="subtle" />
+                ))}
+              </div>
+            ) : (
+              <p className="meta-text">No interests selected. <button onClick={handleEditInterests} className="profile-link">Add some</button></p>
+            )}
+          </aside>
         </div>
 
         {/* Error Section */}
         {error && (
-          <div
-            style={{
-              padding: "24px",
-              borderRadius: "12px",
-              border: "1px solid var(--border-strong)",
-              backgroundColor: "var(--surface)",
-            }}
-          >
-            <h2 style={{ fontSize: "18px", fontWeight: 600, marginBottom: "12px", color: "var(--ink)" }}>
-              Error
-            </h2>
-            <p style={{ color: "var(--ink-muted)" }}>{error}</p>
-          </div>
+          <Card variant="danger" className="profile-error">
+            <strong>Error:</strong> {error}
+          </Card>
         )}
-      </div>
+      </Container>
 
       {/* Modals */}
       <LoginModal

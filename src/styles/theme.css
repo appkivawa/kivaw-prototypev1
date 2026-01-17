@@ -1,6 +1,6 @@
 /* ============================================================
    KIVAW EDITORIAL THEME TOKENS
-   Light mode = paper + ink (reading room)
+   Light mode = clean neutral studio
    Dark mode = ink + ash (late-night studio)
 ============================================================ */
 
@@ -9,14 +9,16 @@
   --font: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif, "Apple Color Emoji", "Segoe UI Emoji";
 
   /* ========== EDITORIAL COLOR TOKENS ========== */
-  /* Light mode: paper + ink */
-  --bg-primary: #F5F3F0; /* Warm off-white paper */
-  --bg-secondary: #F9F8F6; /* Slightly lighter paper */
-  --text-primary: #1A1A1A; /* Deep ink */
-  --text-secondary: #4A4A4A; /* Medium ink */
-  --text-muted: #6A6A6A; /* Light ink */
-  --divider: rgba(26, 26, 26, 0.08); /* Subtle divider */
-  --accent: #8B7355; /* Warm brown accent (used sparingly) */
+  /* Light mode: clean neutral studio - matching reference images */
+  --bg-primary: #ffffff; /* Pure white */
+  --bg-secondary: #fafafa; /* Very light gray */
+  --text-primary: #2C2416; /* Warm dark brown (replaces black) */
+  --text-secondary: #4A3D2E; /* Warm medium brown */
+  --text-muted: #8B7A6B; /* Warm muted brown */
+  --divider: #E8E0D6; /* Warm light beige border */
+  --accent: #FF9F6B; /* Soft peach accent */
+  --accent-gradient: linear-gradient(135deg, #FF9F6B 0%, #FFB085 100%); /* Peach gradient */
+  --accent-light: #FFB085; /* Light peach */
 
   /* Legacy aliases for backward compatibility */
   --ink: var(--text-primary);
@@ -37,46 +39,52 @@
   --bg-glow: transparent;
 
   /* Surfaces */
-  --surface: rgba(249, 248, 246, 0.95); /* Slightly off-white */
-  --surface-2: rgba(245, 243, 240, 0.60);
-  --surface-3: rgba(245, 243, 240, 0.40);
+  --surface: #ffffff; /* Pure white */
+  --surface-2: #FAFAFA; /* Very light neutral gray */
+  --surface-3: #F7F7F7; /* Light neutral gray */
   --card: var(--surface);
-  --cardSolid: #F9F8F6;
+  --cardSolid: #ffffff;
 
   /* Borders */
-  --border: var(--divider);
-  --border-strong: rgba(26, 26, 26, 0.12);
-  --border-gold: rgba(139, 115, 85, 0.20);
+  --border: #E8E0D6; /* Warm light beige border */
+  --border-strong: #D4C4B0; /* Warm medium beige border */
+  --border-subtle: #F0F0F0; /* Very subtle neutral border */
+  --border-gold: rgba(255, 159, 107, 0.20); /* Peach accent borders */
 
   /* Shadows */
   --shadow: none;
   --shadow-soft: none;
   --shadow2: none;
+  --shadow-black-02: rgba(44, 36, 22, 0.02);
+  --shadow-black-04: rgba(44, 36, 22, 0.04);
+  --shadow-black-06: rgba(44, 36, 22, 0.06);
+  --shadow-black-08: rgba(44, 36, 22, 0.08);
+  --shadow-black-12: rgba(44, 36, 22, 0.12);
 
   /* Accents */
-  --accent-2: rgba(139, 115, 85, 0.30);
+  --accent-2: rgba(255, 159, 107, 0.15);
   --accent-ink: var(--text-primary);
-  --gold: #8B7355;
-  --gold-light: #A68B6F;
-  --gold-dark: #6B5A45;
+  --gold: #FF9F6B;
+  --gold-light: #FFB085;
+  --gold-dark: #FF8E53;
   --accentText: var(--text-primary);
   --accentTextDark: var(--text-primary);
 
   /* Pills/Tags */
-  --pillBg: rgba(249, 248, 246, 0.80);
-  --pillBorder: rgba(26, 26, 26, 0.10);
+  --pillBg: #ffffff;
+  --pillBorder: #E8E0D6;
 
   /* Focus */
-  --focus: rgba(139, 115, 85, 0.20);
-  --focus-blue: rgba(139, 115, 85, 0.15);
+  --focus: rgba(255, 159, 107, 0.20);
+  --focus-blue: rgba(255, 159, 107, 0.15);
 
   /* Nav */
-  --nav-bg: rgba(249, 248, 246, 0.95);
+  --nav-bg: #ffffff;
   --nav-border: var(--divider);
 
   /* Controls */
-  --control-bg: rgba(249, 248, 246, 0.80);
-  --control-ring: rgba(139, 115, 85, 0.15);
+  --control-bg: #F5F0EA;
+  --control-ring: rgba(255, 159, 107, 0.15);
 
   /* Buttons */
   --btn-shadow: none;
@@ -90,31 +98,33 @@
 
   --max: 1100px;
 
-  /* Legacy whites (mapped to paper tones) */
-  --white: #F9F8F6;
-  --white-90: rgba(249, 248, 246, 0.90);
-  --white-85: rgba(249, 248, 246, 0.85);
-  --white-82: rgba(249, 248, 246, 0.82);
-  --white-80: rgba(249, 248, 246, 0.80);
-  --white-78: rgba(249, 248, 246, 0.78);
-  --white-75: rgba(249, 248, 246, 0.75);
-  --white-72: rgba(249, 248, 246, 0.72);
-  --white-70: rgba(249, 248, 246, 0.70);
-  --white-65: rgba(249, 248, 246, 0.65);
-  --white-60: rgba(249, 248, 246, 0.60);
-  --white-55: rgba(249, 248, 246, 0.55);
+  /* Legacy whites (mapped to neutral tones) */
+  --white: #ffffff;
+  --white-90: rgba(255, 255, 255, 0.90);
+  --white-85: rgba(255, 255, 255, 0.85);
+  --white-82: rgba(255, 255, 255, 0.82);
+  --white-80: rgba(255, 255, 255, 0.80);
+  --white-78: rgba(255, 255, 255, 0.78);
+  --white-75: rgba(255, 255, 255, 0.75);
+  --white-72: rgba(255, 255, 255, 0.72);
+  --white-70: rgba(255, 255, 255, 0.70);
+  --white-65: rgba(255, 255, 255, 0.65);
+  --white-60: rgba(255, 255, 255, 0.60);
+  --white-55: rgba(255, 255, 255, 0.55);
 }
 
-/* ========== LIGHT MODE: PAPER + INK (reading room) ========== */
+/* ========== LIGHT MODE: CLEAN NEUTRAL STUDIO ========== */
 :root[data-theme="light"] {
   /* Same as default, but explicitly defined for consistency */
-  --bg-primary: #F5F3F0;
-  --bg-secondary: #F9F8F6;
-  --text-primary: #1A1A1A;
-  --text-secondary: #4A4A4A;
-  --text-muted: #6A6A6A;
-  --divider: rgba(26, 26, 26, 0.08);
-  --accent: #8B7355;
+  --bg-primary: #ffffff;
+  --bg-secondary: #fafafa;
+  --text-primary: #2C2416;
+  --text-secondary: #4A3D2E;
+  --text-muted: #8B7A6B;
+  --divider: #E8E0D6;
+  --accent: #FF9F6B;
+  --accent-gradient: linear-gradient(135deg, #FF9F6B 0%, #FFB085 100%);
+  --accent-light: #FFB085;
 }
 
 /* ========== DARK MODE: INK + ASH (late-night studio) ========== */
@@ -126,7 +136,7 @@
   --text-secondary: #B8B5AD; /* Medium ash */
   --text-muted: #8B8880; /* Muted ash */
   --divider: rgba(232, 230, 225, 0.10); /* Subtle divider */
-  --accent: #A68B6F; /* Warm ash accent (used sparingly) */
+  --accent: #6A6A6A; /* Neutral gray accent */
 
   /* Legacy aliases */
   --ink: var(--text-primary);
@@ -156,7 +166,7 @@
   /* Borders */
   --border: var(--divider);
   --border-strong: rgba(232, 230, 225, 0.15);
-  --border-gold: rgba(166, 139, 111, 0.25);
+  --border-gold: rgba(106, 106, 106, 0.25);
 
   /* Shadows */
   --shadow: none;
@@ -164,11 +174,11 @@
   --shadow2: none;
 
   /* Accents */
-  --accent-2: rgba(166, 139, 111, 0.30);
+  --accent-2: rgba(106, 106, 106, 0.30);
   --accent-ink: var(--text-primary);
-  --gold: #A68B6F;
-  --gold-light: #B8A085;
-  --gold-dark: #8B7355;
+  --gold: #6A6A6A;
+  --gold-light: #8B8880;
+  --gold-dark: #4A4A4A;
   --accentText: var(--text-primary);
   --accentTextDark: var(--text-primary);
 
@@ -177,8 +187,8 @@
   --pillBorder: rgba(232, 230, 225, 0.15);
 
   /* Focus */
-  --focus: rgba(166, 139, 111, 0.25);
-  --focus-blue: rgba(166, 139, 111, 0.20);
+  --focus: rgba(106, 106, 106, 0.25);
+  --focus-blue: rgba(106, 106, 106, 0.20);
 
   /* Nav */
   --nav-bg: rgba(26, 26, 26, 0.95);
@@ -186,7 +196,7 @@
 
   /* Controls */
   --control-bg: rgba(36, 36, 36, 0.80);
-  --control-ring: rgba(166, 139, 111, 0.20);
+  --control-ring: rgba(106, 106, 106, 0.20);
 
   /* Buttons */
   --btn-shadow: none;

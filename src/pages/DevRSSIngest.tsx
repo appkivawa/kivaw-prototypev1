@@ -1,6 +1,10 @@
 // src/pages/DevRSSIngest.tsx
 // Local dev-only page for triggering RSS ingest
+// Production: Admin-only button to trigger RSS ingest
 import { useState } from "react";
+import { supabase } from "../lib/supabaseClient";
+import { useRoles } from "../auth/useRoles";
+import { useSession } from "../auth/useSession";
 
 type IngestResult = {
   ok: boolean;
@@ -22,14 +26,25 @@ export default function DevRSSIngest() {
   const [loading, setLoading] = useState(false);
   const [result, setResult] = useState<IngestResult | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const { session, isAuthed } = useSession();
+  const { isAdmin, loading: rolesLoading } = useRoles();
 
-  // Only show in development
+  // In production, only show to admins
   if (import.meta.env.PROD) {
-    return (
-      <div style={{ padding: 40, textAlign: "center" }}>
-        <p>This page is only available in development mode.</p>
-      </div>
-    );
+    if (rolesLoading) {
+      return (
+        <div style={{ padding: 40, textAlign: "center" }}>
+          <p>Loading...</p>
+        </div>
+      );
+    }
+    if (!isAuthed || !isAdmin) {
+      return (
+        <div style={{ padding: 40, textAlign: "center" }}>
+          <p>This page is only available to administrators.</p>
+        </div>
+      );
+    }
   }
 
   async function triggerIngest() {
@@ -38,32 +53,32 @@ export default function DevRSSIngest() {
     setResult(null);
 
     try {
-      // For local dev, call the local Supabase Edge Function
-      // Default port is 54321 for supabase start
-      const localSupabaseUrl = import.meta.env.VITE_SUPABASE_URL || "http://localhost:54321";
-      const functionUrl = `${localSupabaseUrl}/functions/v1/ingest_rss`;
+      // Get user ID from session if available
+      const userId = session?.user?.id || null;
 
-      const response = await fetch(functionUrl, {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          // Include anon key if available (for local dev)
-          ...(import.meta.env.VITE_SUPABASE_ANON_KEY && {
-            apikey: import.meta.env.VITE_SUPABASE_ANON_KEY,
-          }),
-        },
-        body: JSON.stringify({
+      // Use Supabase client to call the Edge Function (works in both dev and production)
+      const { data, error: invokeError } = await supabase.functions.invoke<IngestResult>("ingest_rss", {
+        body: {
+          ...(userId && { user_id: userId }),
           maxFeeds: 50,
           perFeedLimit: 100,
-        }),
+        },
       });
 
-      if (!response.ok) {
-        const errorText = await response.text();
-        throw new Error(`HTTP ${response.status}: ${errorText}`);
+      if (invokeError) {
+        if (invokeError.message?.includes("403") || invokeError.message?.includes("Forbidden")) {
+          throw new Error(
+            "Access forbidden. The RSS ingest function may require admin access. " +
+            "Please ensure you are logged in as an administrator."
+          );
+        }
+        throw invokeError;
       }
 
-      const data = await response.json();
+      if (data?.error) {
+        throw new Error(data.error);
+      }
+
       setResult(data as IngestResult);
     } catch (e: any) {
       console.error("Error triggering RSS ingest:", e);
@@ -86,9 +101,13 @@ export default function DevRSSIngest() {
   return (
     <div style={{ padding: 40, maxWidth: 1000, margin: "0 auto" }}>
       <div style={{ marginBottom: 32 }}>
-        <h1 style={{ fontSize: 32, fontWeight: 700, marginBottom: 8 }}>RSS Ingest (Dev Only)</h1>
+        <h1 style={{ fontSize: 32, fontWeight: 700, marginBottom: 8 }}>
+          RSS Ingest {import.meta.env.PROD ? "(Admin Only)" : "(Dev Only)"}
+        </h1>
         <p style={{ color: "var(--text-muted)", fontSize: 14 }}>
-          Trigger RSS ingestion locally. This page is only available in development mode.
+          {import.meta.env.PROD
+            ? "Manually trigger RSS ingestion. This will process all active RSS sources and fetch the latest items."
+            : "Trigger RSS ingestion locally. This page is only available in development mode."}
         </p>
       </div>
 
@@ -317,4 +336,5 @@ export default function DevRSSIngest() {
     </div>
   );
 }
+
 

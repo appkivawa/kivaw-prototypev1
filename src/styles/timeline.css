@@ -1,0 +1,94 @@
+/* Timeline Page Styles (Editorial Studio) */
+
+.timeline-page {
+  min-height: 100vh;
+  background: var(--bg-primary);
+  padding: 48px 0;
+}
+
+.timeline-container {
+  padding-top: 0;
+}
+
+.timeline-loading-page,
+.timeline-unauth {
+  padding-top: 80px;
+  text-align: center;
+}
+
+.timeline-unauth-card {
+  text-align: center;
+  padding: 48px 40px;
+}
+
+.timeline-unauth-header {
+  margin-bottom: 32px;
+}
+
+.timeline-mode-toggle {
+  display: flex;
+  gap: 24px;
+  align-items: baseline;
+}
+
+.timeline-mode-btn {
+  padding: 0;
+  border: none;
+  background: transparent;
+  cursor: pointer;
+  font-weight: 400;
+  font-size: 16px;
+  color: var(--text-muted);
+  text-decoration: none;
+  transition: all 0.2s ease;
+  font-family: inherit;
+}
+
+.timeline-mode-btn:hover {
+  color: var(--text-primary);
+}
+
+.timeline-mode-btn.active {
+  font-weight: 500;
+  color: var(--text-primary);
+  text-decoration: underline;
+  text-underline-offset: 4px;
+}
+
+.timeline-search {
+  margin-bottom: 32px;
+}
+
+.timeline-search-input {
+  width: 100%;
+  max-width: 400px;
+  padding: 10px 16px;
+  border-radius: var(--radius-md);
+  border: 1px solid var(--border-strong);
+  background: var(--surface);
+  font-size: 14px;
+  color: var(--text-primary);
+  font-family: inherit;
+  transition: border-color 0.2s ease, outline 0.2s ease;
+}
+
+.timeline-search-input:focus {
+  outline: none;
+  border-color: var(--accent);
+  box-shadow: 0 0 0 2px var(--accent-subtle);
+}
+
+.timeline-search-input::placeholder {
+  color: var(--text-muted);
+}
+
+.timeline-loading {
+  text-align: center;
+  padding: 48px;
+  color: var(--text-muted);
+}
+
+.timeline-error {
+  margin-bottom: 24px;
+}
+

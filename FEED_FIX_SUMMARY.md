@@ -123,3 +123,6 @@ supabase functions deploy social_feed
 - Check RLS policies in migration
 - Ensure user is authenticated (not anonymous)
 - Verify Edge Function uses service role for writes
+
+
+

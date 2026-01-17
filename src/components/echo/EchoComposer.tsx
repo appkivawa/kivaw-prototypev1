@@ -42,8 +42,8 @@ export default function EchoComposer({ contentId, onClose, onSaved, inline = fal
                   padding: "8px 12px",
                   borderRadius: "6px",
                   border: "none",
-                  background: "var(--ink)",
-                  color: "var(--bg)",
+                  background: "var(--accent-gradient)",
+                  color: "#ffffff",
                   cursor: "pointer",
                   fontWeight: 600,
                   fontSize: "13px",
@@ -86,7 +86,7 @@ export default function EchoComposer({ contentId, onClose, onSaved, inline = fal
             left: 0,
             right: 0,
             bottom: 0,
-            backgroundColor: "rgba(0, 0, 0, 0.5)",
+            backgroundColor: "var(--overlay)",
             display: "flex",
             alignItems: "center",
             justifyContent: "center",
@@ -117,8 +117,8 @@ export default function EchoComposer({ contentId, onClose, onSaved, inline = fal
                   padding: "10px 16px",
                   borderRadius: "6px",
                   border: "none",
-                  background: "var(--ink)",
-                  color: "var(--bg)",
+                  background: "var(--accent-gradient)",
+                  color: "#ffffff",
                   cursor: "pointer",
                   fontWeight: 600,
                   fontSize: "14px",
@@ -187,14 +187,14 @@ export default function EchoComposer({ contentId, onClose, onSaved, inline = fal
   const content = (
     <div
       style={{
-        backgroundColor: inline ? "transparent" : "rgba(255,255,255,0.95)",
+        backgroundColor: inline ? "transparent" : "var(--surface)",
         borderRadius: "8px",
         padding: inline ? "0" : "24px",
         maxWidth: inline ? "100%" : "600px",
         width: "100%",
         maxHeight: inline ? "none" : "80vh",
         overflow: inline ? "visible" : "auto",
-        boxShadow: inline ? "none" : "0 4px 12px rgba(0,0,0,0.15)",
+        boxShadow: inline ? "none" : "0 4px 12px var(--shadow-black-15)",
       }}
       onClick={(e) => e.stopPropagation()}
     >
@@ -282,8 +282,8 @@ export default function EchoComposer({ contentId, onClose, onSaved, inline = fal
             style={{
               padding: "12px",
               borderRadius: "6px",
-              backgroundColor: "rgba(239, 68, 68, 0.1)",
-              color: "rgba(239, 68, 68, 0.9)",
+              backgroundColor: "var(--danger)",
+              color: "var(--danger-text)",
               marginBottom: "16px",
               fontSize: "14px",
             }}

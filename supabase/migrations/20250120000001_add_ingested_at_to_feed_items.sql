@@ -15,3 +15,6 @@ WHERE ingested_at IS NULL;
 -- Add comment
 COMMENT ON COLUMN public.feed_items.ingested_at IS 'Timestamp when the item was ingested. Used as fallback when published_at is missing.';
 
+
+
+

@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useState, useRef } from "react";
 import { Outlet, useLocation } from "react-router-dom";
 import TopNav from "../ui/TopNav";
 import PostAuthRedirect from "../auth/PostAuthRedirect";
@@ -14,42 +14,76 @@ export default function AppShell() {
   const [showOnboarding, setShowOnboarding] = useState(false);
   const [profile, setProfile] = useState<Profile | null>(null);
   const [profileLoaded, setProfileLoaded] = useState(false);
+  const [profileFetchAttempts, setProfileFetchAttempts] = useState(0);
+  const onboardingCompletedRef = useRef(false); // Session-level guard
 
   // Process pending actions after login
   usePendingActions();
 
-  // Fetch and cache profile once on session load
+  // Fetch and cache profile once on session load with retry logic
   useEffect(() => {
     if (!loading && isAuthed && !profileLoaded) {
       setProfileLoaded(true);
-      getMyProfile()
-        .then((p) => {
-          setProfile(p);
-          // Check if onboarding is needed: onboarded is false OR interests is empty
+      
+      // Retry profile fetch up to 3 times with exponential backoff
+      let attemptCount = 0;
+      const maxAttempts = 3;
+      
+      const fetchProfileWithRetry = async (): Promise<void> => {
+        attemptCount++;
+        setProfileFetchAttempts(attemptCount);
+        
+        try {
+          const p = await getMyProfile();
+          
+          // Only set onboarding if we successfully fetched a profile
           if (p) {
-            const needsOnboarding = p.onboarded !== true || !p.interests || p.interests.length === 0;
-            if (needsOnboarding) {
-              setShowOnboarding(true);
+            setProfile(p);
+            // Only show onboarding if session guard allows AND profile needs it
+            if (!onboardingCompletedRef.current) {
+              const needsOnboarding = p.onboarded !== true || !p.interests || p.interests.length === 0;
+              if (needsOnboarding) {
+                setShowOnboarding(true);
+              }
             }
           } else {
-            // No profile = needs onboarding
-            setShowOnboarding(true);
+            // No profile = needs onboarding (only if guard allows)
+            if (!onboardingCompletedRef.current) {
+              setShowOnboarding(true);
+            }
           }
-        })
-        .catch((e) => {
-          console.error("Error fetching profile:", e);
-          // On error, assume needs onboarding
-          setShowOnboarding(true);
-        });
+        } catch (e) {
+          console.error(`Error fetching profile (attempt ${attemptCount}/${maxAttempts}):`, e);
+          
+          // Retry with exponential backoff
+          if (attemptCount < maxAttempts) {
+            const delayMs = Math.min(1000 * Math.pow(2, attemptCount - 1), 5000); // 1s, 2s, 4s max
+            setTimeout(() => {
+              fetchProfileWithRetry();
+            }, delayMs);
+          } else {
+            // Max attempts reached - don't show onboarding on error
+            console.error("Max profile fetch attempts reached. Not showing onboarding to prevent loop.");
+            setProfile(null);
+          }
+        }
+      };
+      
+      fetchProfileWithRetry();
     } else if (!isAuthed) {
       // Reset when logged out
       setProfile(null);
       setProfileLoaded(false);
       setShowOnboarding(false);
+      setProfileFetchAttempts(0);
+      onboardingCompletedRef.current = false; // Reset guard on logout
     }
   }, [isAuthed, loading, profileLoaded]);
 
-  function handleOnboardingComplete(savedInterests?: string[]) {
+  function handleOnboardingComplete(savedInterests: string[]) {
+    // Set session guard to prevent modal from reopening until page refresh
+    onboardingCompletedRef.current = true;
+    
     // Update local profile state immediately to prevent reopening
     setProfile((prev) => {
       if (prev) {
@@ -81,10 +115,8 @@ export default function AppShell() {
       });
   }
 
-  // Coral theme is now applied globally via .coral-app class
-
-  return (
-    <div className="app coral-app">
+          return (
+            <div className="app">
       <PostAuthRedirect />
       <TopNav />
       <main className="main">

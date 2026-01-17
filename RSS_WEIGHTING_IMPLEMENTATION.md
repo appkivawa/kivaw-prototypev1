@@ -128,3 +128,6 @@ Changes take effect on the next feed load (no cache invalidation needed).
 - **Missing feed_url:** Defaults to weight 1 if `metadata.feed_url` is missing
 - **Inactive sources:** Not included in weight map (treated as weight 1)
 
+
+
+

@@ -3,6 +3,11 @@ import { useEffect, useMemo, useState } from "react";
 import { useSearchParams } from "react-router-dom";
 import { supabase } from "../lib/supabaseClient";
 import { isValidEmail } from "../utils/security";
+import Container from "../ui/Container";
+import Card from "../ui/Card";
+import Button from "../ui/Button";
+import SectionHeader from "../ui/SectionHeader";
+import "../styles/login.css";
 
 function sanitizeNext(raw: string | null): string | null {
   if (!raw) return null;
@@ -66,47 +71,27 @@ export default function Login() {
   }
 
   return (
-    <div className="coral-page-content">
-      <div className="coral-section" style={{ maxWidth: "480px", margin: "0 auto", padding: "80px 20px" }}>
-        <div className="coral-card" style={{ padding: "48px 32px" }}>
-          {err ? (
-            <div
-              style={{
-                padding: "12px 16px",
-                background: "rgba(255, 0, 0, 0.1)",
-                border: "1px solid rgba(255, 0, 0, 0.3)",
-                borderRadius: "8px",
-                color: "var(--coral-text-primary)",
-                marginBottom: "24px",
-                fontSize: "14px",
-              }}
-            >
+    <div className="login-page">
+      <Container maxWidth="sm" className="login-container">
+        <Card className="login-card">
+          {err && (
+            <Card variant="danger" className="login-error">
               {err}
-            </div>
-          ) : null}
+            </Card>
+          )}
 
           {!sent ? (
             <>
-              <h1 className="page-title" style={{ fontSize: "28px", margin: "0 0 8px", textAlign: "center" }}>
-                Sign in to continue
-              </h1>
-              <p style={{ fontSize: "16px", color: "var(--coral-text-muted)", margin: "0 0 32px", textAlign: "center" }}>
-                We’ll send you a magic link to sign in.
-              </p>
+              <SectionHeader
+                title="Sign in to continue"
+                subtitle="We'll send you a magic link to sign in."
+                level={1}
+                className="login-header"
+              />
 
-              <div style={{ marginBottom: "16px" }}>
+              <div className="login-form">
                 <input
-                  style={{
-                    width: "100%",
-                    padding: "12px 16px",
-                    background: "var(--coral-surface)",
-                    backdropFilter: "blur(10px)",
-                    border: "1px solid var(--coral-border)",
-                    borderRadius: "8px",
-                    color: "var(--coral-text-primary)",
-                    fontSize: "16px",
-                    fontFamily: "inherit",
-                  }}
+                  className="login-input"
                   placeholder="you@email.com"
                   value={email}
                   onChange={(e) => setEmail(e.target.value)}
@@ -114,59 +99,57 @@ export default function Login() {
                   type="email"
                   onKeyDown={(e) => e.key === "Enter" && !busy && sendLink()}
                 />
-              </div>
 
-              {/* Only show admin toggle when not explicitly directed (next=...) */}
-              {!nextParam && (
-                <div style={{ marginBottom: "24px" }}>
-                  <label
-                    style={{
-                      display: "flex",
-                      alignItems: "center",
-                      gap: 8,
-                      cursor: "pointer",
-                      fontSize: 14,
-                      color: "var(--coral-text-muted)",
-                    }}
-                  >
+                {/* Only show admin toggle when not explicitly directed (next=...) */}
+                {!nextParam && (
+                  <label className="login-admin-toggle">
                     <input
                       type="checkbox"
                       checked={isAdminLogin}
                       onChange={(e) => setIsAdminLogin(e.target.checked)}
-                      style={{ cursor: "pointer" }}
                     />
                     <span>Admin login</span>
                   </label>
-                </div>
-              )}
+                )}
 
-              <button className="coral-btn" type="button" onClick={sendLink} disabled={busy} style={{ width: "100%" }}>
-                {busy ? "Sending…" : "Send magic link"}
-              </button>
+                <Button
+                  type="button"
+                  onClick={sendLink}
+                  disabled={busy}
+                  variant="primary"
+                  size="lg"
+                  fullWidth
+                >
+                  {busy ? "Sending…" : "Send magic link"}
+                </Button>
+              </div>
             </>
           ) : (
             <>
-              <div style={{ textAlign: "center", marginBottom: "32px" }}>
-                <h1 className="page-title" style={{ fontSize: "28px", margin: "0 0 8px" }}>
-                  Check your email
-                </h1>
-                <p style={{ fontSize: "16px", color: "var(--coral-text-muted)", margin: 0 }}>
-                  We sent a magic link to{" "}
-                  <strong style={{ color: "var(--coral-text-primary)" }}>{email}</strong>. Click it to sign in.
-                </p>
-              </div>
+              <SectionHeader
+                title="Check your email"
+                subtitle={
+                  <>
+                    We sent a magic link to <strong>{email}</strong>. Click it to sign in.
+                  </>
+                }
+                level={1}
+                className="login-header"
+              />
 
-              <button className="coral-btn-secondary" type="button" onClick={() => setSent(false)} style={{ width: "100%" }}>
+              <Button
+                type="button"
+                onClick={() => setSent(false)}
+                variant="secondary"
+                size="lg"
+                fullWidth
+              >
                 Use a different email
-              </button>
+              </Button>
             </>
           )}
-        </div>
-      </div>
+        </Card>
+      </Container>
     </div>
   );
 }
-
-
-
-

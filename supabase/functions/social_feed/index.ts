@@ -256,10 +256,11 @@ serve(async (req) => {
           .eq("user_id", userId)
           .maybeSingle(),
         supabase
-          .from("user_sources")
-          .select("source_type, handle, is_enabled")
+          .from("sources")
+          .select("type, url, enabled, is_active")
           .eq("user_id", userId)
-          .eq("is_enabled", true),
+          .eq("enabled", true)
+          .or("is_active.eq.true,is_active.is.null"),
         supabase
           .from("user_item_actions")
           .select("item_id, action")
@@ -275,7 +276,14 @@ serve(async (req) => {
 
       // Handle follows (isolated error handling)
       if (followsResult.status === "fulfilled" && !followsResult.value.error && followsResult.value.data) {
-        followKeys = new Set((followsResult.value.data ?? []).map((f: any) => `${String(f.source_type)}:${String(f.handle)}`));
+        // Filter for is_active: treat null as true, only exclude if explicitly false
+        const activeSources = (followsResult.value.data ?? []).filter((f: any) => {
+          // If is_active column doesn't exist, include all
+          if (!("is_active" in f)) return true;
+          // If is_active is null or true, include it
+          return f.is_active !== false;
+        });
+        followKeys = new Set(activeSources.map((f: any) => `${String(f.type)}:${String(f.url)}`));
       } else if (followsResult.status === "rejected") {
         console.warn("[social_feed] User sources query failed (non-fatal):", followsResult.reason);
       }

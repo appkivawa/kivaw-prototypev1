@@ -4,10 +4,15 @@ import AppShell from "./layout/AppShell";
 
 import Home from "./pages/Home";
 import HomePage from "./pages/HomePage";
-import ExploreFeed from "./pages/ExploreFeed";
+import ExplorePage from "./pages/ExplorePage";
+import FeedPage from "./pages/FeedPage";
+import ExploreFeedLegacy from "./pages/legacy/ExploreFeedLegacy";
 import ForYou from "./pages/ForYou";
 import MatchPage from "./pages/MatchPage";
 import ItemDetail from "./pages/ItemDetail";
+import StudioHome from "./pages/StudioHome";
+import StudioExplore from "./pages/StudioExplore";
+import StudioFeed from "./pages/StudioFeed";
 
 import QuizState from "./pages/quiz/QuizState";
 import QuizFocus from "./pages/quiz/QuizFocus";
@@ -102,6 +107,18 @@ export default function App() {
         element={
           <RequireAuth title="Team Portal" message="Please log in to continue">
             <Team />
+          </RequireAuth>
+        }
+      />
+
+      {/* Studio pages (standalone routes, no AppShell) */}
+      <Route path="/studio" element={<StudioHome />} />
+      <Route path="/studio/explore" element={<StudioExplore />} />
+      <Route
+        path="/studio/feed"
+        element={
+          <RequireAuth title="Feed" message="Please log in to view your feed">
+            <StudioFeed />
           </RequireAuth>
         }
       />
@@ -252,8 +269,10 @@ export default function App() {
       >
         <Route index element={<HomePage />} />
         <Route path="home" element={<Home />} />
-        <Route path="explore" element={<ExploreFeed />} />
-        <Route path="feed" element={<ExploreFeed />} />
+        <Route path="explore" element={<ExplorePage />} />
+        <Route path="feed" element={<FeedPage />} />
+        {/* Legacy route for rollback */}
+        <Route path="legacy/explore-feed" element={<ExploreFeedLegacy />} />
 
         {/* Preferences (requires auth) */}
         <Route

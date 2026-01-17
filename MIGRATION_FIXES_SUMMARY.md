@@ -77,3 +77,6 @@ After applying these fixes, migrations should:
 2. Verify no errors occur
 3. If you see other policy errors, apply the same pattern: add `DROP POLICY IF EXISTS` before `CREATE POLICY`
 
+
+
+
