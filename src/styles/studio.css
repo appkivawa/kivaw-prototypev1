@@ -102,10 +102,10 @@
   max-width: var(--studio-max-width);
   margin: 0 auto;
   padding: 12px 24px;
-  display: flex;
+  display: grid;
+  grid-template-columns: auto 1fr auto;
   align-items: center;
-  justify-content: space-between;
-  gap: 32px;
+  gap: 24px;
 }
 
 .studio-nav__brand {
@@ -139,6 +139,7 @@
   background: var(--studio-gray-100);
   padding: 4px;
   border-radius: var(--studio-radius-full);
+  justify-self: center;
 }
 
 .studio-nav__link {
@@ -165,6 +166,7 @@
   display: flex;
   align-items: center;
   gap: 12px;
+  justify-self: end;
 }
 
 .studio-nav__link-text {
