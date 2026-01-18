@@ -15,14 +15,14 @@
   grid-template-columns: auto 1fr auto;
   align-items: center;
   gap: 24px;
-  padding: 16px 24px;
+  padding: 16px 24px 24px;
   max-width: 1200px;
   margin: 0 auto;
 }
 
 @media (min-width: 768px) {
   .topnav__inner {
-    padding: 16px 40px;
+    padding: 16px 40px 24px;
   }
 }
 
@@ -47,34 +47,57 @@
 
 /* Desktop Navigation Links */
 .navlinks--desktop {
-  display: flex;
-  gap: 8px;
+  display: none;
+  gap: 0;
   align-items: center;
   justify-content: center;
+  background: var(--surface-2);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-full);
+  padding: 4px;
+  position: relative;
+}
+
+@media (min-width: 1024px) {
+  .navlinks--desktop {
+    display: flex;
+  }
 }
 
 .navlink {
-  padding: 8px 16px;
+  padding: 10px 20px;
   border-radius: var(--radius-full);
   color: var(--text-secondary);
   text-decoration: none;
   font-size: 14px;
   font-weight: 400;
   transition: all 0.2s ease;
-  border: 1px solid transparent;
+  border: none;
   background: transparent;
+  position: relative;
 }
 
 .navlink:hover {
   color: var(--text-primary);
-  background: var(--surface-2);
 }
 
 .navlink.active {
   color: var(--text-primary);
   font-weight: 500;
-  background: var(--surface-2);
-  border-color: var(--border);
+  background: transparent;
+}
+
+/* Underline indicator for active nav item */
+.navlink.active::after {
+  content: '';
+  position: absolute;
+  bottom: -8px;
+  left: 50%;
+  transform: translateX(-50%);
+  width: 24px;
+  height: 3px;
+  background: var(--accent, #E8618C);
+  border-radius: 2px;
 }
 
 /* Right Side Actions */
