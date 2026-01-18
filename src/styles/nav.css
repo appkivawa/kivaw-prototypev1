@@ -47,10 +47,18 @@
 
 /* Desktop Navigation Links */
 .navlinks--desktop {
-  display: flex;
+  display: inline-flex;
   gap: 8px;
   align-items: center;
   justify-content: center;
+  padding: 6px;
+  border-radius: var(--radius-full);
+  background: var(--surface-2);
+  border: 1px solid var(--border);
+  flex: 0 0 auto;
+  width: fit-content;
+  max-width: 100%;
+  justify-self: center;
 }
 
 .navlink {
@@ -67,13 +75,13 @@
 
 .navlink:hover {
   color: var(--text-primary);
-  background: var(--surface-2);
+  background: var(--surface);
 }
 
 .navlink.active {
   color: var(--text-primary);
   font-weight: 500;
-  background: var(--surface-2);
+  background: var(--surface);
   border-color: var(--border);
 }
 
