@@ -3,7 +3,7 @@ import { NavLink, useNavigate, useLocation } from "react-router-dom";
 import { useTheme } from "../theme/ThemeContext";
 import { supabase } from "../lib/supabaseClient";
 import { getMyProfile } from "../data/profileApi";
-import "../styles/nav.css";
+import "../styles/studio.css";
 
 export default function TopNav() {
   const nav = useNavigate();
@@ -58,7 +58,7 @@ export default function TopNav() {
   async function handleSignOut() {
     try {
       await supabase.auth.signOut();
-      nav("/");
+      nav("/studio");
     } catch (error) {
       console.error("Error signing out:", error);
     }
@@ -73,70 +73,85 @@ export default function TopNav() {
   }
 
   return (
-    <header className="topnav">
-      <div className="topnav__inner">
-        <button className="brand" onClick={() => nav("/")} aria-label="Go home">
-          KIVAW
+    <header className="studio-nav">
+      <div className="studio-nav__inner">
+        <button 
+          className="studio-nav__brand" 
+          onClick={() => nav("/studio")} 
+          aria-label="Go home"
+          style={{ background: "none", border: "none", padding: 0, cursor: "pointer", fontFamily: "inherit" }}
+        >
+          <span className="studio-nav__brand-icon">K</span>
+          <span>KIVAW</span>
         </button>
 
-        {/* Desktop nav */}
-        <nav className="navlinks navlinks--desktop">
+        {/* Desktop nav - Pill style */}
+        <nav className="studio-nav__links">
           <NavLink
-            to="/"
-            end
-            className={({ isActive }) => `navlink ${isActive ? "active" : ""}`}
+            to="/studio"
+            className={({ isActive }) => `studio-nav__link ${isActive ? "studio-nav__link--active" : ""}`}
           >
             Home
           </NavLink>
 
           <NavLink
-            to="/feed"
-            className={({ isActive }) => `navlink ${isActive ? "active" : ""}`}
+            to="/timeline"
+            className={({ isActive }) => `studio-nav__link ${isActive || location.pathname.includes("/timeline/") ? "studio-nav__link--active" : ""}`}
           >
-            Discover
+            Timeline
           </NavLink>
 
-          {isSignedIn && (
-            <>
-              <NavLink
-                to="/timeline"
-                className={({ isActive }) => `navlink ${isActive ? "active" : ""}`}
-              >
-                Timeline
-              </NavLink>
-
-              <NavLink
-                to="/waves"
-                className={({ isActive }) => `navlink ${isActive ? "active" : ""}`}
-              >
-                Waves
-              </NavLink>
-            </>
-          )}
+          <NavLink
+            to="/collection"
+            className={({ isActive }) => `studio-nav__link ${isActive ? "studio-nav__link--active" : ""}`}
+          >
+            Collection
+          </NavLink>
         </nav>
 
-        <div className="topnav__right">
+        <div className="studio-nav__actions">
+          <button className="studio-nav__link-text" type="button">
+            How it works
+          </button>
           {isSignedIn && (
             <button
               onClick={() => nav("/profile")}
               type="button"
-              className="topnav-profile-btn"
               aria-label="Profile"
               title="Profile"
+              style={{
+                width: "36px",
+                height: "36px",
+                borderRadius: "50%",
+                border: "1px solid var(--studio-border)",
+                background: "var(--studio-white)",
+                color: "var(--studio-text)",
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "center",
+                fontSize: "14px",
+                fontWeight: 500,
+                cursor: "pointer",
+                padding: 0,
+                fontFamily: "inherit",
+              }}
             >
               {userInitial}
             </button>
           )}
-          <button className="nav-cta-btn" onClick={handleAuthClick} type="button">
-            {isSignedIn ? "Sign out" : "Continue"}
+          <button 
+            onClick={handleAuthClick} 
+            type="button"
+            className="studio-btn studio-btn--primary"
+          >
+            {isSignedIn ? "Sign out" : "Go to Feed"}
           </button>
-
           <button
             onClick={toggle}
             type="button"
+            className="studio-theme-toggle"
             aria-label={theme === "dark" ? "Switch to light mode" : "Switch to dark mode"}
             title={theme === "dark" ? "Switch to light mode" : "Switch to dark mode"}
-              className="topnav-theme-toggle"
           >
             {theme === "dark" ? "☀" : "☾"}
           </button>
@@ -144,38 +159,164 @@ export default function TopNav() {
       </div>
 
       {/* Mobile tab bar */}
-      <nav className="tabbar">
-        <div className="tabbar__item">
-          <NavLink to="/" end className="tabbar__btn">
-            <span className="tabbar__icon">🏠</span>
-            <span className="tabbar__label">Home</span>
-          </NavLink>
-        </div>
+      <nav className="mobile-nav" style={{
+        display: "grid",
+        gridTemplateColumns: "repeat(3, 1fr)",
+        gap: 0,
+        borderTop: "1px solid var(--studio-border)",
+        background: "var(--studio-white)",
+        padding: "8px 0",
+        position: "sticky",
+        bottom: 0,
+        zIndex: 50,
+      }}>
+        <NavLink 
+          to="/studio" 
+          className={({ isActive }) => isActive ? "mobile-nav__link--active" : ""}
+          style={{
+            display: "flex",
+            flexDirection: "column",
+            alignItems: "center",
+            gap: "4px",
+            padding: "8px 12px",
+            border: "none",
+            background: "transparent",
+            color: "var(--studio-text-muted)",
+            textDecoration: "none",
+            fontSize: "11px",
+            fontWeight: 400,
+            cursor: "pointer",
+            width: "100%",
+            borderRadius: "6px",
+            transition: "all 0.15s ease",
+          }}
+          onMouseEnter={(e) => {
+            if (!e.currentTarget.classList.contains("mobile-nav__link--active")) {
+              e.currentTarget.style.color = "var(--studio-text)";
+              e.currentTarget.style.background = "var(--studio-gray-50)";
+            }
+          }}
+          onMouseLeave={(e) => {
+            if (!e.currentTarget.classList.contains("mobile-nav__link--active")) {
+              e.currentTarget.style.color = "var(--studio-text-muted)";
+              e.currentTarget.style.background = "transparent";
+            }
+          }}
+        >
+          <span style={{ fontSize: "20px", lineHeight: 1 }}>🏠</span>
+          <span style={{ fontSize: "11px", lineHeight: 1.2 }}>Home</span>
+        </NavLink>
 
-        <div className="tabbar__item">
-          <NavLink to="/feed" className="tabbar__btn">
-            <span className="tabbar__icon">🔍</span>
-            <span className="tabbar__label">Discover</span>
-          </NavLink>
-        </div>
+        <NavLink 
+          to="/timeline" 
+          className={({ isActive }) => isActive || location.pathname.includes("/timeline/") ? "mobile-nav__link--active" : ""}
+          style={{
+            display: "flex",
+            flexDirection: "column",
+            alignItems: "center",
+            gap: "4px",
+            padding: "8px 12px",
+            border: "none",
+            background: "transparent",
+            color: "var(--studio-text-muted)",
+            textDecoration: "none",
+            fontSize: "11px",
+            fontWeight: 400,
+            cursor: "pointer",
+            width: "100%",
+            borderRadius: "6px",
+            transition: "all 0.15s ease",
+          }}
+          onMouseEnter={(e) => {
+            if (!e.currentTarget.classList.contains("mobile-nav__link--active")) {
+              e.currentTarget.style.color = "var(--studio-text)";
+              e.currentTarget.style.background = "var(--studio-gray-50)";
+            }
+          }}
+          onMouseLeave={(e) => {
+            if (!e.currentTarget.classList.contains("mobile-nav__link--active")) {
+              e.currentTarget.style.color = "var(--studio-text-muted)";
+              e.currentTarget.style.background = "transparent";
+            }
+          }}
+        >
+          <span style={{ fontSize: "20px", lineHeight: 1 }}>📅</span>
+          <span style={{ fontSize: "11px", lineHeight: 1.2 }}>Timeline</span>
+        </NavLink>
 
-        {isSignedIn && (
-          <>
-            <div className="tabbar__item">
-              <NavLink to="/timeline" className="tabbar__btn">
-                <span className="tabbar__icon">💭</span>
-                <span className="tabbar__label">Timeline</span>
-              </NavLink>
-            </div>
+        <NavLink 
+          to="/collection" 
+          className={({ isActive }) => isActive ? "mobile-nav__link--active" : ""}
+          style={{
+            display: "flex",
+            flexDirection: "column",
+            alignItems: "center",
+            gap: "4px",
+            padding: "8px 12px",
+            border: "none",
+            background: "transparent",
+            color: "var(--studio-text-muted)",
+            textDecoration: "none",
+            fontSize: "11px",
+            fontWeight: 400,
+            cursor: "pointer",
+            width: "100%",
+            borderRadius: "6px",
+            transition: "all 0.15s ease",
+          }}
+          onMouseEnter={(e) => {
+            if (!e.currentTarget.classList.contains("mobile-nav__link--active")) {
+              e.currentTarget.style.color = "var(--studio-text)";
+              e.currentTarget.style.background = "var(--studio-gray-50)";
+            }
+          }}
+          onMouseLeave={(e) => {
+            if (!e.currentTarget.classList.contains("mobile-nav__link--active")) {
+              e.currentTarget.style.color = "var(--studio-text-muted)";
+              e.currentTarget.style.background = "transparent";
+            }
+          }}
+        >
+          <span style={{ fontSize: "20px", lineHeight: 1 }}>📅</span>
+          <span style={{ fontSize: "11px", lineHeight: 1.2 }}>Timeline</span>
+        </NavLink>
 
-            <div className="tabbar__item">
-              <NavLink to="/waves" className="tabbar__btn">
-                <span className="tabbar__icon">🌊</span>
-                <span className="tabbar__label">Waves</span>
-              </NavLink>
-            </div>
-          </>
-        )}
+        <NavLink 
+          to="/collection" 
+          className={({ isActive }) => isActive ? "mobile-nav__link--active" : ""}
+          style={{
+            display: "flex",
+            flexDirection: "column",
+            alignItems: "center",
+            gap: "4px",
+            padding: "8px 12px",
+            border: "none",
+            background: "transparent",
+            color: "var(--studio-text-muted)",
+            textDecoration: "none",
+            fontSize: "11px",
+            fontWeight: 400,
+            cursor: "pointer",
+            width: "100%",
+            borderRadius: "6px",
+            transition: "all 0.15s ease",
+          }}
+          onMouseEnter={(e) => {
+            if (!e.currentTarget.classList.contains("mobile-nav__link--active")) {
+              e.currentTarget.style.color = "var(--studio-text)";
+              e.currentTarget.style.background = "var(--studio-gray-50)";
+            }
+          }}
+          onMouseLeave={(e) => {
+            if (!e.currentTarget.classList.contains("mobile-nav__link--active")) {
+              e.currentTarget.style.color = "var(--studio-text-muted)";
+              e.currentTarget.style.background = "transparent";
+            }
+          }}
+        >
+          <span style={{ fontSize: "20px", lineHeight: 1 }}>📚</span>
+          <span style={{ fontSize: "11px", lineHeight: 1.2 }}>Collection</span>
+        </NavLink>
       </nav>
     </header>
   );

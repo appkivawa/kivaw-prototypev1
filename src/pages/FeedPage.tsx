@@ -11,6 +11,7 @@ import EmptyState from "../ui/EmptyState";
 import ErrorBoundary from "../ui/ErrorBoundary";
 import LoadingSkeleton from "../components/ui/LoadingSkeleton";
 import FeedItemCard from "../components/feed/FeedItemCard";
+import "../styles/studio.css";
 
 // Feed item from social_feed Edge Function
 interface SocialFeedItem {
@@ -262,31 +263,40 @@ export default function FeedPage() {
     loadContent();
   }, [loadContent]);
 
+  // Check if we're inside Timeline (hide header)
+  const isInTimeline = window.location.pathname.includes("/timeline");
+
   return (
     <ErrorBoundary>
-      <div className="page">
-        <Container>
-          <h1 style={{ fontSize: "28px", fontWeight: 700, marginBottom: "24px" }}>Feed</h1>
+      <div className="studio-page" data-theme="light" style={isInTimeline ? { paddingTop: 0 } : {}}>
+        <Container maxWidth="xl" style={isInTimeline ? { paddingTop: 0, paddingBottom: "48px" } : { paddingTop: "96px", paddingBottom: "48px" }}>
+          {!isInTimeline && <h1 style={{ fontSize: "32px", fontWeight: 700, color: "var(--studio-text)", marginBottom: "24px" }}>Feed</h1>}
 
           {/* Loading State */}
           {loading && <LoadingSkeleton count={6} type="grid" />}
 
         {/* Error State */}
         {error && (
-          <Card style={{ padding: "24px", marginBottom: "24px", background: "#FEE2E2", border: "1px solid #DC2626" }}>
-            <div style={{ color: "#DC2626", fontWeight: 500 }}>Error</div>
-            <div style={{ color: "#991B1B", fontSize: "14px", marginTop: "8px" }}>{error}</div>
+          <Card style={{ 
+            padding: "24px", 
+            marginBottom: "24px", 
+            background: "#FEE2E2", 
+            border: "1px solid #DC2626",
+            borderRadius: "12px"
+          }}>
+            <div style={{ color: "#DC2626", fontWeight: 500, marginBottom: "8px" }}>Error</div>
+            <div style={{ color: "#991B1B", fontSize: "14px", marginBottom: "16px" }}>{error}</div>
             <button
               onClick={handleRetry}
               style={{
-                marginTop: "16px",
-                padding: "8px 16px",
-                background: "#DC2626",
+                padding: "10px 20px",
+                background: "var(--studio-coral)",
                 color: "white",
                 border: "none",
-                borderRadius: "6px",
+                borderRadius: "8px",
                 cursor: "pointer",
                 fontSize: "14px",
+                fontWeight: 500,
               }}
             >
               Try again
@@ -296,12 +306,12 @@ export default function FeedPage() {
 
         {/* Feed Sections */}
         {!loading && !error && memoizedSections.length > 0 && (
-          <div>
+          <div style={{ marginTop: "24px" }}>
             {memoizedSections.map((section) => (
               <div key={section.id} style={{ marginBottom: "48px" }}>
                 <div style={{ marginBottom: "16px" }}>
-                  <h2 style={{ fontSize: "20px", fontWeight: 700, marginBottom: "4px" }}>{section.title}</h2>
-                  <div style={{ fontSize: "14px", color: "#6B7280" }}>{section.subtitle} • {section.items.length} items</div>
+                  <h2 style={{ fontSize: "20px", fontWeight: 700, color: "var(--studio-text)", marginBottom: "4px" }}>{section.title}</h2>
+                  <div style={{ fontSize: "14px", color: "var(--studio-text-secondary)" }}>{section.subtitle} • {section.items.length} items</div>
                 </div>
                 <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(300px, 1fr))", gap: "20px" }}>
                   {section.items.map((item) => (
@@ -329,9 +339,8 @@ export default function FeedPage() {
         {/* Empty State */}
         {!loading && !error && sections.length === 0 && (
           <EmptyState
-            icon="📭"
             title="Your feed is empty"
-            subtitle="Check back soon for new updates"
+            message="Check back soon for new updates"
           />
         )}
       </Container>

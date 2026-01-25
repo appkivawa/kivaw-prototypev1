@@ -50,7 +50,7 @@ export default function TimelineEchoPost({ echo, onDelete }: TimelineEchoPostPro
     <article
       style={{
         padding: "0 0 32px 0",
-        borderBottom: "1px solid var(--border)",
+        borderBottom: "1px solid var(--studio-border)",
         marginBottom: "32px",
       }}
     >
@@ -59,7 +59,7 @@ export default function TimelineEchoPost({ echo, onDelete }: TimelineEchoPostPro
         style={{
           fontSize: "18px",
           lineHeight: 1.7,
-          color: "var(--ink)",
+          color: "var(--studio-text)",
           marginBottom: "16px",
           fontWeight: 400,
         }}
@@ -75,7 +75,7 @@ export default function TimelineEchoPost({ echo, onDelete }: TimelineEchoPostPro
           gap: "12px",
           marginBottom: content ? "16px" : "0",
           fontSize: "13px",
-          color: "var(--ink-tertiary)",
+          color: "var(--studio-text-muted)",
         }}
       >
         <span>{formatTime(echo.created_at)}</span>
@@ -95,8 +95,8 @@ export default function TimelineEchoPost({ echo, onDelete }: TimelineEchoPostPro
               style={{
                 padding: "2px 6px",
                 borderRadius: "4px",
-                backgroundColor: "var(--success)",
-                color: "var(--success-text)",
+                backgroundColor: "var(--studio-coral-light)",
+                color: "var(--studio-coral)",
                 fontSize: "11px",
                 fontWeight: 500,
               }}
@@ -119,20 +119,20 @@ export default function TimelineEchoPost({ echo, onDelete }: TimelineEchoPostPro
                 gap: "8px",
                 padding: "8px 12px",
                 borderRadius: "6px",
-                backgroundColor: "var(--border)",
-                border: "1px solid var(--border-strong)",
+                backgroundColor: "var(--studio-gray-50)",
+                border: "1px solid var(--studio-gray-300)",
                 cursor: "pointer",
                 fontSize: "13px",
-                color: "var(--ink-muted)",
+                color: "var(--studio-text-secondary)",
                 textAlign: "left",
                 width: "100%",
                 transition: "background-color 0.2s",
               }}
               onMouseEnter={(e) => {
-                e.currentTarget.style.backgroundColor = "var(--border-strong)";
+                e.currentTarget.style.backgroundColor = "var(--studio-gray-200)";
               }}
               onMouseLeave={(e) => {
-                e.currentTarget.style.backgroundColor = "var(--border)";
+                e.currentTarget.style.backgroundColor = "var(--studio-gray-50)";
               }}
             >
               {content.image_url && (
@@ -161,7 +161,7 @@ export default function TimelineEchoPost({ echo, onDelete }: TimelineEchoPostPro
                 </div>
               </div>
               {!isMobile && (
-                <span style={{ fontSize: "11px", color: "var(--ink-tertiary)" }}>
+                <span style={{ fontSize: "11px", color: "var(--studio-text-muted)" }}>
                   {contentExpanded ? "Hide" : "Show"} original
                 </span>
               )}
@@ -171,8 +171,8 @@ export default function TimelineEchoPost({ echo, onDelete }: TimelineEchoPostPro
               style={{
                 padding: "12px",
                 borderRadius: "6px",
-                backgroundColor: "var(--border)",
-                border: "1px solid var(--border-strong)",
+                backgroundColor: "var(--studio-gray-50)",
+                border: "1px solid var(--studio-gray-300)",
               }}
             >
               <div style={{ display: "flex", gap: "12px", alignItems: "flex-start", marginBottom: "8px" }}>
@@ -194,7 +194,7 @@ export default function TimelineEchoPost({ echo, onDelete }: TimelineEchoPostPro
                     style={{
                       fontSize: "14px",
                       fontWeight: 600,
-                      color: "var(--ink)",
+                      color: "var(--studio-text)",
                       marginBottom: "4px",
                     }}
                   >
@@ -204,7 +204,7 @@ export default function TimelineEchoPost({ echo, onDelete }: TimelineEchoPostPro
                     <div
                       style={{
                         fontSize: "12px",
-                        color: "var(--ink-tertiary)",
+                        color: "var(--studio-text-muted)",
                       }}
                     >
                       {content.kind}
@@ -219,7 +219,7 @@ export default function TimelineEchoPost({ echo, onDelete }: TimelineEchoPostPro
                   border: "none",
                   cursor: "pointer",
                   fontSize: "12px",
-                  color: "var(--ink-tertiary)",
+                  color: "var(--studio-text-muted)",
                   padding: "4px 0",
                   textDecoration: "underline",
                 }}
@@ -240,7 +240,7 @@ export default function TimelineEchoPost({ echo, onDelete }: TimelineEchoPostPro
           marginTop: "16px",
         }}
       >
-        <div style={{ fontSize: "12px", color: "var(--ink-tertiary)" }}>
+        <div style={{ fontSize: "12px", color: "var(--studio-text-muted)" }}>
           {echo.shared_to_waves ? "Shared publicly" : "Private reflection"}
         </div>
         <button
@@ -252,16 +252,16 @@ export default function TimelineEchoPost({ echo, onDelete }: TimelineEchoPostPro
           style={{
             background: "none",
             border: "none",
-            color: "var(--danger-text)",
+            color: "#DC2626",
             cursor: "pointer",
             fontSize: "12px",
             padding: "4px 0",
           }}
           onMouseEnter={(e) => {
-            e.currentTarget.style.color = "var(--danger-text)";
+            e.currentTarget.style.color = "#DC2626";
           }}
           onMouseLeave={(e) => {
-            e.currentTarget.style.color = "var(--danger-text)";
+            e.currentTarget.style.color = "#DC2626";
           }}
         >
           Delete

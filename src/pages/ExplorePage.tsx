@@ -10,6 +10,7 @@ import EmptyState from "../ui/EmptyState";
 import ErrorBoundary from "../ui/ErrorBoundary";
 import LoadingSkeleton from "../components/ui/LoadingSkeleton";
 import ExploreItemCard from "../components/explore/ExploreItemCard";
+import "../styles/studio.css";
 
 // Unified content item from explore_feed_v2
 interface UnifiedContentItem {
@@ -77,19 +78,32 @@ export default function ExplorePage() {
 
       // Call explore_feed_v2 Edge Function
       const { data, error: invokeError } = await supabase.functions.invoke<ExploreFeedV2Response>("explore_feed_v2", {
+        method: "POST",
         body: {
           limit: 50,
           cursor: currentCursor,
-          sort: "featured", // Default sort
         },
       });
 
       if (invokeError) {
+        console.error("[ExplorePage] Edge Function error:", invokeError);
+        // Provide more helpful error message
+        if (invokeError.message?.includes("Failed to send") || invokeError.message?.includes("fetch")) {
+          throw new Error(
+            "Edge Function not available. " +
+            "Please ensure explore_feed_v2 is deployed: " +
+            "`supabase functions deploy explore_feed_v2`"
+          );
+        }
         throw new Error(invokeError.message || "Failed to fetch explore feed");
       }
 
-      if (!data || !Array.isArray(data.items)) {
-        throw new Error("Invalid response from explore_feed_v2");
+      if (!data) {
+        throw new Error("No data returned from explore_feed_v2");
+      }
+
+      if (!Array.isArray(data.items)) {
+        throw new Error("Invalid response from explore_feed_v2: expected items array");
       }
 
       // Update state
@@ -108,8 +122,17 @@ export default function ExplorePage() {
       nextCursorRef.current = data.nextCursor;
       setHasMore(data.hasMore);
     } catch (e: any) {
-      console.error("Error loading explore feed:", e);
-      setError(e.message || "Failed to load explore feed");
+      console.error("[ExplorePage] Error loading explore feed:", e);
+      // Provide user-friendly error message
+      let errorMessage = "Failed to load explore feed";
+      if (e.message) {
+        errorMessage = e.message;
+      } else if (e instanceof Error) {
+        errorMessage = e.message;
+      } else if (typeof e === "string") {
+        errorMessage = e;
+      }
+      setError(errorMessage);
     } finally {
       setLoading(false);
       setLoadingMore(false);
@@ -134,31 +157,40 @@ export default function ExplorePage() {
     loadContent(false);
   }, [loadContent]);
 
+  // Check if we're inside Timeline (hide header)
+  const isInTimeline = window.location.pathname.includes("/timeline");
+
   return (
     <ErrorBoundary>
-      <div className="page">
-        <Container>
-          <h1 style={{ fontSize: "28px", fontWeight: 700, marginBottom: "24px" }}>Explore</h1>
+      <div className="studio-page" data-theme="light" style={isInTimeline ? { paddingTop: 0 } : {}}>
+        <Container maxWidth="xl" style={isInTimeline ? { paddingTop: 0, paddingBottom: "48px" } : { paddingTop: "96px", paddingBottom: "48px" }}>
+          {!isInTimeline && <h1 style={{ fontSize: "32px", fontWeight: 700, color: "var(--studio-text)", marginBottom: "24px" }}>Explore</h1>}
 
           {/* Loading State */}
           {loading && <LoadingSkeleton count={6} type="grid" />}
 
         {/* Error State */}
         {error && (
-          <Card style={{ padding: "24px", marginBottom: "24px", background: "#FEE2E2", border: "1px solid #DC2626" }}>
-            <div style={{ color: "#DC2626", fontWeight: 500 }}>Error</div>
-            <div style={{ color: "#991B1B", fontSize: "14px", marginTop: "8px" }}>{error}</div>
+          <Card style={{ 
+            padding: "24px", 
+            marginBottom: "24px", 
+            background: "#FEE2E2", 
+            border: "1px solid #DC2626",
+            borderRadius: "12px"
+          }}>
+            <div style={{ color: "#DC2626", fontWeight: 500, marginBottom: "8px" }}>Error</div>
+            <div style={{ color: "#991B1B", fontSize: "14px", marginBottom: "16px" }}>{error}</div>
             <button
               onClick={handleRetry}
               style={{
-                marginTop: "16px",
-                padding: "8px 16px",
-                background: "#DC2626",
+                padding: "10px 20px",
+                background: "var(--studio-coral)",
                 color: "white",
                 border: "none",
-                borderRadius: "6px",
+                borderRadius: "8px",
                 cursor: "pointer",
                 fontSize: "14px",
+                fontWeight: 500,
               }}
             >
               Try again
@@ -168,7 +200,7 @@ export default function ExplorePage() {
 
         {/* Content Grid */}
         {!loading && !error && memoizedItems.length > 0 && (
-          <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(300px, 1fr))", gap: "20px" }}>
+          <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(300px, 1fr))", gap: "20px", marginTop: "24px" }}>
             {memoizedItems.map((item) => (
               <ExploreItemCard
                 key={item.id}
@@ -194,10 +226,10 @@ export default function ExplorePage() {
               disabled={loadingMore}
               style={{
                 padding: "10px 20px",
-                background: loadingMore ? "#9CA3AF" : "#10B981",
+                background: loadingMore ? "var(--studio-gray-400)" : "var(--studio-coral)",
                 color: "white",
                 border: "none",
-                borderRadius: "6px",
+                borderRadius: "8px",
                 fontSize: "14px",
                 fontWeight: 500,
                 cursor: loadingMore ? "not-allowed" : "pointer",
@@ -211,9 +243,8 @@ export default function ExplorePage() {
         {/* Empty State */}
         {!loading && !error && items.length === 0 && (
           <EmptyState
-            icon="📭"
             title="No content yet"
-            subtitle="Check back soon for new discoveries"
+            message="Check back soon for new discoveries"
           />
         )}
       </Container>

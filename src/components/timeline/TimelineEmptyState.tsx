@@ -131,7 +131,7 @@ export default function TimelineEmptyState({ viewMode }: TimelineEmptyStateProps
           style={{
             fontSize: "24px",
             fontWeight: 700,
-            color: "var(--ink)",
+            color: "var(--studio-text)",
             marginBottom: "8px",
           }}
         >
@@ -140,7 +140,7 @@ export default function TimelineEmptyState({ viewMode }: TimelineEmptyStateProps
         <p
           style={{
             fontSize: "15px",
-            color: "var(--ink-muted)",
+            color: "var(--studio-text-secondary)",
             lineHeight: 1.6,
           }}
         >
@@ -161,7 +161,7 @@ export default function TimelineEmptyState({ viewMode }: TimelineEmptyStateProps
           style={{
             fontSize: "18px",
             fontWeight: 600,
-            color: "var(--ink)",
+            color: "var(--studio-text)",
             marginBottom: "20px",
           }}
         >
@@ -208,25 +208,34 @@ export default function TimelineEmptyState({ viewMode }: TimelineEmptyStateProps
             style={{
               textAlign: "center",
               padding: "40px 20px",
-              color: "var(--ink-muted)",
+              color: "var(--studio-text-muted)",
             }}
           >
             <p style={{ fontSize: "14px" }}>No curated content available right now.</p>
             <button
-              onClick={() => navigate("/feed")}
+              onClick={() => navigate("/studio/explore")}
               style={{
                 marginTop: "16px",
                 padding: "10px 20px",
                 borderRadius: "8px",
-                border: "1px solid var(--border)",
-                backgroundColor: "var(--control-bg)",
-                color: "var(--ink)",
+                border: "1px solid var(--studio-border)",
+                backgroundColor: "var(--studio-white)",
+                color: "var(--studio-text)",
                 cursor: "pointer",
                 fontSize: "14px",
                 fontWeight: 500,
+                transition: "all 0.2s ease",
+              }}
+              onMouseEnter={(e) => {
+                e.currentTarget.style.backgroundColor = "var(--studio-gray-50)";
+                e.currentTarget.style.borderColor = "var(--studio-coral)";
+              }}
+              onMouseLeave={(e) => {
+                e.currentTarget.style.backgroundColor = "var(--studio-white)";
+                e.currentTarget.style.borderColor = "var(--studio-border)";
               }}
             >
-              Go to Discover
+              Go to Explore
             </button>
           </div>
         )}

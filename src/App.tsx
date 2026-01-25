@@ -2,8 +2,6 @@ import { useEffect } from "react";
 import { Navigate, Route, Routes, useNavigate } from "react-router-dom";
 import AppShell from "./layout/AppShell";
 
-import Home from "./pages/Home";
-import HomePage from "./pages/HomePage";
 import ExplorePage from "./pages/ExplorePage";
 import FeedPage from "./pages/FeedPage";
 import ExploreFeedLegacy from "./pages/legacy/ExploreFeedLegacy";
@@ -53,6 +51,7 @@ import PublishToExplore from "./admin/tabs/PublishToExplore";
 import RecommendationsPage from "./pages/RecommendationsPage";
 import Preferences from "./pages/preferences";
 import Timeline from "./pages/Timeline";
+import Collection from "./pages/Collection";
 import Waves from "./pages/Waves";
 import Saved from "./pages/Saved";
 import Profile from "./pages/Profile";
@@ -79,7 +78,7 @@ export default function App() {
       <Route path="/auth/callback" element={<AuthCallback />} />
 
       {/* Optional convenience route: logged-in landing */}
-      <Route path="/app" element={<Navigate to="/feed" replace />} />
+      <Route path="/app" element={<Navigate to="/studio" replace />} />
 
       {/* Creator pages */}
       <Route
@@ -267,8 +266,7 @@ export default function App() {
           </>
         }
       >
-        <Route index element={<HomePage />} />
-        <Route path="home" element={<Home />} />
+        <Route index element={<Navigate to="/studio" replace />} />
         <Route path="explore" element={<ExplorePage />} />
         <Route path="feed" element={<FeedPage />} />
         {/* Legacy route for rollback */}
@@ -307,17 +305,29 @@ export default function App() {
         />
         <Route
           path="timeline"
+          element={<Timeline />}
+        />
+        <Route
+          path="timeline/explore"
+          element={<Timeline />}
+        />
+        <Route
+          path="timeline/feed"
+          element={<Timeline />}
+        />
+        <Route
+          path="collection"
           element={
-            <RequireAuth title="Timeline" message="Please log in to view your Timeline">
-              <Timeline />
+            <RequireAuth title="Collection" message="Please log in to view your Collection">
+              <Collection />
             </RequireAuth>
           }
         />
         <Route path="profile" element={<Profile />} />
-        <Route path="echo" element={<Navigate to="/timeline" replace />} />
-        <Route path="save-echo" element={<Navigate to="/timeline" replace />} />
+        <Route path="echo" element={<Navigate to="/collection" replace />} />
+        <Route path="save-echo" element={<Navigate to="/collection" replace />} />
         <Route path="match" element={<MatchPage />} />
-        <Route path="events" element={<Navigate to="/explore" replace />} />
+        <Route path="events" element={<Navigate to="/studio/explore" replace />} />
         <Route path="item/:id" element={<ItemDetail />} />
 
         <Route path="quiz/state" element={<QuizState />} />
@@ -330,11 +340,11 @@ export default function App() {
         {import.meta.env.DEV && <Route path="dev/rss-ingest" element={<DevRSSIngest />} />}
 
         {/* shell catch-all */}
-        <Route path="*" element={<Navigate to="/" replace />} />
+        <Route path="*" element={<Navigate to="/studio" replace />} />
       </Route>
 
       {/* global catch-all */}
-      <Route path="*" element={<Navigate to="/" replace />} />
+      <Route path="*" element={<Navigate to="/studio" replace />} />
     </Routes>
   );
 }

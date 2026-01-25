@@ -28,7 +28,7 @@ export default function AuthGate({
   }
 
   function handleBack() {
-    navigate("/", { replace: true });
+    navigate("/studio", { replace: true });
   }
 
   return (

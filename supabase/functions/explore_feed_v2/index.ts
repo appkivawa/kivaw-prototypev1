@@ -7,13 +7,13 @@ import { corsHeaders, handleCors, jsonResponse } from "../_shared/cors.ts";
 // ============================================================
 
 export interface UnifiedContentItem {
-  id: string;                    // 'feed_items:{uuid}' | 'recommendation:{uuid}' | 'cache:{uuid}'
-  kind: string;                  // 'rss' | 'article' | 'video' | 'podcast' | 'watch' | 'read' | etc.
+  id: string;                    // 'feed_items:{uuid}' | 'recommendation:{uuid}' | 'cache:{uuid}' | 'creator_post:{uuid}'
+  kind: string;                  // 'rss' | 'article' | 'video' | 'podcast' | 'watch' | 'read' | 'listen' | 'creator' | etc.
   title: string;
   byline: string | null;
   image_url: string | null;
   url: string | null;
-  provider: string;              // 'rss' | 'youtube' | 'tmdb' | 'open_library' | etc.
+  provider: string;              // 'rss' | 'youtube' | 'tmdb' | 'open_library' | 'google_books' | 'kivaw' | etc.
   external_id: string | null;
   tags: string[];
   created_at: string;
@@ -24,15 +24,13 @@ export interface UnifiedContentItem {
 export interface ExploreFeedV2Request {
   limit?: number;
   cursor?: string;               // Base64 encoded offset (for pagination)
-  kinds?: string[];              // Filter by kind: ['rss', 'watch', 'read']
-  tags?: string[];               // Filter by tags: ['tech', 'ai']
-  sort?: "featured" | "recent" | "score";  // Ordering strategy
+  kinds?: string[];              // Filter by kind: ['watch', 'read', 'listen']
+  providers?: string[];          // Filter by provider: ['tmdb', 'open_library']
 }
 
 export interface ExploreFeedV2Response {
   items: UnifiedContentItem[];
-  nextCursor?: string;           // Base64 encoded offset for next page (if has more)
-  hasMore: boolean;
+  nextCursor: string | null;     // Base64 encoded offset for next page (if has more)
 }
 
 // ============================================================
@@ -64,7 +62,7 @@ serve(async (req) => {
 
   // Smoke test
   if (req.method === "GET") {
-    return jsonResponse({ ok: true, fn: "explore_feed_v2", version: "1.0.0" });
+    return jsonResponse({ ok: true, fn: "explore_feed_v2", version: "2.0.0" });
   }
 
   try {
@@ -73,19 +71,32 @@ serve(async (req) => {
     const SUPABASE_ANON_KEY = Deno.env.get("SUPABASE_ANON_KEY");
 
     if (!SUPABASE_URL || !SUPABASE_ANON_KEY) {
+      console.error("[explore_feed_v2] Missing environment variables");
       return jsonResponse(
         { error: "Missing SUPABASE_URL or SUPABASE_ANON_KEY" },
         500
       );
     }
 
-    // Create Supabase client with user auth (respects RLS)
+    // Get auth header (optional - function works for anonymous users)
     const authHeader = req.headers.get("Authorization") ?? "";
+    const apikeyHeader = req.headers.get("apikey") ?? SUPABASE_ANON_KEY;
+    
+    // Log request info for debugging
+    console.log("[explore_feed_v2] Request received:", {
+      method: req.method,
+      hasAuth: !!authHeader,
+      hasApikey: !!apikeyHeader,
+      contentType: req.headers.get("Content-Type"),
+    });
+
+    // Create Supabase client with user auth (respects RLS)
+    // Works with or without Authorization header (anonymous access supported)
     const supabase = createClient(SUPABASE_URL, SUPABASE_ANON_KEY, {
       global: {
         headers: {
-          Authorization: authHeader,
-          apikey: SUPABASE_ANON_KEY,
+          ...(authHeader ? { Authorization: authHeader } : {}),
+          apikey: apikeyHeader,
         },
       },
     });
@@ -101,65 +112,42 @@ serve(async (req) => {
       body = {};
     }
 
-    // Parse parameters
+    // Parse and validate parameters
     const limit = typeof body.limit === "number" 
-      ? Math.min(Math.max(body.limit, 1), 200)  // Min 1, max 200
-      : 50;  // Default: 50 items
+      ? Math.min(Math.max(body.limit, 1), 50)  // Clamp between 1 and 50
+      : 20;  // Default: 20 items
     
     const cursor = body.cursor;
     const offset = decodeCursor(cursor);
     
-    const kinds = Array.isArray(body.kinds) ? body.kinds : undefined;
-    const tags = Array.isArray(body.tags) ? body.tags : undefined;
-    const sort = body.sort || "featured";  // Default: featured first
+    const kinds = Array.isArray(body.kinds) && body.kinds.length > 0 
+      ? body.kinds.filter((k): k is string => typeof k === "string")
+      : undefined;
+    
+    const providers = Array.isArray(body.providers) && body.providers.length > 0
+      ? body.providers.filter((p): p is string => typeof p === "string")
+      : undefined;
 
-    // Build query
+    // Build query - select specific columns from explore_items_v2
     let query = supabase
       .from("explore_items_v2")
-      .select("*", { count: "exact" });
+      .select("id, kind, provider, external_id, url, title, byline, image_url, tags, created_at, raw, score", { count: "exact" });
 
     // Apply filters
+    // Only filter by kinds if provided and non-empty
     if (kinds && kinds.length > 0) {
       query = query.in("kind", kinds);
     }
 
-    if (tags && tags.length > 0) {
-      // Filter by tags (contains any of the provided tags)
-      // Note: Supabase PostgREST supports array overlap with cs (contains) operator
-      query = query.contains("tags", tags);
+    // Only filter by providers if provided and non-empty
+    if (providers && providers.length > 0) {
+      query = query.in("provider", providers);
     }
 
-    // Apply ordering based on sort strategy
-    switch (sort) {
-      case "featured":
-        // Featured first: public_recommendations (id starts with 'recommendation:') by rank desc,
-        // then feed_items with score desc,
-        // then external_content_cache (no score) by created_at desc
-        query = query
-          .order("score", { ascending: false, nullsFirst: false })
-          .order("created_at", { ascending: false, nullsFirst: false });
-        break;
-      
-      case "recent":
-        // Pure recency: created_at desc, then score desc as tiebreaker
-        query = query
-          .order("created_at", { ascending: false, nullsFirst: false })
-          .order("score", { ascending: false, nullsFirst: false });
-        break;
-      
-      case "score":
-        // Score first: score desc, then created_at desc as tiebreaker
-        query = query
-          .order("score", { ascending: false, nullsFirst: false })
-          .order("created_at", { ascending: false, nullsFirst: false });
-        break;
-      
-      default:
-        // Fallback: featured ordering
-        query = query
-          .order("score", { ascending: false, nullsFirst: false })
-          .order("created_at", { ascending: false, nullsFirst: false });
-    }
+    // Apply ordering: score DESC NULLS LAST, then created_at DESC
+    query = query
+      .order("score", { ascending: false, nullsFirst: false })
+      .order("created_at", { ascending: false, nullsFirst: false });
 
     // Apply pagination (must be after ordering)
     query = query.range(offset, offset + limit - 1);
@@ -191,17 +179,16 @@ serve(async (req) => {
       score: row.score !== null && row.score !== undefined ? Number(row.score) : null,
     }));
 
-    // Determine if there are more items
+    // Determine if there are more items (for cursor pagination)
     const totalCount = count ?? 0;
     const nextOffset = offset + limit;
     const hasMore = nextOffset < totalCount;
-    const nextCursor = hasMore ? encodeCursor(nextOffset) : undefined;
+    const nextCursor = hasMore ? encodeCursor(nextOffset) : null;
 
     // Return response
     const response: ExploreFeedV2Response = {
       items,
       nextCursor,
-      hasMore,
     };
 
     return jsonResponse(response);
@@ -213,4 +200,3 @@ serve(async (req) => {
     );
   }
 });
-

@@ -107,3 +107,4 @@ Supabase uses **Resend** by default for sending emails. You have two options:
 
 
 
+

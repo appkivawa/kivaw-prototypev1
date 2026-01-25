@@ -80,3 +80,4 @@ COMMENT ON FUNCTION public.is_user_admin(UUID) IS 'Checks if a user is in admin_
 
 
 
+

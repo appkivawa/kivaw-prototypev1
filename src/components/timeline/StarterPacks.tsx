@@ -115,7 +115,7 @@ export default function StarterPacks({ onPackClick }: StarterPacksProps) {
       if (pack.filters.sources) {
         params.set("sources", pack.filters.sources.join(","));
       }
-      navigate(`/feed?${params.toString()}`);
+      navigate(`/studio/explore?${params.toString()}`);
     }
   }
 
@@ -123,10 +123,10 @@ export default function StarterPacks({ onPackClick }: StarterPacksProps) {
     <div>
       <h3
         style={{
-          fontSize: "16px",
+          fontSize: "18px",
           fontWeight: 600,
-          color: "var(--ink)",
-          marginBottom: "12px",
+          color: "var(--studio-text)",
+          marginBottom: "16px",
         }}
       >
         Starter Packs
@@ -145,29 +145,30 @@ export default function StarterPacks({ onPackClick }: StarterPacksProps) {
             style={{
               display: "flex",
               alignItems: "center",
-              gap: "6px",
-              padding: "8px 14px",
-              borderRadius: "20px",
-              border: "1px solid var(--border)",
-              backgroundColor: "var(--surface)",
+              gap: "8px",
+              padding: "10px 16px",
+              borderRadius: "24px",
+              border: "1px solid var(--studio-border)",
+              backgroundColor: "var(--studio-white)",
               cursor: "pointer",
-              fontSize: "13px",
+              fontSize: "14px",
               fontWeight: 500,
-              color: "var(--ink)",
-              transition: "all 0.2s",
+              color: "var(--studio-text)",
+              transition: "all 0.2s ease",
+              fontFamily: "inherit",
             }}
             onMouseEnter={(e) => {
-              e.currentTarget.style.backgroundColor = "var(--control-bg)";
-              e.currentTarget.style.borderColor = "var(--border-strong)";
+              e.currentTarget.style.backgroundColor = "var(--studio-gray-50)";
+              e.currentTarget.style.borderColor = "var(--studio-coral)";
               e.currentTarget.style.transform = "translateY(-1px)";
             }}
             onMouseLeave={(e) => {
-              e.currentTarget.style.backgroundColor = "var(--surface)";
-              e.currentTarget.style.borderColor = "var(--border)";
+              e.currentTarget.style.backgroundColor = "var(--studio-white)";
+              e.currentTarget.style.borderColor = "var(--studio-border)";
               e.currentTarget.style.transform = "translateY(0)";
             }}
           >
-            <span style={{ fontSize: "16px" }}>{pack.emoji}</span>
+            <span style={{ fontSize: "18px" }}>{pack.emoji}</span>
             <span>{pack.title}</span>
           </button>
         ))}

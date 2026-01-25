@@ -1,111 +1,89 @@
-// src/pages/StudioHome.tsx
-// New homepage matching the "Yav Studio Home" design mockup
-// This file can be used alongside existing pages for testing
+// src/pages/studio/StudioHome.tsx
+// New Studio landing page - "Match your signal, not the noise"
 
-import { useState, useEffect } from "react";
-import { useNavigate } from "react-router-dom";
+import { useState } from "react";
+import { useNavigate, NavLink, useLocation } from "react-router-dom";
 import { useTheme } from "../theme/ThemeContext";
-import { supabase } from "../lib/supabaseClient";
+import { useSession } from "../auth/useSession";
+
 import "../styles/studio.css";
 
-// Signal types that users can toggle
-const SIGNALS = [
-  { key: "news", label: "News", sub: "Long-form only", icon: "📰" },
-  { key: "social", label: "Social", sub: "Threads, not noise", icon: "💬" },
-  { key: "podcasts", label: "Podcasts", sub: "Weekly picks", icon: "🎧" },
-  { key: "video", label: "Music + Video", sub: "Background only", icon: "🎵" },
+type SignalKey = "news" | "social" | "podcasts" | "video";
+
+const SIGNALS: { key: SignalKey; icon: string; label: string; sub: string }[] = [
+  { key: "news", icon: "📰", label: "News", sub: "Long-form only" },
+  { key: "social", icon: "💬", label: "Social", sub: "Threads, not noise" },
+  { key: "podcasts", icon: "🎧", label: "Podcasts", sub: "Weekly picks" },
+  { key: "video", icon: "🎵", label: "Music + Video", sub: "Background only" },
 ];
 
-// Quick filter tags
-const QUICK_TAGS = [
-  { label: "All signals · one studio", active: true },
-  { label: "News", active: false },
-  { label: "Social", active: false },
-  { label: "Podcasts", active: false },
-  { label: "Music", active: false },
-  { label: "Video", active: false },
-];
+const FEATURES = ["No infinite scroll", "No autoplay", "Signals only"];
+
+const TAGS = ["All signals · one studio", "News", "Social", "Podcasts", "Music", "Video"];
 
 export default function StudioHome() {
   const navigate = useNavigate();
+  const location = useLocation();
   const { theme, toggle } = useTheme();
-  const [activeSignals, setActiveSignals] = useState<string[]>(["podcasts"]);
-  const [isSignedIn, setIsSignedIn] = useState(false);
+  const { session } = useSession();
+  const isSignedIn = !!session;
 
-  // Check auth on mount
-  useEffect(() => {
-    supabase.auth.getSession().then(({ data }) => {
-      setIsSignedIn(!!data.session);
-    });
-  }, []);
+  const [activeSignals, setActiveSignals] = useState<SignalKey[]>(["podcasts"]);
 
-  function toggleSignal(key: string) {
-    setActiveSignals((prev) =>
-      prev.includes(key) ? prev.filter((k) => k !== key) : [...prev, key]
-    );
-  }
+  const toggleSignal = (key: SignalKey) => {
+    setActiveSignals((prev) => (prev.includes(key) ? prev.filter((k) => k !== key) : [...prev, key]));
+  };
 
-  function handleGetStarted() {
-    if (isSignedIn) {
-      navigate("/studio/feed");
-    } else {
-      navigate("/login", { state: { from: "/studio/feed" } });
-    }
-  }
+  const handleGetStarted = () => {
+    if (isSignedIn) navigate("/timeline/feed");
+    else navigate("/login", { state: { from: "/timeline/feed" } });
+  };
+
+  const handleSampleFeed = () => navigate("/timeline/explore");
 
   return (
-    <div className="studio-page">
-      {/* Navigation */}
+    <div className="studio-page" data-theme="light">
       <nav className="studio-nav">
         <div className="studio-nav__inner">
-          <button 
-            className="studio-nav__brand" 
-            onClick={() => navigate("/")}
-            style={{ background: "none", border: "none", cursor: "pointer" }}
-          >
+          <button className="studio-nav__brand" onClick={() => navigate("/studio")}>
             <span className="studio-nav__brand-icon">K</span>
-            <span>KIVAW</span>
+            KIVAW
           </button>
 
           <div className="studio-nav__links">
-            <button 
-              className="studio-nav__link studio-nav__link--active"
-              onClick={() => navigate("/")}
+            <NavLink
+              to="/studio"
+              className={({ isActive }) => `studio-nav__link ${isActive ? "studio-nav__link--active" : ""}`}
             >
               Home
-            </button>
-            <button 
-              className="studio-nav__link"
-              onClick={() => navigate("/studio/explore")}
+            </NavLink>
+
+            <NavLink
+              to="/timeline"
+              className={({ isActive }) => `studio-nav__link ${isActive || location.pathname.includes("/timeline/") ? "studio-nav__link--active" : ""}`}
             >
-              Discover
-            </button>
-            <button 
-              className="studio-nav__link"
-              onClick={() => navigate("/studio/feed")}
+              Timeline
+            </NavLink>
+
+            <NavLink
+              to="/collection"
+              className={({ isActive }) => `studio-nav__link ${isActive ? "studio-nav__link--active" : ""}`}
             >
-              Feed
-            </button>
+              Collection
+            </NavLink>
           </div>
 
           <div className="studio-nav__actions">
-            <button 
-              className="studio-nav__link-text"
-              onClick={() => navigate("/guide")}
-            >
+            <button className="studio-nav__link-text" type="button">
               How it works
             </button>
-            <button 
-              className="studio-btn studio-btn--primary"
-              onClick={handleGetStarted}
-            >
-              {isSignedIn ? "Go to Feed" : "Continue"}
+            <button className="studio-btn studio-btn--primary" onClick={handleGetStarted} type="button">
+              {isSignedIn ? "Go to Feed" : "Get started"}
             </button>
             <button
-              className="studio-btn studio-btn--ghost"
+              className="studio-theme-toggle"
               onClick={toggle}
-              aria-label="Toggle theme"
-              title={theme === "dark" ? "Switch to light mode" : "Switch to dark mode"}
+              aria-label={theme === "dark" ? "Switch to light mode" : "Switch to dark mode"}
             >
               {theme === "dark" ? "☀️" : "🌙"}
             </button>
@@ -113,65 +91,62 @@ export default function StudioHome() {
         </div>
       </nav>
 
-      {/* Hero Section */}
-      <main className="studio-hero">
-        {/* Left: Main content */}
-        <div>
-          <div className="studio-hero__label">STUDIO MEDIA FEED</div>
-          
+      <div className="studio-hero">
+        <div className="studio-hero__main">
           <h1 className="studio-hero__title">
-            Match your{" "}
-            <span className="studio-hero__title-highlight">signal</span>
-            <br />
-            not the noise.
+            Match your <span className="studio-hero__title-highlight">signal</span> not the noise.
           </h1>
 
           <p className="studio-hero__desc">
-            A quiet, clean home for the news, socials, podcasts, music and videos 
-            that actually fit your headspace.
+            A quiet, clean home for the news, socials, podcasts, music and videos that actually fit your headspace.
           </p>
 
           <div className="studio-hero__actions">
-            <button 
-              className="studio-btn studio-btn--primary"
-              onClick={handleGetStarted}
-            >
+            <button className="studio-btn studio-btn--primary" onClick={handleGetStarted} type="button">
               Get started
             </button>
-            <button 
-              className="studio-btn studio-btn--secondary"
-              onClick={() => navigate("/studio/explore")}
-            >
+            <button className="studio-btn studio-btn--secondary" onClick={handleSampleFeed} type="button">
               See a sample feed
             </button>
           </div>
 
           <div className="studio-hero__tags">
-            {QUICK_TAGS.map((tag) => (
-              <span
-                key={tag.label}
-                className={`studio-hero__tag ${tag.active ? "studio-hero__tag--active" : ""}`}
+            {TAGS.map((tag, i) => (
+              <button
+                key={tag}
+                type="button"
+                className={`studio-hero__tag ${i === 0 ? "studio-hero__tag--active" : ""}`}
+                onClick={() => {
+                  if (tag !== "All signals · one studio") {
+                    navigate("/timeline/explore");
+                  }
+                }}
               >
-                {tag.label}
-              </span>
+                {tag}
+              </button>
             ))}
           </div>
 
           <div className="studio-hero__footer">
-            Built for people who want a calm, studio-grade view of their media universe.
+            <p>Built for people who want a calm, studio-grade view of their media universe.</p>
+            <div className="studio-hero__features">
+              {FEATURES.map((feature) => (
+                <span key={feature} className="studio-hero__feature">
+                  <span style={{ color: "var(--studio-coral)", marginRight: "6px" }}>✓</span>
+                  {feature}
+                </span>
+              ))}
+            </div>
           </div>
         </div>
 
-        {/* Right: Tune your mix card */}
         <div className="studio-mix-card">
           <div className="studio-mix-card__header">
             <h2 className="studio-mix-card__title">Tune your mix</h2>
             <span className="studio-mix-card__profile">Profile: Deep work</span>
           </div>
 
-          <p className="studio-mix-card__desc">
-            Tell us what you care about. We do the quiet curation.
-          </p>
+          <p className="studio-mix-card__desc">Tell us what you care about. We do the quiet curation.</p>
 
           <div className="studio-mix-card__signals">
             {SIGNALS.map((signal) => (
@@ -188,32 +163,14 @@ export default function StudioHome() {
           </div>
 
           <div className="studio-mix-card__footer">
-            <span className="studio-mix-card__hint">
-              We surface what matches your energy across the last 48 hours.
-            </span>
-            <button 
-              className="studio-mix-card__preview"
-              onClick={() => navigate("/studio/explore")}
-            >
-              ▶ Preview echo
+            <span className="studio-mix-card__hint">We surface what matches your energy across the last 48 hours.</span>
+            <button className="studio-mix-card__preview" onClick={handleSampleFeed} type="button">
+              ► Preview echo
             </button>
           </div>
         </div>
-      </main>
-
-      {/* Bottom feature tags */}
-      <div style={{ 
-        maxWidth: "1000px", 
-        margin: "0 auto", 
-        padding: "0 24px 80px",
-        display: "flex",
-        justifyContent: "flex-end",
-        gap: "12px"
-      }}>
-        <span className="studio-hero__tag">No infinite scroll</span>
-        <span className="studio-hero__tag">No autoplay</span>
-        <span className="studio-hero__tag">Signals only</span>
       </div>
+
     </div>
   );
 }

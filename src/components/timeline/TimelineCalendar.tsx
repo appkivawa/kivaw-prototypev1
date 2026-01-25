@@ -126,7 +126,7 @@ export default function TimelineCalendar({
               cursor: "pointer",
               fontSize: "18px",
               padding: "4px 8px",
-              color: "var(--ink)",
+              color: "var(--studio-text)",
             }}
           >
             ←
@@ -135,7 +135,7 @@ export default function TimelineCalendar({
             style={{
               fontSize: "18px",
               fontWeight: 600,
-              color: "var(--ink)",
+              color: "var(--studio-text)",
               minWidth: "160px",
               textAlign: "center",
             }}
@@ -150,7 +150,7 @@ export default function TimelineCalendar({
               cursor: "pointer",
               fontSize: "18px",
               padding: "4px 8px",
-              color: "var(--ink)",
+              color: "var(--studio-text)",
             }}
           >
             →
@@ -165,8 +165,8 @@ export default function TimelineCalendar({
               gap: "4px",
               padding: "4px",
               borderRadius: "8px",
-              border: "1px solid var(--border-strong)",
-              background: "var(--surface)",
+              border: "1px solid var(--studio-gray-300)",
+              background: "var(--studio-white)",
             }}
           >
             <button
@@ -175,11 +175,11 @@ export default function TimelineCalendar({
                 padding: "6px 12px",
                 borderRadius: "6px",
                 border: "none",
-                background: calendarView === "month" ? "var(--border)" : "transparent",
+                background: calendarView === "month" ? "var(--studio-border)" : "transparent",
                 cursor: "pointer",
                 fontWeight: calendarView === "month" ? 600 : 500,
                 fontSize: "13px",
-                color: "var(--ink-muted)",
+                color: "var(--studio-text-secondary)",
               }}
             >
               Month
@@ -190,11 +190,11 @@ export default function TimelineCalendar({
                 padding: "6px 12px",
                 borderRadius: "6px",
                 border: "none",
-                background: calendarView === "week" ? "var(--border)" : "transparent",
+                background: calendarView === "week" ? "var(--studio-border)" : "transparent",
                 cursor: "pointer",
                 fontWeight: calendarView === "week" ? 600 : 500,
                 fontSize: "13px",
-                color: "var(--ink-muted)",
+                color: "var(--studio-text-secondary)",
               }}
             >
               Week
@@ -205,12 +205,12 @@ export default function TimelineCalendar({
             style={{
               padding: "8px 16px",
               borderRadius: "8px",
-              border: "1px solid var(--border-strong)",
-              background: "var(--surface)",
+              border: "1px solid var(--studio-gray-300)",
+              background: "var(--studio-white)",
               cursor: "pointer",
               fontSize: "14px",
               fontWeight: 600,
-              color: "var(--ink)",
+              color: "var(--studio-text)",
             }}
           >
             Today
@@ -221,9 +221,9 @@ export default function TimelineCalendar({
       {/* Calendar Grid */}
       <div
         style={{
-          backgroundColor: "var(--surface)",
+          backgroundColor: "var(--studio-white)",
           borderRadius: "12px",
-          border: "1px solid var(--border)",
+          border: "1px solid var(--studio-border)",
           padding: "20px",
           marginBottom: "24px",
         }}

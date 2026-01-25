@@ -1,66 +1,64 @@
-# Quick Deployment Guide
+# Deploy explore_feed_v2 - Quick Steps
 
-## Favicon Updated ✅
-The favicon has been updated to match your design: KIVAW with horizontal gradient (reddish-pink to orange-pink) on white background.
+## ⚠️ Current Status
+The Edge Function `explore_feed_v2` is not deployed. The Explore page cannot load content until it's deployed.
 
-## Deploy to Vercel
+## 🚀 Quick Deploy (Choose One Method)
 
-### Step 1: Install Vercel CLI (if needed)
+### Method 1: Supabase Dashboard (Easiest - No CLI needed)
+
+1. **Open Dashboard:**
+   - Go to: https://supabase.com/dashboard/project/pjuueamhdxqdrnxvavwd/edge-functions
+
+2. **Create/Edit Function:**
+   - Click **"Create function"** button (or find `explore_feed_v2` if it exists)
+   - Function name: `explore_feed_v2`
+
+3. **Copy Code:**
+   - Open: `supabase/functions/explore_feed_v2/index.ts`
+   - Copy **ALL** contents (lines 1-189)
+
+4. **Paste & Deploy:**
+   - Paste into the Supabase editor
+   - Click **"Deploy"** button
+   - Wait for deployment to complete (usually 30-60 seconds)
+
+5. **Verify:**
+   - Refresh your Explore page
+   - Error should disappear
+   - Content should load
+
+### Method 2: Supabase CLI
+
 ```bash
-npm install -g vercel
+# 1. Login (opens browser)
+supabase login
+
+# 2. Link project
+supabase link --project-ref pjuueamhdxqdrnxvavwd
+
+# 3. Deploy
+supabase functions deploy explore_feed_v2
 ```
 
-### Step 2: Login
+## ✅ After Deployment
+
+Test the function:
 ```bash
-vercel login
+curl https://pjuueamhdxqdrnxvavwd.supabase.co/functions/v1/explore_feed_v2
 ```
 
-### Step 3: Deploy
-```bash
-cd /Users/mauvekiara/kivaw-web
-vercel --prod
-```
+Expected: `{"ok":true,"fn":"explore_feed_v2","version":"2.0.0"}`
 
-### Step 4: Set Environment Variables
-After deployment, go to your Vercel project dashboard:
-1. Navigate to Settings → Environment Variables
-2. Add:
-   - `VITE_SUPABASE_URL` = your Supabase project URL
-   - `VITE_SUPABASE_ANON_KEY` = your Supabase anon key
-3. Redeploy if needed
+## 📋 Prerequisites
 
-## Alternative: Deploy via GitHub
+Before deploying, make sure:
+- ✅ `explore_items_v2` view exists (run `CREATE_EXPLORE_ITEMS_V2.sql` in SQL Editor)
+- ✅ Edge Function code is ready (`supabase/functions/explore_feed_v2/index.ts`)
 
-1. **Push to GitHub:**
-   ```bash
-   git add .
-   git commit -m "Update favicon and deploy"
-   git push
-   ```
+## 🐛 Troubleshooting
 
-2. **Import to Vercel:**
-   - Go to vercel.com
-   - Click "Add New Project"
-   - Import your repository
-   - Add environment variables
-   - Deploy
-
-## Build Configuration
-- ✅ `vercel.json` configured for React Router
-- ✅ Build script: `vite build` (no TypeScript checking during build)
-- ✅ Favicon: `/favicon.svg` (updated with gradient KIVAW)
-
-## Post-Deployment Checklist
-- [ ] Verify favicon appears in browser tab
-- [ ] Test homepage in light and dark modes
-- [ ] Test all navigation links
-- [ ] Verify Supabase connection works
-- [ ] Test "How does this work?" button
-- [ ] Test detail panel opens correctly
-
-
-
-
-
-
-
+- **"Function not found"**: Make sure you're deploying to the correct project
+- **"Missing SUPABASE_URL"**: These are auto-provided, shouldn't happen
+- **"explore_items_v2 not found"**: Run the SQL migration first
+- **Still seeing error**: Clear browser cache and hard refresh (Cmd+Shift+R)

@@ -107,3 +107,4 @@ WHERE status = 'published'
 COMMENT ON VIEW public.explore_items_v2 IS 
 'Unified view of all discoverable content for Explore feed. Combines feed_items (RSS/news/social), public_recommendations (curated), external_content_cache (movies/books/TV), and creator_posts (published creator content). Output schema: id (text), kind (text), provider (text), external_id (text), url (text), title (text), byline (text), image_url (text), tags (text[]), created_at (timestamptz), raw (jsonb), score (numeric nullable).';
 
+

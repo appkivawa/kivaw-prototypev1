@@ -822,3 +822,4 @@ rm src/styles/studio.css
 
 **Ready to implement when approved.** All changes are isolated, zero impact on existing code, easy rollback.
 
+

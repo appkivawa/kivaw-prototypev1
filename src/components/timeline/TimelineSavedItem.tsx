@@ -24,7 +24,7 @@ export default function TimelineSavedItem({ item, onRemove }: TimelineSavedItemP
     <article
       style={{
         padding: "0 0 20px 0",
-        borderBottom: "1px solid var(--border)",
+        borderBottom: "1px solid var(--studio-border)",
         marginBottom: "20px",
       }}
     >
@@ -47,7 +47,7 @@ export default function TimelineSavedItem({ item, onRemove }: TimelineSavedItemP
             style={{
               fontSize: "15px",
               fontWeight: 600,
-              color: "var(--ink)",
+              color: "var(--studio-text)",
               marginBottom: "4px",
               lineHeight: 1.4,
             }}
@@ -58,7 +58,7 @@ export default function TimelineSavedItem({ item, onRemove }: TimelineSavedItemP
             <div
               style={{
                 fontSize: "13px",
-                color: "var(--ink-muted)",
+                color: "var(--studio-text-secondary)",
                 marginBottom: "6px",
               }}
             >
@@ -69,7 +69,7 @@ export default function TimelineSavedItem({ item, onRemove }: TimelineSavedItemP
             <div
               style={{
                 fontSize: "12px",
-                color: "var(--ink-tertiary)",
+                color: "var(--studio-text-muted)",
                 marginBottom: "8px",
               }}
             >
@@ -86,7 +86,7 @@ export default function TimelineSavedItem({ item, onRemove }: TimelineSavedItemP
                 rel="noopener noreferrer"
                 style={{
                   fontSize: "13px",
-                  color: "var(--ink-muted)",
+                  color: "var(--studio-text-secondary)",
                   textDecoration: "none",
                 }}
                 onMouseEnter={(e) => {
@@ -106,14 +106,14 @@ export default function TimelineSavedItem({ item, onRemove }: TimelineSavedItemP
                 border: "none",
                 cursor: "pointer",
                 fontSize: "13px",
-                color: showEchoComposer ? "var(--ink-muted)" : "var(--ink-tertiary)",
+                color: showEchoComposer ? "var(--studio-text-secondary)" : "var(--studio-text-muted)",
                 padding: "0",
               }}
               onMouseEnter={(e) => {
-                e.currentTarget.style.color = "var(--ink-muted)";
+                e.currentTarget.style.color = "var(--studio-text-secondary)";
               }}
               onMouseLeave={(e) => {
-                e.currentTarget.style.color = showEchoComposer ? "var(--ink-muted)" : "var(--ink-tertiary)";
+                e.currentTarget.style.color = showEchoComposer ? "var(--studio-text-secondary)" : "var(--studio-text-muted)";
               }}
             >
               💭 Echo
@@ -123,16 +123,16 @@ export default function TimelineSavedItem({ item, onRemove }: TimelineSavedItemP
               style={{
                 background: "none",
                 border: "none",
-                color: "var(--danger-text)",
+                color: "#DC2626",
                 cursor: "pointer",
                 fontSize: "13px",
                 padding: "0",
               }}
               onMouseEnter={(e) => {
-                e.currentTarget.style.color = "var(--danger-text)";
+                e.currentTarget.style.color = "#DC2626";
               }}
               onMouseLeave={(e) => {
-                e.currentTarget.style.color = "var(--danger-text)";
+                e.currentTarget.style.color = "#DC2626";
               }}
             >
               Remove
@@ -145,7 +145,7 @@ export default function TimelineSavedItem({ item, onRemove }: TimelineSavedItemP
               style={{
                 marginTop: "12px",
                 paddingTop: "12px",
-                borderTop: "1px solid var(--border)",
+                borderTop: "1px solid var(--studio-border)",
               }}
             >
               <EchoComposer

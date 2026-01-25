@@ -11,7 +11,7 @@ import Button from "../ui/Button";
 import SectionHeader from "../ui/SectionHeader";
 import Tag from "../ui/Tag";
 import EmptyState from "../ui/EmptyState";
-import "../styles/profile.css";
+import "../styles/studio.css";
 
 type ProfileData = {
   id: string;
@@ -142,31 +142,49 @@ export default function Profile() {
 
   if (sessionLoading || loading) {
     return (
-      <Container maxWidth="xl" className="profile-loading">
-        <p className="meta-text">Loading...</p>
-      </Container>
+      <div className="studio-page" data-theme="light">
+        <Container maxWidth="xl" style={{ paddingTop: "96px", paddingBottom: "40px", paddingLeft: "20px", paddingRight: "20px", textAlign: "center" }}>
+          <p style={{ color: "var(--studio-text-muted)" }}>Loading...</p>
+        </Container>
+      </div>
     );
   }
 
   if (!isAuthed || !session?.user) {
     return (
-      <Container maxWidth="md" className="profile-unauth">
-        <SectionHeader title="Profile" level={1} />
-        <Card>
-          <p className="meta-text" style={{ marginBottom: "16px" }}>
-            Please sign in to view your profile.
-          </p>
-          <Button onClick={() => setShowLoginModal(true)} variant="primary" size="md">
-            Sign In
-          </Button>
-        </Card>
-        <LoginModal
-          isOpen={showLoginModal}
-          onClose={() => setShowLoginModal(false)}
-          title="Sign in to view profile"
-          message="We'll send you a magic link to sign in."
-        />
-      </Container>
+      <div className="studio-page" data-theme="light">
+        <Container maxWidth="md" style={{ paddingTop: "96px", paddingBottom: "40px", paddingLeft: "20px", paddingRight: "20px" }}>
+          <h1 style={{ fontSize: "32px", fontWeight: 700, color: "var(--studio-text)", marginBottom: "24px" }}>Profile</h1>
+          <Card style={{ padding: "40px 24px", textAlign: "center", borderRadius: "12px", border: "1px solid var(--studio-border)", backgroundColor: "var(--studio-white)" }}>
+            <p style={{ color: "var(--studio-text-secondary)", marginBottom: "24px", fontSize: "15px" }}>
+              Please sign in to view your profile.
+            </p>
+            <Button 
+              onClick={() => setShowLoginModal(true)} 
+              variant="primary" 
+              size="md"
+              style={{
+                backgroundColor: "var(--studio-coral)",
+                color: "white",
+                border: "none",
+                padding: "12px 24px",
+                borderRadius: "8px",
+                fontSize: "15px",
+                fontWeight: 600,
+                cursor: "pointer",
+              }}
+            >
+              Sign In
+            </Button>
+          </Card>
+          <LoginModal
+            isOpen={showLoginModal}
+            onClose={() => setShowLoginModal(false)}
+            title="Sign in to view profile"
+            message="We'll send you a magic link to sign in."
+          />
+        </Container>
+      </div>
     );
   }
 
@@ -175,137 +193,274 @@ export default function Profile() {
   const userInitial = user.email?.charAt(0).toUpperCase() || "?";
 
   return (
-    <div className="profile-page">
-      <Container maxWidth="xl" className="profile-container">
+    <div className="studio-page" data-theme="light">
+      <Container maxWidth="xl" style={{ paddingTop: "96px", paddingBottom: "48px" }}>
         {/* Profile Header - Editorial Style */}
-        <div className="profile-header">
-          <div className="profile-avatar-wrapper">
-            <div className="profile-avatar">
+        <div style={{ display: "flex", alignItems: "flex-start", gap: "24px", marginBottom: "40px", paddingBottom: "32px", borderBottom: "1px solid var(--studio-border)" }}>
+          <div style={{ position: "relative", flexShrink: 0 }}>
+            <div style={{
+              width: "120px",
+              height: "120px",
+              borderRadius: "50%",
+              background: "var(--studio-gray-100)",
+              border: "2px solid var(--studio-border)",
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "center",
+              fontSize: "48px",
+              fontWeight: 600,
+              color: "var(--studio-text)",
+            }}>
               {userInitial}
             </div>
-            <div className="profile-status-indicator" />
+            <div style={{
+              position: "absolute",
+              bottom: "4px",
+              right: "4px",
+              width: "24px",
+              height: "24px",
+              borderRadius: "50%",
+              background: "var(--studio-coral)",
+              border: "3px solid var(--studio-white)",
+            }} />
           </div>
           
-          <div className="profile-header-content">
-            <div className="profile-badge">PRO MEMBER</div>
-            <h1 className="profile-name">{user.email?.split("@")[0] || "User"}</h1>
-            <div className="profile-stats">
-              <div className="profile-stat">
-                <strong>{stats.echoesCount}</strong> Echoes
+          <div style={{ flex: 1 }}>
+            <div style={{
+              display: "inline-block",
+              padding: "4px 12px",
+              borderRadius: "4px",
+              background: "var(--studio-coral-light)",
+              color: "var(--studio-coral)",
+              fontSize: "11px",
+              fontWeight: 600,
+              textTransform: "uppercase",
+              letterSpacing: "0.05em",
+              marginBottom: "12px",
+            }}>
+              PRO MEMBER
+            </div>
+            <h1 style={{ fontSize: "32px", fontWeight: 700, color: "var(--studio-text)", margin: "0 0 16px 0" }}>
+              {user.email?.split("@")[0] || "User"}
+            </h1>
+            <div style={{ display: "flex", gap: "24px", flexWrap: "wrap" }}>
+              <div style={{ fontSize: "14px", color: "var(--studio-text-secondary)" }}>
+                <strong style={{ color: "var(--studio-text)", display: "block", fontSize: "18px", marginBottom: "4px" }}>{stats.echoesCount}</strong> Echoes
               </div>
-              <div className="profile-stat">
-                <strong>{stats.savedCount}</strong> Saved
+              <div style={{ fontSize: "14px", color: "var(--studio-text-secondary)" }}>
+                <strong style={{ color: "var(--studio-text)", display: "block", fontSize: "18px", marginBottom: "4px" }}>{stats.savedCount}</strong> Saved
               </div>
-              <div className="profile-stat">
-                <strong>{interests.length}</strong> Interests
+              <div style={{ fontSize: "14px", color: "var(--studio-text-secondary)" }}>
+                <strong style={{ color: "var(--studio-text)", display: "block", fontSize: "18px", marginBottom: "4px" }}>{interests.length}</strong> Interests
               </div>
             </div>
           </div>
 
-          <div className="profile-header-actions">
-            <Button onClick={handleEditInterests} variant="primary" size="md">
+          <div>
+            <Button 
+              onClick={handleEditInterests} 
+              variant="primary" 
+              size="md"
+              style={{
+                backgroundColor: "var(--studio-coral)",
+                color: "white",
+                border: "none",
+                padding: "12px 24px",
+                borderRadius: "8px",
+                fontSize: "15px",
+                fontWeight: 600,
+                cursor: "pointer",
+              }}
+            >
               Edit Profile
             </Button>
           </div>
         </div>
 
         {/* Navigation Tabs */}
-        <nav className="profile-tabs">
-          <button className="profile-tab active">Overview</button>
-          <button className="profile-tab">Collections</button>
-          <button className="profile-tab">Liked Media</button>
-          <button className="profile-tab">Reviews</button>
-          <button className="profile-tab">Settings</button>
+        <nav className="studio-nav__links" style={{ marginBottom: "40px" }}>
+          <button className="studio-nav__link studio-nav__link--active">
+            Overview
+          </button>
+          <button className="studio-nav__link">
+            Collections
+          </button>
+          <button className="studio-nav__link">
+            Liked Media
+          </button>
+          <button className="studio-nav__link">
+            Reviews
+          </button>
+          <button className="studio-nav__link">
+            Settings
+          </button>
         </nav>
 
         {/* Main Content Grid */}
-        <div className="profile-content-grid">
+        <div style={{ display: "grid", gridTemplateColumns: "1fr 320px", gap: "48px", alignItems: "start" }}>
           {/* Left Column - Featured Collections */}
-          <div className="profile-main-content">
-            <SectionHeader
-              title="Featured Collections"
-              actions={<a href="#" className="profile-view-all">View All</a>}
-              level={2}
-            />
+          <div>
+            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline", marginBottom: "24px" }}>
+              <h2 style={{ fontSize: "24px", fontWeight: 700, color: "var(--studio-text)", margin: 0 }}>Featured Collections</h2>
+              <a href="#" style={{ fontSize: "14px", color: "var(--studio-coral)", textDecoration: "none", fontWeight: 500 }}>View All</a>
+            </div>
             
-            <div className="profile-collections-grid">
-              {/* Collection cards would go here - placeholder for now */}
-              <Card className="profile-collection-card">
-                <div className="profile-collection-image">
-                  <div className="profile-collection-placeholder">📚</div>
+            <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(200px, 1fr))", gap: "20px" }}>
+              {/* Collection cards */}
+              <Card style={{ padding: 0, borderRadius: "12px", border: "1px solid var(--studio-border)", backgroundColor: "var(--studio-white)", overflow: "hidden", cursor: "pointer", transition: "transform 0.2s ease, box-shadow 0.2s ease" }}
+                onMouseEnter={(e) => {
+                  e.currentTarget.style.transform = "translateY(-2px)";
+                  e.currentTarget.style.boxShadow = "0 4px 12px rgba(0, 0, 0, 0.1)";
+                }}
+                onMouseLeave={(e) => {
+                  e.currentTarget.style.transform = "translateY(0)";
+                  e.currentTarget.style.boxShadow = "none";
+                }}
+              >
+                <div style={{ width: "100%", height: "120px", background: "var(--studio-gray-100)", display: "flex", alignItems: "center", justifyContent: "center", fontSize: "48px" }}>
+                  📚
                 </div>
-                <h3 className="profile-collection-title">My Echoes</h3>
-                <p className="profile-collection-meta">{stats.echoesCount} Items • Echoes</p>
+                <div style={{ padding: "16px" }}>
+                  <h3 style={{ fontSize: "16px", fontWeight: 600, color: "var(--studio-text)", margin: "0 0 8px 0" }}>My Echoes</h3>
+                  <p style={{ fontSize: "13px", color: "var(--studio-text-muted)", margin: 0 }}>{stats.echoesCount} Items • Echoes</p>
+                </div>
               </Card>
               
-              <Card className="profile-collection-card">
-                <div className="profile-collection-image">
-                  <div className="profile-collection-placeholder">💾</div>
+              <Card style={{ padding: 0, borderRadius: "12px", border: "1px solid var(--studio-border)", backgroundColor: "var(--studio-white)", overflow: "hidden", cursor: "pointer", transition: "transform 0.2s ease, box-shadow 0.2s ease" }}
+                onMouseEnter={(e) => {
+                  e.currentTarget.style.transform = "translateY(-2px)";
+                  e.currentTarget.style.boxShadow = "0 4px 12px rgba(0, 0, 0, 0.1)";
+                }}
+                onMouseLeave={(e) => {
+                  e.currentTarget.style.transform = "translateY(0)";
+                  e.currentTarget.style.boxShadow = "none";
+                }}
+              >
+                <div style={{ width: "100%", height: "120px", background: "var(--studio-gray-100)", display: "flex", alignItems: "center", justifyContent: "center", fontSize: "48px" }}>
+                  💾
                 </div>
-                <h3 className="profile-collection-title">Saved Items</h3>
-                <p className="profile-collection-meta">{stats.savedCount} Items • Saved</p>
+                <div style={{ padding: "16px" }}>
+                  <h3 style={{ fontSize: "16px", fontWeight: 600, color: "var(--studio-text)", margin: "0 0 8px 0" }}>Saved Items</h3>
+                  <p style={{ fontSize: "13px", color: "var(--studio-text-muted)", margin: 0 }}>{stats.savedCount} Items • Saved</p>
+                </div>
               </Card>
 
-              <Card className="profile-collection-card profile-collection-new">
-                <div className="profile-collection-image">
-                  <div className="profile-collection-placeholder">+</div>
+              <Card style={{ padding: 0, borderRadius: "12px", border: "2px dashed var(--studio-border)", backgroundColor: "var(--studio-gray-50)", overflow: "hidden", cursor: "pointer", transition: "transform 0.2s ease, border-color 0.2s ease" }}
+                onMouseEnter={(e) => {
+                  e.currentTarget.style.transform = "translateY(-2px)";
+                  e.currentTarget.style.borderColor = "var(--studio-coral)";
+                }}
+                onMouseLeave={(e) => {
+                  e.currentTarget.style.transform = "translateY(0)";
+                  e.currentTarget.style.borderColor = "var(--studio-border)";
+                }}
+              >
+                <div style={{ width: "100%", height: "120px", background: "transparent", display: "flex", alignItems: "center", justifyContent: "center", fontSize: "48px", color: "var(--studio-text-muted)" }}>
+                  +
                 </div>
-                <h3 className="profile-collection-title">New Collection</h3>
-                <p className="profile-collection-meta">Create custom list</p>
+                <div style={{ padding: "16px" }}>
+                  <h3 style={{ fontSize: "16px", fontWeight: 600, color: "var(--studio-text)", margin: "0 0 8px 0" }}>New Collection</h3>
+                  <p style={{ fontSize: "13px", color: "var(--studio-text-muted)", margin: 0 }}>Create custom list</p>
+                </div>
               </Card>
             </div>
           </div>
 
           {/* Right Column - Sidebar */}
-          <aside className="profile-sidebar">
+          <aside>
             {/* Recently Played */}
-            <SectionHeader title="Recently Played" level={3} />
-            <div className="profile-recent-list">
-              {stats.echoesCount > 0 ? (
-                <div className="profile-recent-item">
-                  <div className="profile-recent-thumbnail">🎵</div>
-                  <div className="profile-recent-content">
-                    <div className="profile-recent-title">Your Echoes</div>
-                    <div className="profile-recent-meta">Echoes • {stats.echoesCount} items</div>
-                    <div className="profile-recent-time">Recently</div>
+            <div style={{ marginBottom: "32px" }}>
+              <h3 style={{ fontSize: "18px", fontWeight: 600, color: "var(--studio-text)", marginBottom: "16px" }}>Recently Played</h3>
+              <div>
+                {stats.echoesCount > 0 ? (
+                  <div style={{ display: "flex", gap: "12px", padding: "12px", borderRadius: "8px", backgroundColor: "var(--studio-gray-50)" }}>
+                    <div style={{ fontSize: "32px", flexShrink: 0 }}>🎵</div>
+                    <div style={{ flex: 1, minWidth: 0 }}>
+                      <div style={{ fontSize: "14px", fontWeight: 600, color: "var(--studio-text)", marginBottom: "4px" }}>Your Echoes</div>
+                      <div style={{ fontSize: "12px", color: "var(--studio-text-muted)", marginBottom: "4px" }}>Echoes • {stats.echoesCount} items</div>
+                      <div style={{ fontSize: "12px", color: "var(--studio-text-muted)" }}>Recently</div>
+                    </div>
                   </div>
-                </div>
-              ) : (
-                <p className="meta-text">No recent activity</p>
-              )}
+                ) : (
+                  <p style={{ fontSize: "14px", color: "var(--studio-text-muted)" }}>No recent activity</p>
+                )}
+              </div>
             </div>
 
             {/* Saved for Later */}
-            <SectionHeader title="Saved for Later" level={3} />
-            <Card className="profile-saved-card">
-              <div className="profile-saved-icon">📌</div>
-              <div className="profile-saved-content">
-                <strong>{stats.savedCount} Items Saved</strong>
-                <p className="meta-text">Catch up on your saved content</p>
-                <Button onClick={() => navigate("/saved")} variant="primary" size="sm" className="profile-saved-button">
-                  View Watchlist
-                </Button>
-              </div>
-            </Card>
+            <div style={{ marginBottom: "32px" }}>
+              <h3 style={{ fontSize: "18px", fontWeight: 600, color: "var(--studio-text)", marginBottom: "16px" }}>Saved for Later</h3>
+              <Card style={{ padding: "20px", borderRadius: "12px", border: "1px solid var(--studio-border)", backgroundColor: "var(--studio-white)" }}>
+                <div style={{ display: "flex", gap: "16px" }}>
+                  <div style={{ fontSize: "32px", flexShrink: 0 }}>📌</div>
+                  <div style={{ flex: 1 }}>
+                    <strong style={{ display: "block", fontSize: "16px", fontWeight: 600, color: "var(--studio-text)", marginBottom: "8px" }}>{stats.savedCount} Items Saved</strong>
+                    <p style={{ fontSize: "14px", color: "var(--studio-text-secondary)", marginBottom: "16px" }}>Catch up on your saved content</p>
+                    <Button 
+                      onClick={() => navigate("/saved")} 
+                      variant="primary" 
+                      size="sm"
+                      style={{
+                        backgroundColor: "var(--studio-coral)",
+                        color: "white",
+                        border: "none",
+                        padding: "8px 16px",
+                        borderRadius: "6px",
+                        fontSize: "14px",
+                        fontWeight: 500,
+                        cursor: "pointer",
+                      }}
+                    >
+                      View Watchlist
+                    </Button>
+                  </div>
+                </div>
+              </Card>
+            </div>
 
             {/* Interests */}
-            <SectionHeader title="Interests" level={3} />
-            {interests.length > 0 ? (
-              <div className="profile-interests">
-                {interests.map((interest) => (
-                  <Tag key={interest} label={interest} variant="subtle" />
-                ))}
-              </div>
-            ) : (
-              <p className="meta-text">No interests selected. <button onClick={handleEditInterests} className="profile-link">Add some</button></p>
-            )}
+            <div>
+              <h3 style={{ fontSize: "18px", fontWeight: 600, color: "var(--studio-text)", marginBottom: "16px" }}>Interests</h3>
+              {interests.length > 0 ? (
+                <div style={{ display: "flex", flexWrap: "wrap", gap: "8px" }}>
+                  {interests.map((interest) => (
+                    <Tag key={interest} label={interest} variant="subtle" />
+                  ))}
+                </div>
+              ) : (
+                <p style={{ fontSize: "14px", color: "var(--studio-text-muted)" }}>
+                  No interests selected.{" "}
+                  <button 
+                    onClick={handleEditInterests} 
+                    style={{
+                      background: "none",
+                      border: "none",
+                      color: "var(--studio-coral)",
+                      cursor: "pointer",
+                      textDecoration: "underline",
+                      fontSize: "14px",
+                      padding: 0,
+                    }}
+                  >
+                    Add some
+                  </button>
+                </p>
+              )}
+            </div>
           </aside>
         </div>
 
         {/* Error Section */}
         {error && (
-          <Card variant="danger" className="profile-error">
-            <strong>Error:</strong> {error}
+          <Card style={{
+            padding: "24px",
+            marginTop: "32px",
+            background: "#FEE2E2",
+            border: "1px solid #DC2626",
+            borderRadius: "8px",
+          }}>
+            <strong style={{ color: "#DC2626", display: "block", marginBottom: "8px" }}>Error:</strong>
+            <div style={{ color: "#991B1B", fontSize: "14px" }}>{error}</div>
           </Card>
         )}
       </Container>

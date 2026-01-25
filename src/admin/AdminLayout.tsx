@@ -148,7 +148,7 @@ export default function AdminLayout() {
   async function handleSignOut() {
     try {
       await supabase.auth.signOut();
-      navigate("/", { replace: true });
+      navigate("/studio", { replace: true });
     } catch (error) {
       console.error("Error signing out:", error);
     }
@@ -169,7 +169,7 @@ export default function AdminLayout() {
               <button
                 className="coral-btn-secondary"
                 type="button"
-                onClick={() => navigate("/")}
+                onClick={() => navigate("/studio")}
                 style={{ fontSize: 12, padding: "8px 16px" }}
               >
                 🏠 Home

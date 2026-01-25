@@ -64,7 +64,7 @@ export default function DayDrawer({
           left: 0,
           right: 0,
           bottom: 0,
-          backgroundColor: "var(--overlay)",
+          backgroundColor: "rgba(0, 0, 0, 0.5)",
           zIndex: 1000,
           display: "flex",
           alignItems: "flex-end",
@@ -75,11 +75,11 @@ export default function DayDrawer({
           style={{
             width: "100%",
             maxHeight: "80vh",
-            backgroundColor: "var(--surface)",
+            backgroundColor: "var(--studio-white)",
             borderRadius: "20px 20px 0 0",
             padding: "20px",
             overflowY: "auto",
-            boxShadow: "0 -4px 20px var(--shadow-black-12)",
+            boxShadow: "0 -4px 20px rgba(0, 0, 0, 0.12)",
           }}
           onClick={(e) => e.stopPropagation()}
         >
@@ -95,7 +95,7 @@ export default function DayDrawer({
               style={{
                 fontSize: "20px",
                 fontWeight: 700,
-                color: "var(--ink)",
+                color: "var(--studio-text)",
                 margin: 0,
               }}
             >
@@ -108,7 +108,7 @@ export default function DayDrawer({
                 border: "none",
                 fontSize: "24px",
                 cursor: "pointer",
-                color: "var(--ink-tertiary)",
+                color: "var(--studio-text-muted)",
                 padding: "4px 8px",
               }}
             >
@@ -130,9 +130,9 @@ export default function DayDrawer({
         right: 0,
         bottom: 0,
         width: "420px",
-        backgroundColor: "var(--surface)",
-        borderLeft: "1px solid var(--border)",
-        boxShadow: "-4px 0 20px var(--shadow-black-08)",
+        backgroundColor: "var(--studio-white)",
+        borderLeft: "1px solid var(--studio-border)",
+        boxShadow: "-4px 0 20px rgba(0, 0, 0, 0.08)",
         zIndex: 100,
         display: "flex",
         flexDirection: "column",
@@ -141,7 +141,7 @@ export default function DayDrawer({
       <div
         style={{
           padding: "20px",
-          borderBottom: "1px solid var(--border)",
+          borderBottom: "1px solid var(--studio-border)",
           display: "flex",
           justifyContent: "space-between",
           alignItems: "center",
@@ -151,7 +151,7 @@ export default function DayDrawer({
           style={{
             fontSize: "20px",
             fontWeight: 700,
-            color: "var(--ink)",
+            color: "var(--studio-text)",
             margin: 0,
           }}
         >
@@ -164,7 +164,7 @@ export default function DayDrawer({
             border: "none",
             fontSize: "24px",
             cursor: "pointer",
-            color: "var(--ink-tertiary)",
+            color: "var(--studio-text-muted)",
             padding: "4px 8px",
           }}
         >
@@ -187,7 +187,7 @@ export default function DayDrawer({
     if (viewMode === "echo") {
       if (echoes.length === 0) {
         return (
-          <div style={{ textAlign: "center", padding: "40px", color: "var(--ink-tertiary)" }}>
+          <div style={{ textAlign: "center", padding: "40px", color: "var(--studio-text-muted)" }}>
             No Echoes on this day
           </div>
         );
@@ -203,8 +203,8 @@ export default function DayDrawer({
                 style={{
                   padding: "16px",
                   borderRadius: "12px",
-                  border: "1px solid var(--border)",
-                  backgroundColor: "var(--border)",
+                  border: "1px solid var(--studio-border)",
+                  backgroundColor: "var(--studio-gray-50)",
                 }}
               >
                 {/* Echo text - main content */}
@@ -212,7 +212,7 @@ export default function DayDrawer({
                   style={{
                     fontSize: "16px",
                     lineHeight: 1.6,
-                    color: "var(--ink)",
+                    color: "var(--studio-text)",
                     marginBottom: echo.content_items ? "12px" : "0",
                   }}
                 >
@@ -226,8 +226,8 @@ export default function DayDrawer({
                       marginTop: "12px",
                       padding: "12px",
                       borderRadius: "8px",
-                      backgroundColor: "var(--surface)",
-                      border: "1px solid var(--border-strong)",
+                      backgroundColor: "var(--studio-white)",
+                      border: "1px solid var(--studio-gray-300)",
                     }}
                   >
                     <div
@@ -256,7 +256,7 @@ export default function DayDrawer({
                           style={{
                             fontSize: "14px",
                             fontWeight: 600,
-                            color: "var(--ink)",
+                            color: "var(--studio-text)",
                             marginBottom: "4px",
                           }}
                         >
@@ -265,7 +265,7 @@ export default function DayDrawer({
                         <div
                           style={{
                             fontSize: "12px",
-                            color: "var(--ink-tertiary)",
+                            color: "var(--studio-text-muted)",
                             display: "flex",
                             alignItems: "center",
                             gap: "6px",
@@ -280,7 +280,7 @@ export default function DayDrawer({
                       href={`/item/${echo.content_items.id}`}
                       style={{
                         fontSize: "13px",
-                        color: "var(--ink-muted)",
+                        color: "var(--studio-text-secondary)",
                         textDecoration: "none",
                       }}
                       onMouseEnter={(e) => {
@@ -313,16 +313,16 @@ export default function DayDrawer({
                       style={{
                         background: "none",
                         border: "none",
-                        color: "var(--danger-text)",
+                        color: "#DC2626",
                         cursor: "pointer",
                         fontSize: "12px",
                         padding: "4px 0",
                       }}
                       onMouseEnter={(e) => {
-                        e.currentTarget.style.color = "var(--danger-text)";
+                        e.currentTarget.style.color = "#DC2626";
                       }}
                       onMouseLeave={(e) => {
-                        e.currentTarget.style.color = "var(--danger-text)";
+                        e.currentTarget.style.color = "#DC2626";
                       }}
                     >
                       Delete
@@ -337,7 +337,7 @@ export default function DayDrawer({
       // Saved view
       if (savedItems.length === 0) {
         return (
-          <div style={{ textAlign: "center", padding: "40px", color: "var(--ink-tertiary)" }}>
+          <div style={{ textAlign: "center", padding: "40px", color: "var(--studio-text-muted)" }}>
             No saved items on this day
           </div>
         );
@@ -356,8 +356,8 @@ export default function DayDrawer({
                 style={{
                   padding: "16px",
                   borderRadius: "12px",
-                  border: "1px solid var(--border)",
-                  backgroundColor: "var(--border)",
+                  border: "1px solid var(--studio-border)",
+                  backgroundColor: "var(--studio-gray-50)",
                 }}
               >
                 <div style={{ display: "flex", gap: "12px", alignItems: "flex-start" }}>
@@ -379,7 +379,7 @@ export default function DayDrawer({
                       style={{
                         fontSize: "15px",
                         fontWeight: 600,
-                        color: "var(--ink)",
+                        color: "var(--studio-text)",
                         marginBottom: "4px",
                       }}
                     >
@@ -389,7 +389,7 @@ export default function DayDrawer({
                       <div
                         style={{
                           fontSize: "13px",
-                          color: "var(--ink-muted)",
+                          color: "var(--studio-text-secondary)",
                           marginBottom: "6px",
                         }}
                       >
@@ -400,7 +400,7 @@ export default function DayDrawer({
                       <div
                         style={{
                           fontSize: "12px",
-                          color: "var(--ink-tertiary)",
+                          color: "var(--studio-text-muted)",
                           marginBottom: "8px",
                         }}
                       >
@@ -414,7 +414,7 @@ export default function DayDrawer({
                         rel="noopener noreferrer"
                         style={{
                           fontSize: "13px",
-                          color: "var(--ink-muted)",
+                          color: "var(--studio-text-secondary)",
                           textDecoration: "none",
                         }}
                         onMouseEnter={(e) => {
@@ -434,13 +434,13 @@ export default function DayDrawer({
                       style={{
                         background: "none",
                         border: "none",
-                        color: "var(--danger-text)",
+                        color: "#DC2626",
                         cursor: "pointer",
                         fontSize: "12px",
                         padding: "4px 0",
                       }}
                       onMouseEnter={(e) => {
-                        e.currentTarget.style.color = "var(--danger-text)";
+                        e.currentTarget.style.color = "#DC2626";
                       }}
                       onMouseLeave={(e) => {
                         e.currentTarget.style.color = "rgba(239, 68, 68, 0.5)";

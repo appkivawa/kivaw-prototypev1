@@ -105,3 +105,4 @@ COMMENT ON COLUMN public.ingestion_runs.error_message IS 'Error message if statu
 COMMENT ON FUNCTION public.get_last_successful_ingestion(TEXT) IS 'Get the last successful run for a specific job';
 COMMENT ON FUNCTION public.get_last_successful_ingestion_all() IS 'Get the last successful run for all jobs';
 
+

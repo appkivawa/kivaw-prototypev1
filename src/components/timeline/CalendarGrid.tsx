@@ -80,7 +80,7 @@ export default function CalendarGrid({
               textAlign: "center",
               fontSize: "12px",
               fontWeight: 600,
-              color: "var(--ink-tertiary)",
+              color: "var(--studio-text-muted)",
               padding: "8px",
             }}
           >
@@ -119,14 +119,14 @@ export default function CalendarGrid({
                 borderRadius: "8px",
                 border: "none",
                 background: isSelected
-                  ? "var(--ink)"
+                  ? "var(--studio-coral)"
                   : isToday
-                  ? "var(--border-strong)"
+                  ? "var(--studio-gray-200)"
                   : dayData.count > 0
-                  ? "var(--border)"
+                  ? "var(--studio-gray-50)"
                   : "transparent",
                 cursor: isCurrentMonth && dayData.count > 0 ? "pointer" : "default",
-                color: isSelected ? "var(--bg)" : isCurrentMonth ? "var(--ink)" : "var(--ink-tertiary)",
+                color: isSelected ? "white" : isCurrentMonth ? "var(--studio-text)" : "var(--studio-text-muted)",
                 fontSize: "14px",
                 fontWeight: isToday ? 700 : 500,
                 position: "relative",
@@ -138,12 +138,12 @@ export default function CalendarGrid({
               }}
               onMouseEnter={(e) => {
                 if (isCurrentMonth && dayData.count > 0 && !isSelected) {
-                  e.currentTarget.style.backgroundColor = "var(--border-strong)";
+                  e.currentTarget.style.backgroundColor = "var(--studio-gray-200)";
                 }
               }}
               onMouseLeave={(e) => {
                 if (isCurrentMonth && dayData.count > 0 && !isSelected) {
-                  e.currentTarget.style.backgroundColor = isToday ? "var(--border-strong)" : "var(--border)";
+                  e.currentTarget.style.backgroundColor = isToday ? "var(--studio-gray-200)" : "var(--studio-gray-50)";
                 }
               }}
             >

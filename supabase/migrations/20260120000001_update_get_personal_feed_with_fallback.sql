@@ -173,3 +173,4 @@ COMMENT ON FUNCTION public.get_personal_feed IS
   'Interest match bonus: 0.5 points per matching tag/topic/ILIKE match (capped at 10 points). '
   'Returns same columns as explore_items_v1 plus score_final, ordered by score_final desc, published_at desc.';
 
+

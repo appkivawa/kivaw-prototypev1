@@ -104,3 +104,4 @@ SELECT cron.schedule(
 --
 -- 3. NEVER commit service role key to git - use Supabase dashboard or environment variables
 
+
