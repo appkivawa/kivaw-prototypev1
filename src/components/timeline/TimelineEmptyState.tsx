@@ -145,8 +145,8 @@ export default function TimelineEmptyState({ viewMode }: TimelineEmptyStateProps
           }}
         >
           {viewMode === "echo"
-            ? "Echo something from Discover to start building your Timeline, or explore curated content below."
-            : "Save items from Discover to see them here, or explore curated content below."}
+            ? "Echo something from Explore to start building your Timeline, or explore curated content below."
+            : "Save items from Explore to see them here, or explore curated content below."}
         </p>
       </div>
 

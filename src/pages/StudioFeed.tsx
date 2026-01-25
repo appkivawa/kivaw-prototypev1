@@ -371,64 +371,18 @@ export default function StudioFeed({ hideNav = false }: StudioFeedProps = {}) {
           </nav>
         )}
 
-        <div className="studio-feed-layout studio-feed-layout--no-profile">
-          <aside className="studio-sidebar">
-            <div className="studio-sidebar__section">
-              <div className="studio-sidebar__label">Your Feed</div>
-              <h3 className="studio-sidebar__title">Hey, {userEmail?.split("@")[0] || "there"} 👋</h3>
-              <p className="studio-sidebar__desc">Here’s what’s fresh based on your interests.</p>
-            </div>
-
-            <div className="studio-sidebar__section">
-              <div className="studio-sidebar__label">Focus</div>
-              <div className="studio-focus">
-                {FOCUS_MODES.map((m) => (
-                  <button
-                    key={m.key}
-                    className={`studio-focus-btn ${focus === m.key ? "studio-focus-btn--active" : ""}`}
-                    onClick={() => setFocus(m.key)}
-                    type="button"
-                  >
-                    <span className="studio-focus-btn__icon">{m.icon}</span>
-                    <span className="studio-focus-btn__label">{m.label}</span>
-                  </button>
-                ))}
-              </div>
-            </div>
-
-            <div className="studio-sidebar__section">
-              <div className="studio-sidebar__label">Activity</div>
-              <div className="studio-metrics">
-                <div className="studio-metric">
-                  <div className="studio-metric__num">{totalCount}</div>
-                  <div className="studio-metric__label">Items</div>
-                </div>
-                <div className="studio-metric">
-                  <div className="studio-metric__num">48h</div>
-                  <div className="studio-metric__label">Fresh</div>
-                </div>
-              </div>
-            </div>
-          </aside>
-
-          <main className="studio-main">
-            <div className="studio-feed-header">
+        <div className="feed-page">
+          <header className="feed-header">
+            <div className="feed-header-top">
               <div>
-                <h1 className="studio-feed-header__title">Your Feed</h1>
-                <p className="studio-feed-header__desc">Curated content based on your preferences</p>
-
-                <div className="studio-feed-header__meta">
-                  <span>{lastIngestion ? `Last updated ${formatTimeAgo(lastIngestion)}` : `Last loaded ${formatTimeAgo(lastRefresh)}`}</span>
-                  {totalCount > 0 && (
-                    <>
-                      <span>•</span>
-                      <span>{totalCount} items</span>
-                    </>
-                  )}
-                </div>
+                <h2 className="feed-title">Your Feed</h2>
+                <p className="feed-subtitle">Curated content based on your preferences</p>
+                <span className="feed-meta">
+                  {lastIngestion ? `Last updated ${formatTimeAgo(lastIngestion)}` : `Last loaded ${formatTimeAgo(lastRefresh)}`}
+                  {totalCount > 0 && ` • ${totalCount} items`}
+                </span>
               </div>
-
-              <div className="studio-feed-header__actions">
+              <div className="feed-actions">
                 <button className="studio-btn studio-btn--secondary" onClick={loadContent} type="button">
                   ↻ Refresh
                 </button>
@@ -437,6 +391,24 @@ export default function StudioFeed({ hideNav = false }: StudioFeedProps = {}) {
                 </button>
               </div>
             </div>
+            
+            {/* HORIZONTAL filter chips - replaces sidebar filters */}
+            <div className="feed-filters">
+              {FOCUS_MODES.map((m) => (
+                <button
+                  key={m.key}
+                  className={`filter-chip ${focus === m.key ? "active" : ""}`}
+                  onClick={() => setFocus(m.key)}
+                  type="button"
+                >
+                  <span>{m.icon}</span>
+                  <span>{m.label}</span>
+                </button>
+              ))}
+            </div>
+          </header>
+
+          <main className="feed-list-container">
 
             {loading && (
               <div className="studio-empty" style={{ padding: 40 }}>
@@ -457,7 +429,7 @@ export default function StudioFeed({ hideNav = false }: StudioFeedProps = {}) {
             )}
 
             {!loading && !error && sections.length > 0 && (
-              <div>
+              <div className="feed-list">
                 {sections.map((section) => (
                   <div key={section.id} style={{ marginBottom: 48 }}>
                     <div className="studio-section__header" style={{ marginBottom: 16 }}>

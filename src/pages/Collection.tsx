@@ -1,18 +1,26 @@
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useState, useMemo } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
 import { listMyEchoes, deleteEcho, type EchoWithContent } from "../data/echoApi";
 import { supabase } from "../lib/supabaseClient";
 import { getLocalSaved, getLocalSavedIds, unsaveLocal } from "../data/savedLocal";
 import { useSession } from "../auth/useSession";
-import TimelineCalendar from "../components/timeline/TimelineCalendar";
-import TimelineEmptyState from "../components/timeline/TimelineEmptyState";
 import { ToastContainer } from "../components/ui/Toast";
 import LoginModal from "../components/auth/LoginModal";
 import Container from "../ui/Container";
 import Card from "../ui/Card";
-import Button from "../ui/Button";
-import SectionHeader from "../ui/SectionHeader";
-import EmptyState from "../ui/EmptyState";
+import CollectionSidebar from "../components/collection/CollectionSidebar";
+import SavedItemCard from "../components/collection/SavedItemCard";
+import EchoCard from "../components/collection/EchoCard";
+import TimelineEchoPost from "../components/timeline/TimelineEchoPost";
+import AddItemModal from "../components/collection/AddItemModal";
+import ViewOptionsModal, { type ViewDensity, type ViewMode } from "../components/collection/ViewOptionsModal";
+import {
+  computeLibraryCounts,
+  computeEchoCounts,
+  filterSavedItems,
+  type LibraryFilter,
+  type SavedFilter,
+} from "../utils/collectionHelpers";
 import "../styles/studio.css";
 
 // Unified saved item type that can be either content_item or feed_item
@@ -30,30 +38,14 @@ export type SavedItem = {
   summary?: string | null;
   author?: string | null;
   published_at?: string | null;
+  // Status fields for filtering
+  status?: string;
+  isFavorite?: boolean;
+  isArchived?: boolean;
+  board?: string;
 };
 
-type ViewMode = "echo" | "saved";
-
-function getStoredViewMode(location: { pathname: string }): ViewMode {
-  // Check URL first
-  if (location.pathname.includes("saved")) return "saved";
-  // Check localStorage
-  try {
-    const stored = localStorage.getItem("kivaw_collection_view_v1");
-    if (stored === "echo" || stored === "saved") return stored;
-  } catch {
-    // ignore
-  }
-  return "echo"; // default
-}
-
-function setStoredViewMode(mode: ViewMode) {
-  try {
-    localStorage.setItem("kivaw_collection_view_v1", mode);
-  } catch {
-    // ignore
-  }
-}
+// Removed old ViewMode - now using sidebar filters instead
 
 function formatDate(dateStr: string): string {
   const date = new Date(dateStr);
@@ -108,10 +100,19 @@ function getCalendarDays(year: number, month: number): Date[] {
 
 
 function CollectionContent() {
-  const location = useLocation();
   const navigate = useNavigate();
-  const [viewMode, setViewMode] = useState<ViewMode>(getStoredViewMode(location));
-  const [searchQuery, setSearchQuery] = useState("");
+  
+  // Filter states
+  const [activeLibraryFilter, setActiveLibraryFilter] = useState<LibraryFilter | null>(null);
+  const [activeJournalFilter, setActiveJournalFilter] = useState<"echoes" | "history" | null>(null);
+  const [activeBoard, setActiveBoard] = useState<string | null>(null);
+  const [activeSavedFilter, setActiveSavedFilter] = useState<SavedFilter>("all");
+  
+  // View options
+  const [viewDensity, setViewDensity] = useState<ViewDensity>("comfortable");
+  const [viewMode, setViewMode] = useState<ViewMode>("grid");
+  const [showViewOptions, setShowViewOptions] = useState(false);
+  const [showAddItem, setShowAddItem] = useState(false);
 
   // Echo state
   const [echoes, setEchoes] = useState<EchoWithContent[]>([]);
@@ -122,6 +123,25 @@ function CollectionContent() {
   const [savedItems, setSavedItems] = useState<SavedItem[]>([]);
   const [savedLoading, setSavedLoading] = useState(true);
   const [savedError, setSavedError] = useState<string | null>(null);
+  
+  // Boards state (in-memory for now)
+  const [boards, setBoards] = useState<Array<{ key: string; label: string; count?: number }>>([
+    { key: "favorites", label: "Favorites" },
+    { key: "travel-inspiration", label: "Travel Inspiration" },
+  ]);
+
+  // Calculate board counts
+  const boardsWithCounts = useMemo(() => {
+    return boards.map((board) => {
+      if (board.key === "favorites") {
+        const count = savedItems.filter((item) => (item as any).isFavorite === true || (item as any).board === "favorites").length;
+        return { ...board, count: count > 0 ? count : undefined };
+      }
+      // For other boards, count items with matching board key
+      const count = savedItems.filter((item) => (item as any).board === board.key).length;
+      return { ...board, count: count > 0 ? count : undefined };
+    });
+  }, [boards, savedItems]);
 
 
   async function loadEchoes() {
@@ -211,9 +231,22 @@ function CollectionContent() {
         url: item.url || null,
         source: item.source || null,
         created_at: item.created_at || null,
+        // Default status to "unfinished" for new items
+        status: (item as any).status || "unfinished",
+        isFavorite: (item as any).isFavorite || false,
+        isArchived: (item as any).isArchived || false,
+        board: (item as any).board || null,
       }));
 
-      setSavedItems([...contentItems, ...feedData] as SavedItem[]);
+      const combined = [...contentItems, ...feedData] as SavedItem[];
+      // Ensure all items have default status
+      combined.forEach((item) => {
+        if (!item.status) item.status = "unfinished";
+        if (item.isFavorite === undefined) item.isFavorite = false;
+        if (item.isArchived === undefined) item.isArchived = false;
+      });
+
+      setSavedItems(combined);
     } catch (e: any) {
       setSavedError(e?.message || "Failed to load saved items");
     } finally {
@@ -252,136 +285,396 @@ function CollectionContent() {
     }
   }
 
+  // Load both echoes and saved items on mount
   useEffect(() => {
-    if (viewMode === "echo") {
-      loadEchoes();
-    } else {
-      loadSaved();
-    }
+    loadEchoes();
+    loadSaved();
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [viewMode]);
+  }, []);
 
+  // Compute counts
+  const libraryCounts = useMemo(() => computeLibraryCounts(savedItems), [savedItems]);
+  const echoCounts = useMemo(() => computeEchoCounts(echoes), [echoes]);
 
-  function handleViewModeChange(mode: ViewMode) {
-    setViewMode(mode);
-    setStoredViewMode(mode);
+  // Build library items for sidebar
+  const libraryItems = useMemo(
+    () => [
+      { key: "all" as LibraryFilter, label: "All Items", count: libraryCounts.all },
+      { key: "books" as LibraryFilter, label: "Books", count: libraryCounts.books },
+      { key: "movies_tv" as LibraryFilter, label: "Movies & TV", count: libraryCounts.movies_tv },
+      { key: "music" as LibraryFilter, label: "Music", count: libraryCounts.music },
+    ],
+    [libraryCounts]
+  );
+
+  // Build journal items for sidebar
+  const journalItems = useMemo(
+    () => [
+      { key: "echoes" as const, label: "Echoes", count: echoCounts.echoes },
+      { key: "history" as const, label: "History", count: echoCounts.history },
+    ],
+    [echoCounts]
+  );
+
+  // Filter saved items based on active filters
+  const filteredSavedItems = useMemo(
+    () => filterSavedItems(savedItems, activeSavedFilter, activeLibraryFilter),
+    [savedItems, activeSavedFilter, activeLibraryFilter]
+  );
+
+  // Get recent echoes (limit 2)
+  const recentEchoes = useMemo(() => echoes.slice(0, 2), [echoes]);
+
+  function handleLibraryClick(filter: LibraryFilter) {
+    if (filter === "all") {
+      setActiveLibraryFilter(null);
+    } else {
+      setActiveLibraryFilter(filter);
+    }
+    setActiveJournalFilter(null);
+    setActiveBoard(null);
   }
 
-  const loading = viewMode === "echo" ? echoLoading : savedLoading;
-  const error = viewMode === "echo" ? echoError : savedError;
-  const items = viewMode === "echo" ? echoes : savedItems;
+  function handleJournalClick(filter: "echoes" | "history") {
+    setActiveJournalFilter(filter);
+    setActiveLibraryFilter(null);
+    setActiveBoard(null);
+    // Navigate to echoes view or history
+    if (filter === "echoes") {
+      navigate("/collection?tab=echoes");
+    }
+  }
+
+  function handleBoardClick(boardKey: string) {
+    setActiveBoard(boardKey);
+    setActiveLibraryFilter(null);
+    setActiveJournalFilter(null);
+    // Filter by board
+    setActiveSavedFilter("favorites"); // For favorites board
+  }
+
+  function handleNewBoardClick() {
+    const newBoardKey = `board-${Date.now()}`;
+    const newBoard = { key: newBoardKey, label: "New Board" };
+    setBoards((prev) => [...prev, newBoard]);
+    setActiveBoard(newBoardKey);
+    // TODO: Persist board if persistence exists
+  }
+
+  async function handleAddItem() {
+    setShowAddItem(true);
+  }
+
+  function handleItemAdded() {
+    loadSaved();
+    setShowAddItem(false);
+  }
+
+  const loading = savedLoading || echoLoading;
+  const error = savedError || echoError;
+
+  // Determine what to show based on active filters
+  const showEchoes = activeJournalFilter === "echoes";
+  const showSavedItems = !activeJournalFilter || activeJournalFilter === null;
 
   return (
     <div className="studio-page" data-theme="light">
-      <Container maxWidth="xl" className="collection-container" style={{ paddingTop: "96px", paddingBottom: "48px" }}>
-        {/* Header with toggle */}
-        <div style={{ marginBottom: "32px" }}>
-          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline", marginBottom: "24px" }}>
-            <h1 style={{ fontSize: "32px", fontWeight: 700, color: "var(--studio-text)", margin: 0 }}>Collection</h1>
-            <div className="collection-mode-toggle" style={{ display: "flex", gap: "24px", alignItems: "baseline" }}>
-              <button
-                onClick={() => handleViewModeChange("echo")}
-                className={`collection-mode-btn ${viewMode === "echo" ? "active" : ""}`}
-                style={{
-                  padding: 0,
-                  border: "none",
-                  background: "transparent",
-                  cursor: "pointer",
-                  fontWeight: viewMode === "echo" ? 600 : 400,
-                  fontSize: "16px",
-                  color: viewMode === "echo" ? "var(--studio-coral)" : "var(--studio-text-muted)",
-                  textDecoration: viewMode === "echo" ? "underline" : "none",
-                  textUnderlineOffset: "4px",
-                  transition: "all 0.2s ease",
-                  fontFamily: "inherit",
-                }}
-              >
-                Echo
-              </button>
-              <button
-                onClick={() => handleViewModeChange("saved")}
-                className={`collection-mode-btn ${viewMode === "saved" ? "active" : ""}`}
-                style={{
-                  padding: 0,
-                  border: "none",
-                  background: "transparent",
-                  cursor: "pointer",
-                  fontWeight: viewMode === "saved" ? 600 : 400,
-                  fontSize: "16px",
-                  color: viewMode === "saved" ? "var(--studio-coral)" : "var(--studio-text-muted)",
-                  textDecoration: viewMode === "saved" ? "underline" : "none",
-                  textUnderlineOffset: "4px",
-                  transition: "all 0.2s ease",
-                  fontFamily: "inherit",
-                }}
-              >
-                Saved
-              </button>
+      <div style={{ paddingTop: "96px", paddingBottom: "48px" }}>
+        <Container maxWidth="xl" className="collection-container">
+          {/* 2-column layout: Sidebar + Main */}
+          <div style={{ display: "flex", gap: "32px" }} className="collection-layout">
+            {/* LEFT SIDEBAR */}
+            <div className="collection-sidebar-wrapper">
+              <CollectionSidebar
+              activeLibraryFilter={activeLibraryFilter}
+              activeJournalFilter={activeJournalFilter}
+              activeBoard={activeBoard}
+              libraryItems={libraryItems}
+              journalItems={journalItems}
+              boards={boardsWithCounts}
+              onLibraryClick={handleLibraryClick}
+              onJournalClick={handleJournalClick}
+              onBoardClick={handleBoardClick}
+              onNewBoardClick={handleNewBoardClick}
+              />
             </div>
-          </div>
-        </div>
 
-        {/* Search (Echoes only) */}
-        {viewMode === "echo" && (
-          <div style={{ marginBottom: "32px" }}>
-            <input
-              type="text"
-              value={searchQuery}
-              onChange={(e) => setSearchQuery(e.target.value)}
-              placeholder="Search Echoes..."
-              style={{
-                width: "100%",
-                padding: "12px 16px",
-                fontSize: "15px",
-                border: "1px solid var(--studio-border)",
-                borderRadius: "8px",
-                background: "var(--studio-white)",
-                color: "var(--studio-text)",
-                fontFamily: "inherit",
-                transition: "border-color 0.2s ease",
-              }}
-              onFocus={(e) => {
-                e.target.style.borderColor = "var(--studio-coral)";
-                e.target.style.outline = "none";
-              }}
-              onBlur={(e) => {
-                e.target.style.borderColor = "var(--studio-border)";
-              }}
-            />
-          </div>
-        )}
+            {/* MAIN CONTENT */}
+            <main style={{ flex: 1, minWidth: 0 }}>
+              {/* Header */}
+              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline", marginBottom: "32px" }}>
+                <h1 style={{ fontSize: "32px", fontWeight: 700, color: "var(--studio-text)", margin: 0 }}>
+                  Collection
+                </h1>
+                <div style={{ display: "flex", gap: "12px", alignItems: "center" }}>
+                  <button
+                    type="button"
+                    onClick={() => setShowViewOptions(true)}
+                    style={{
+                      padding: "8px 16px",
+                      borderRadius: "8px",
+                      border: "1px solid var(--studio-border)",
+                      background: "var(--studio-white)",
+                      color: "var(--studio-text-secondary)",
+                      fontSize: "14px",
+                      fontWeight: 500,
+                      cursor: "pointer",
+                      fontFamily: "inherit",
+                    }}
+                  >
+                    View Options
+                  </button>
+                  <button
+                    type="button"
+                    onClick={handleAddItem}
+                    style={{
+                      padding: "8px 16px",
+                      borderRadius: "8px",
+                      border: "none",
+                      background: "var(--studio-coral)",
+                      color: "white",
+                      fontSize: "14px",
+                      fontWeight: 500,
+                      cursor: "pointer",
+                      fontFamily: "inherit",
+                    }}
+                  >
+                    Add Item
+                  </button>
+                </div>
+              </div>
 
-        {error && (
-          <Card
-            style={{
-              padding: "24px",
-              marginBottom: "24px",
-              background: "#FEE2E2",
-              border: "1px solid #DC2626",
-              borderRadius: "8px",
-            }}
-          >
-            <div style={{ color: "#DC2626", fontWeight: 500 }}>{error}</div>
-          </Card>
-        )}
+              {error && (
+                <Card
+                  style={{
+                    padding: "24px",
+                    marginBottom: "24px",
+                    background: "#FEE2E2",
+                    border: "1px solid #DC2626",
+                    borderRadius: "8px",
+                  }}
+                >
+                  <div style={{ color: "#DC2626", fontWeight: 500 }}>{error}</div>
+                </Card>
+              )}
 
-        {loading ? (
-          <div style={{ padding: "80px 20px", textAlign: "center", color: "var(--studio-text-muted)" }}>
-            Loading...
+              {loading ? (
+                <div style={{ padding: "80px 20px", textAlign: "center", color: "var(--studio-text-muted)" }}>
+                  Loading...
+                </div>
+              ) : (
+                <>
+                  {/* Recent Echoes Section */}
+                  {showSavedItems && recentEchoes.length > 0 && (
+                    <div style={{ marginBottom: "48px" }}>
+                      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline", marginBottom: "16px" }}>
+                        <h2 style={{ fontSize: "20px", fontWeight: 600, color: "var(--studio-text)", margin: 0 }}>
+                          Recent Echoes
+                        </h2>
+                        <button
+                          type="button"
+                          onClick={() => navigate("/collection?tab=echoes")}
+                          style={{
+                            background: "none",
+                            border: "none",
+                            color: "var(--studio-coral)",
+                            fontSize: "14px",
+                            fontWeight: 500,
+                            cursor: "pointer",
+                            fontFamily: "inherit",
+                            padding: 0,
+                          }}
+                        >
+                          View all journal entries →
+                        </button>
+                      </div>
+                      <div
+                        style={{
+                          display: "grid",
+                          gridTemplateColumns: "repeat(2, 1fr)",
+                          gap: "20px",
+                        }}
+                        className="recent-echoes-grid"
+                      >
+                        {recentEchoes.map((echo) => (
+                          <EchoCard key={echo.id} echo={echo} />
+                        ))}
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Saved Items Section */}
+                  {showSavedItems && (
+                    <div>
+                      <h2 style={{ fontSize: "20px", fontWeight: 600, color: "var(--studio-text)", marginBottom: "16px" }}>
+                        Saved Items
+                      </h2>
+
+                      {/* Filter Pills */}
+                      <div style={{ display: "flex", gap: "8px", marginBottom: "24px", flexWrap: "wrap" }}>
+                        {(["all", "unfinished", "favorites", "archive"] as SavedFilter[]).map((filter) => (
+                          <button
+                            key={filter}
+                            type="button"
+                            onClick={() => setActiveSavedFilter(filter)}
+                            style={{
+                              padding: "8px 14px",
+                              borderRadius: "20px",
+                              border: "1px solid var(--studio-border)",
+                              background: activeSavedFilter === filter ? "var(--studio-text)" : "var(--studio-white)",
+                              color: activeSavedFilter === filter ? "var(--studio-white)" : "var(--studio-text-secondary)",
+                              fontSize: "13px",
+                              fontWeight: 500,
+                              cursor: "pointer",
+                              fontFamily: "inherit",
+                              textTransform: "capitalize",
+                              transition: "all 0.15s ease",
+                            }}
+                            onMouseEnter={(e) => {
+                              if (activeSavedFilter !== filter) {
+                                e.currentTarget.style.borderColor = "var(--studio-gray-300)";
+                              }
+                            }}
+                            onMouseLeave={(e) => {
+                              if (activeSavedFilter !== filter) {
+                                e.currentTarget.style.borderColor = "var(--studio-border)";
+                              }
+                            }}
+                          >
+                            {filter}
+                          </button>
+                        ))}
+                      </div>
+
+                      {/* Saved Items Grid */}
+                      {filteredSavedItems.length > 0 ? (
+                        <div
+                          style={{
+                            display: "grid",
+                            gridTemplateColumns:
+                              viewMode === "grid"
+                                ? "repeat(auto-fill, minmax(180px, 1fr))"
+                                : "1fr",
+                            gap: viewDensity === "compact" ? "12px" : viewDensity === "comfortable" ? "16px" : "24px",
+                            marginBottom: "24px",
+                          }}
+                          className="collection-grid"
+                        >
+                          {filteredSavedItems.map((item) => (
+                            <SavedItemCard key={item.id} item={item} onRemove={handleRemoveSaved} />
+                          ))}
+                          
+                          {/* "Save something new" add card */}
+                          <div
+                            onClick={handleAddItem}
+                            style={{
+                              background: "var(--studio-white)",
+                              border: "2px dashed var(--studio-border)",
+                              borderRadius: "12px",
+                              padding: "40px 20px",
+                              display: "flex",
+                              flexDirection: "column",
+                              alignItems: "center",
+                              justifyContent: "center",
+                              cursor: "pointer",
+                              transition: "all 0.15s ease",
+                              minHeight: viewMode === "grid" ? "200px" : "auto",
+                            }}
+                            onMouseEnter={(e) => {
+                              e.currentTarget.style.borderColor = "var(--studio-coral)";
+                              e.currentTarget.style.background = "var(--studio-coral-light)";
+                            }}
+                            onMouseLeave={(e) => {
+                              e.currentTarget.style.borderColor = "var(--studio-border)";
+                              e.currentTarget.style.background = "var(--studio-white)";
+                            }}
+                          >
+                            <div
+                              style={{
+                                fontSize: "14px",
+                                fontWeight: 500,
+                                color: "var(--studio-text-secondary)",
+                                textAlign: "center",
+                              }}
+                            >
+                              Save something new
+                            </div>
+                          </div>
+                        </div>
+                      ) : (
+                        <div
+                          style={{
+                            padding: "80px 20px",
+                            textAlign: "center",
+                            color: "var(--studio-text-muted)",
+                          }}
+                        >
+                          <p style={{ fontSize: "16px", marginBottom: "16px" }}>No saved items found.</p>
+                          <button
+                            type="button"
+                            onClick={handleAddItem}
+                            style={{
+                              padding: "12px 24px",
+                              borderRadius: "8px",
+                              border: "none",
+                              background: "var(--studio-coral)",
+                              color: "white",
+                              fontSize: "14px",
+                              fontWeight: 500,
+                              cursor: "pointer",
+                              fontFamily: "inherit",
+                            }}
+                          >
+                            Add your first item
+                          </button>
+                        </div>
+                      )}
+                    </div>
+                  )}
+
+                  {/* Echoes List View (when Journal > Echoes is clicked) */}
+                  {showEchoes && (
+                    <div>
+                      <h2 style={{ fontSize: "20px", fontWeight: 600, color: "var(--studio-text)", marginBottom: "24px" }}>
+                        Echoes
+                      </h2>
+                      {echoes.length > 0 ? (
+                        <div style={{ display: "flex", flexDirection: "column", gap: "24px" }}>
+                          {echoes.map((echo) => (
+                            <TimelineEchoPost key={echo.id} echo={echo} onDelete={handleDeleteEcho} />
+                          ))}
+                        </div>
+                      ) : (
+                        <div
+                          style={{
+                            padding: "80px 20px",
+                            textAlign: "center",
+                            color: "var(--studio-text-muted)",
+                          }}
+                        >
+                          <p style={{ fontSize: "16px", marginBottom: "16px" }}>No echoes yet.</p>
+                          <p style={{ fontSize: "14px" }}>Create your first Echo to start building your journal.</p>
+                        </div>
+                      )}
+                    </div>
+                  )}
+                </>
+              )}
+            </main>
           </div>
-        ) : items.length === 0 ? (
-          <TimelineEmptyState viewMode={viewMode} />
-        ) : (
-          <TimelineCalendar
-            viewMode={viewMode}
-            echoes={echoes}
-            savedItems={savedItems}
-            onDeleteEcho={handleDeleteEcho}
-            onRemoveSaved={handleRemoveSaved}
-            searchQuery={searchQuery}
-          />
-        )}
-      </Container>
+        </Container>
+      </div>
+
+      {/* Modals */}
+      <AddItemModal isOpen={showAddItem} onClose={() => setShowAddItem(false)} onItemAdded={handleItemAdded} />
+      <ViewOptionsModal
+        isOpen={showViewOptions}
+        onClose={() => setShowViewOptions(false)}
+        density={viewDensity}
+        viewMode={viewMode}
+        onDensityChange={setViewDensity}
+        onViewModeChange={setViewMode}
+      />
     </div>
   );
 }

@@ -180,7 +180,7 @@ export default function AdminLayout() {
                 onClick={() => navigate("/feed")}
                 style={{ fontSize: 12, padding: "8px 16px" }}
               >
-                🔍 Discover
+                🔍 Explore
               </button>
               <button
                 className="coral-btn-secondary"

@@ -9,6 +9,7 @@ import { useSession } from "../auth/useSession";
 import { supabase } from "../lib/supabaseClient";
 import "../styles/studio.css";
 import { formatProviderName, formatShortDate, normalizeTags, toText, inferSignal } from "../ui/studioNormalize";
+import { FilterDrawer } from "../components/FilterDrawer";
 
 type Signal =
   | "all"
@@ -93,6 +94,7 @@ export default function StudioExplore({ hideNav = false }: StudioExploreProps = 
   const [items, setItems] = useState<UnifiedContentItem[]>([]);
   const [loading, setLoading] = useState(true);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
+  const [filterDrawerOpen, setFilterDrawerOpen] = useState(false);
 
   useEffect(() => {
     let cancelled = false;
@@ -199,35 +201,57 @@ export default function StudioExplore({ hideNav = false }: StudioExploreProps = 
     return cards.filter((c) => c.sig === activeSignal);
   }, [cards, activeSignal]);
 
+  function getFilterIcon(signal: Signal): string {
+    const filter = SIGNALS.find((s) => s.key === signal);
+    if (!filter) return "✨";
+    switch (signal) {
+      case "all": return "✨";
+      case "news": return "📰";
+      case "social": return "💬";
+      case "podcast": return "🎧";
+      case "video": return "🎬";
+      case "music": return "🎵";
+      case "watch": return "📺";
+      case "read": return "📚";
+      case "creator": return "👤";
+      default: return "✨";
+    }
+  }
+
+  function getFilterLabel(signal: Signal): string {
+    const filter = SIGNALS.find((s) => s.key === signal);
+    return filter?.label || "All";
+  }
+
   return (
     <div className="studio-page" data-theme="light" style={hideNav ? { paddingTop: 0 } : {}}>
       {!hideNav && (
-        <nav className="studio-nav">
-          <div className="studio-nav__inner">
+      <nav className="studio-nav">
+        <div className="studio-nav__inner">
             <button className="studio-nav__brand" onClick={() => navigate("/studio")} type="button">
-              <span className="studio-nav__brand-icon">K</span>
+            <span className="studio-nav__brand-icon">K</span>
               KIVAW
-            </button>
+          </button>
 
-            <div className="studio-nav__links">
+          <div className="studio-nav__links">
               <button className="studio-nav__link" onClick={() => navigate("/studio")} type="button">
-                Home
-              </button>
+              Home
+            </button>
               <button className="studio-nav__link studio-nav__link--active" onClick={() => navigate("/studio/explore")} type="button">
                 Explore
-              </button>
+            </button>
               <button className="studio-nav__link" onClick={() => navigate("/studio/feed")} type="button">
-                Feed
-              </button>
+              Feed
+            </button>
               <button className="studio-nav__link" onClick={() => navigate("/timeline")} type="button">
                 Timeline
-              </button>
-            </div>
+            </button>
+          </div>
 
-            <div className="studio-nav__actions">
+          <div className="studio-nav__actions">
               <button className="studio-nav__link-text" type="button">
                 How it works
-              </button>
+                </button>
               {session && (
                 <button
                   onClick={() => navigate("/profile")}
@@ -258,34 +282,45 @@ export default function StudioExplore({ hideNav = false }: StudioExploreProps = 
                 Go to Feed
               </button>
               <button className="studio-theme-toggle" onClick={toggle} aria-label="Toggle theme" type="button">
-                {theme === "dark" ? "☀️" : "🌙"}
-              </button>
-            </div>
+              {theme === "dark" ? "☀️" : "🌙"}
+            </button>
           </div>
-        </nav>
+        </div>
+      </nav>
       )}
 
       <section className="studio-section">
-        <div className="studio-section__header">
+        <div className="explore-header">
           <div>
-            <h1 className="studio-section__title">Explore</h1>
-            <div className="studio-section__meta">Movies, books, news, and more · curated recommendations</div>
+            <h2 className="explore-title">Explore</h2>
+            <p className="explore-subtitle">Movies, books, news, and more · curated recommendations</p>
           </div>
-          <div className="studio-section__meta">{loading ? "Loading…" : `${filtered.length} items`}</div>
-        </div>
-
-        <div className="studio-pillbar">
-          {SIGNALS.map((s) => (
-            <button 
-              key={s.key}
-              className={`studio-pill ${activeSignal === s.key ? "studio-pill--active" : ""}`}
-              onClick={() => setActiveSignal(s.key)}
-              type="button"
-            >
-              {s.label}
+          <div className="explore-actions">
+            <span className="explore-count">{loading ? "Loading…" : `${filtered.length} items`}</span>
+            <button className="btn-filter" onClick={() => setFilterDrawerOpen(true)} type="button">
+              <span>🔍</span> Filters
+              {activeSignal !== "all" && <span className="filter-badge">1</span>}
             </button>
-          ))}
+        </div>
       </div>
+
+        {/* Show active filter as removable chip */}
+        {activeSignal !== "all" && (
+          <div className="active-filter-display">
+            <span className="active-filter-chip">
+              {getFilterIcon(activeSignal)} {getFilterLabel(activeSignal)}
+              <button className="chip-remove" onClick={() => setActiveSignal("all")} type="button">×</button>
+            </span>
+          </div>
+        )}
+
+        {/* Filter drawer */}
+        <FilterDrawer
+          isOpen={filterDrawerOpen}
+          onClose={() => setFilterDrawerOpen(false)}
+          activeFilter={activeSignal}
+          onFilterChange={setActiveSignal}
+        />
 
         {errorMsg && (
           <div style={{ 
