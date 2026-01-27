@@ -120,7 +120,7 @@ export async function createEcho(input: {
         ],
         { onConflict: "user_id,content_id" }
       )
-      .catch(() => {
+      .then(null, () => {
         // Ignore errors - item might already be saved or table might not exist
       });
   }

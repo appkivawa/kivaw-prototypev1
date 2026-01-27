@@ -20,7 +20,8 @@ export function useNowPlaying(): NowPlayingItem | null {
       if (stored) {
         const parsed = JSON.parse(stored);
         if (parsed && parsed.title) {
-          setNowPlaying(parsed);
+          // Use setTimeout to avoid setState in effect warning
+          setTimeout(() => setNowPlaying(parsed), 0);
         }
       }
     } catch {

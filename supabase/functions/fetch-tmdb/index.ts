@@ -1,5 +1,6 @@
 import { serve } from "https://deno.land/std@0.224.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
+import { logHealthEvent } from "./_shared/logHealthEvent.ts";
 
 // ============================================================
 // CORS Headers
@@ -111,6 +112,12 @@ async function fetchTMDBMovies(
 function normalizeTMDBMovie(movie: TMDBMovie): NormalizedContent {
   const imageBaseUrl = "https://image.tmdb.org/t/p/w500";
   
+  // Ensure raw includes overview for summary extraction in view
+  const raw = {
+    ...(movie as Record<string, unknown>),
+    overview: movie.overview || null, // Explicitly ensure overview is in raw
+  };
+  
   return {
     provider: "tmdb",
     provider_id: String(movie.id),
@@ -119,7 +126,7 @@ function normalizeTMDBMovie(movie: TMDBMovie): NormalizedContent {
     description: movie.overview || null,
     image_url: movie.poster_path ? `${imageBaseUrl}${movie.poster_path}` : null,
     url: `https://www.themoviedb.org/movie/${movie.id}`,
-    raw: movie as Record<string, unknown>,
+    raw,
   };
 }
 
@@ -141,11 +148,32 @@ serve(async (req) => {
   const corsResponse = handleCors(req);
   if (corsResponse) return corsResponse;
 
+  // Smoke test
+  if (req.method === "GET") {
+    return jsonResponse({ ok: true, fn: "fetch-tmdb", version: "2026-01-27" });
+  }
+
+  const startTime = Date.now();
+  let supabase: ReturnType<typeof createClient> | null = null;
+
   try {
+    // Check CRON_SECRET if set (for internal cron calls)
+    const CRON_SECRET = (Deno.env.get("CRON_SECRET") ?? "").trim();
+    if (CRON_SECRET) {
+      const got = (req.headers.get("x-cron-secret") ?? "").trim();
+      if (got !== CRON_SECRET) {
+        // Allow service role key as fallback (for direct calls)
+        const authHeader = req.headers.get("Authorization");
+        if (!authHeader || !authHeader.includes("Bearer")) {
+          return jsonResponse({ error: "Forbidden: Missing or invalid x-cron-secret" }, 403);
+        }
+      }
+    }
+
     // Get Supabase client
     const supabaseUrl = Deno.env.get("SUPABASE_URL")!;
     const supabaseServiceKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
-    const supabase = createClient(supabaseUrl, supabaseServiceKey);
+    supabase = createClient(supabaseUrl, supabaseServiceKey);
 
     // Parse request body
     const body: TMDBRequest = await req.json().catch(() => ({}));
@@ -253,15 +281,37 @@ serve(async (req) => {
       }
     }
 
+    const durationMs = Date.now() - startTime;
+    await logHealthEvent(supabase, {
+      jobName: "fetch-tmdb",
+      status: "ok",
+      durationMs,
+      metadata: {
+        items: normalizedContent.length,
+      },
+    });
+    
     // Return normalized content
     return jsonResponse({
       items: normalizedContent,
     });
   } catch (error) {
     console.error("Error in fetch-tmdb:", error);
+    const durationMs = Date.now() - startTime;
+    const errorMsg = error instanceof Error ? error.message : "Unknown error";
+    
+    if (supabase) {
+      await logHealthEvent(supabase, {
+        jobName: "fetch-tmdb",
+        status: "fail",
+        durationMs,
+        errorMessage: errorMsg,
+      });
+    }
+    
     return jsonResponse(
       {
-        error: error instanceof Error ? error.message : "Unknown error",
+        error: errorMsg,
       },
       500
     );

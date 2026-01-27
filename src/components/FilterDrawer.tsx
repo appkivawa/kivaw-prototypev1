@@ -2,6 +2,7 @@
 // Filter drawer component for Explore page filters
 
 import { useEffect } from "react";
+import { SparkleIcon, NewsIcon, SocialIcon, MusicIcon, MovieIcon, TVIcon, BookIcon, UserIcon } from "./icons/ContentIcons";
 
 type Signal =
   | "all"
@@ -14,16 +15,16 @@ type Signal =
   | "read"
   | "creator";
 
-const FILTERS: { id: Signal; label: string; icon: string }[] = [
-  { id: "all", label: "All", icon: "✨" },
-  { id: "news", label: "News", icon: "📰" },
-  { id: "social", label: "Social", icon: "💬" },
-  { id: "podcast", label: "Podcasts", icon: "🎧" },
-  { id: "video", label: "Video", icon: "🎬" },
-  { id: "music", label: "Music", icon: "🎵" },
-  { id: "watch", label: "Watch", icon: "📺" },
-  { id: "read", label: "Read", icon: "📚" },
-  { id: "creator", label: "Creators", icon: "👤" },
+const FILTERS: { id: Signal; label: string; icon: React.ReactNode }[] = [
+  { id: "all", label: "All", icon: <SparkleIcon size={18} /> },
+  { id: "news", label: "News", icon: <NewsIcon size={18} /> },
+  { id: "social", label: "Social", icon: <SocialIcon size={18} /> },
+  { id: "podcast", label: "Podcasts", icon: <MusicIcon size={18} /> },
+  { id: "video", label: "Video", icon: <MovieIcon size={18} /> },
+  { id: "music", label: "Music", icon: <MusicIcon size={18} /> },
+  { id: "watch", label: "Watch", icon: <TVIcon size={18} /> },
+  { id: "read", label: "Read", icon: <BookIcon size={18} /> },
+  { id: "creator", label: "Creators", icon: <UserIcon size={18} /> },
 ];
 
 interface FilterDrawerProps {
@@ -78,7 +79,7 @@ export function FilterDrawer({ isOpen, onClose, activeFilter, onFilterChange }: 
                   onClick={() => handleFilterClick(filter.id)}
                   type="button"
                 >
-                  <span className="filter-option-icon">{filter.icon}</span>
+                  <span className="filter-option-icon" style={{ display: "flex", alignItems: "center", justifyContent: "center" }}>{filter.icon}</span>
                   <span>{filter.label}</span>
                 </button>
               ))}

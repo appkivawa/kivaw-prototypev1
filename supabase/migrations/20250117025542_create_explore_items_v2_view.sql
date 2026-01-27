@@ -1,6 +1,24 @@
 -- ============================================================
 -- CREATE explore_items_v2 VIEW
 -- ============================================================
+-- 
+-- VERIFICATION QUERIES (run after creating view):
+-- 
+-- 1. Check RSS freshness (should be within 7 days):
+--    SELECT kind, MAX(published_at) as newest_published
+--    FROM explore_items_v2
+--    WHERE kind IN ('rss', 'atom', 'article', 'news')
+--    GROUP BY kind;
+--
+-- 2. Check book publish years (should be >= 2000):
+--    SELECT kind, provider, 
+--           (raw->>'first_publish_year')::int as publish_year
+--    FROM explore_items_v2
+--    WHERE kind = 'read' AND provider = 'open_library'
+--    ORDER BY publish_year DESC NULLS LAST
+--    LIMIT 20;
+--
+-- ============================================================
 -- Unified view combining:
 --  1. feed_items (discoverable RSS/news/social/podcast/video/music items)
 --  2. public_recommendations (admin-published curated items from external_content_cache)
@@ -59,7 +77,10 @@
 --
 -- ============================================================
 
-CREATE OR REPLACE VIEW public.explore_items_v2 AS
+-- Drop existing view if it exists (to allow column changes)
+DROP VIEW IF EXISTS public.explore_items_v2 CASCADE;
+
+CREATE VIEW public.explore_items_v2 AS
 -- ============================================================
 -- SOURCE 1: feed_items (RSS, news, social, podcasts, videos, music)
 -- ============================================================
@@ -72,12 +93,34 @@ SELECT
   title,
   COALESCE(author, NULL) AS byline,
   image_url,
+  summary,
   COALESCE(tags, ARRAY[]::TEXT[]) || COALESCE(topics, ARRAY[]::TEXT[]) AS tags,
-  created_at,
+  -- Use published_at if available, fallback to created_at
+  COALESCE(published_at, created_at) AS created_at,
   COALESCE(metadata, '{}'::jsonb) AS raw,
-  score
+  -- Add recency score boost for RSS items (0-5 points, heavily favor today's items)
+  CASE 
+    WHEN content_kind IN ('rss', 'atom', 'article', 'news') AND published_at IS NOT NULL THEN
+      score + CASE
+        -- Today's items get maximum boost (5 points)
+        WHEN published_at >= date_trunc('day', NOW()) THEN 5.0
+        -- Yesterday gets 3 points
+        WHEN published_at >= date_trunc('day', NOW()) - INTERVAL '1 day' THEN 3.0
+        -- Last 3 days get 2 points
+        WHEN published_at >= date_trunc('day', NOW()) - INTERVAL '3 days' THEN 2.0
+        -- Last 7 days get 1 point
+        WHEN published_at >= date_trunc('day', NOW()) - INTERVAL '7 days' THEN 1.0
+        ELSE 0.0
+      END
+    ELSE score
+  END AS score
 FROM public.feed_items
 WHERE is_discoverable = true
+  -- Exclude stale RSS items (older than 7 days)
+  AND NOT (
+    content_kind IN ('rss', 'atom', 'article', 'news')
+    AND COALESCE(published_at, created_at) < NOW() - INTERVAL '7 days'
+  )
 
 UNION ALL
 
@@ -93,6 +136,7 @@ SELECT
   title,
   NULL::TEXT AS byline,
   image_url,
+  NULL::TEXT AS summary,
   COALESCE(mood_tags, ARRAY[]::TEXT[]) || COALESCE(focus_tags, ARRAY[]::TEXT[]) AS tags,
   created_at,
   NULL::jsonb AS raw,
@@ -113,10 +157,41 @@ SELECT
   c.title,
   NULL::TEXT AS byline,
   c.image_url,
+  -- Derive summary from raw for TMDB and books, fallback to description column
+  CASE
+    -- TMDB: use overview or description from raw
+    WHEN c.provider = 'tmdb' THEN
+      COALESCE(
+        NULLIF(c.raw->>'overview', ''),
+        NULLIF(c.raw->>'description', ''),
+        c.description
+      )
+    -- Books (Open Library, Google Books): use description from raw (can be string or {value: string})
+    WHEN c.type = 'read' THEN
+      COALESCE(
+        NULLIF(c.raw->>'description', ''),
+        NULLIF(c.raw#>>'{description,value}', ''),
+        NULLIF(c.raw->>'subtitle', ''),
+        c.description
+      )
+    -- Fallback to description column
+    ELSE c.description
+  END AS summary,
   ARRAY[]::TEXT[] AS tags,
   c.fetched_at AS created_at,
   c.raw,
-  NULL::numeric AS score
+  -- Optional scoring bump for newer publish years (for books)
+  CASE 
+    WHEN c.type = 'read' AND c.raw->>'first_publish_year' IS NOT NULL THEN
+      GREATEST(
+        0.0,
+        LEAST(
+          2.0,
+          (CAST(c.raw->>'first_publish_year' AS INTEGER) - 1990) / 10.0
+        )
+      )
+    ELSE NULL
+  END AS score
 FROM public.external_content_cache c
 WHERE NOT EXISTS (
   -- Exclude items that are already in public_recommendations
@@ -148,7 +223,7 @@ GRANT SELECT ON public.explore_items_v2 TO anon;
 -- ============================================================
 
 COMMENT ON VIEW public.explore_items_v2 IS 
-'Unified view of all discoverable content for Explore feed. Combines feed_items (RSS/news/social), public_recommendations (curated), and external_content_cache (movies/books/TV). Output schema: id (text), kind (text), provider (text), external_id (text), url (text), title (text), byline (text), image_url (text), tags (text[]), created_at (timestamptz), raw (jsonb), score (numeric nullable).';
+'Unified view of all discoverable content for Explore feed. Combines feed_items (RSS/news/social), public_recommendations (curated), and external_content_cache (movies/books/TV). Output schema: id (text), kind (text), provider (text), external_id (text), url (text), title (text), byline (text), image_url (text), summary (text), tags (text[]), created_at (timestamptz), raw (jsonb), score (numeric nullable). RSS items use published_at for created_at and get recency score boost. Books get score boost for newer publish years.';
 
 -- ============================================================
 -- INDEXES (on underlying tables, not on view)

@@ -1,11 +1,10 @@
 // src/auth/RequireRole.tsx
 import React from "react";
 import { Navigate, useLocation } from "react-router-dom";
-import { useSession } from "./useSession";
-import { useRoles } from "./useRoles";
+import { usePermissions } from "./usePermissions";
 
 type RequireRoleProps = {
-  allow: string[];              // e.g. ["admin"] or ["admin","ops"]
+  allow: string[];              // e.g. ["creator"] or ["ops"]
   children: React.ReactNode;
   redirectTo?: string;          // where to send authed-but-not-allowed users
 };
@@ -16,10 +15,7 @@ export default function RequireRole({
   redirectTo = "/",
 }: RequireRoleProps) {
   const location = useLocation();
-  const { loading: sessionLoading, isAuthed } = useSession();
-  const { loading: rolesLoading, roleKeys, isSuperAdmin } = useRoles();
-
-  const loading = sessionLoading || rolesLoading;
+  const { loading, isAuthed, roleKeys, isAdmin, isSuperAdmin, error } = usePermissions();
 
   if (loading) {
     return (
@@ -37,21 +33,15 @@ export default function RequireRole({
     return <Navigate to="/login" replace state={{ from: location.pathname }} />;
   }
 
-  // super admins can do anything
-  if (isSuperAdmin) return <>{children}</>;
-
-  const allowSet = new Set((allow || []).map(String));
-  const hasAny = (roleKeys || []).some((rk) => allowSet.has(rk));
-
-  if (!hasAny) {
-    // CRITICAL: If we're on an admin route but roles are empty, 
-    // it might be a race condition - show error instead of redirecting
-    if (location.pathname.startsWith("/admin") && (!roleKeys || roleKeys.length === 0)) {
+  // Fail closed on permissions failure
+  if (error) {
+    if (import.meta.env.DEV) {
       return (
         <div className="coral-page-content">
           <div className="coral-section" style={{ maxWidth: 560, margin: "0 auto", padding: "80px 20px" }}>
             <div className="coral-card" style={{ padding: "48px 32px", textAlign: "center" }}>
-              <p style={{ color: "var(--coral-text-muted)" }}>Loading roles... Please wait.</p>
+              <p style={{ color: "var(--coral-text-muted)" }}>Permissions error:</p>
+              <pre style={{ textAlign: "left", whiteSpace: "pre-wrap", marginTop: 12 }}>{error}</pre>
             </div>
           </div>
         </div>
@@ -60,7 +50,19 @@ export default function RequireRole({
     return <Navigate to={redirectTo} replace />;
   }
 
+  // Admin override: admins can do anything
+  if (isSuperAdmin || isAdmin) return <>{children}</>;
+
+  const allowSet = new Set((allow || []).map((s) => String(s).toLowerCase()));
+  const hasAny = (roleKeys || []).some((rk) => allowSet.has(String(rk).toLowerCase()));
+
+  if (!hasAny) {
+    return <Navigate to={redirectTo} replace />;
+  }
+
   return <>{children}</>;
 }
+
+
 
 

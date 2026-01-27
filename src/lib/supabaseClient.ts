@@ -1,20 +1,10 @@
 import { createClient } from "@supabase/supabase-js";
+import { SUPABASE_URL, SUPABASE_ANON_KEY } from "./env";
 
-const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
-const supabaseAnonKey = import.meta.env.VITE_SUPABASE_ANON_KEY;
-
-/* -----------------------------
-   Hard env checks (GOOD PRACTICE)
------------------------------- */
-if (!supabaseUrl) {
-  console.error("[supabaseClient] VITE_SUPABASE_URL is undefined");
-  throw new Error("Missing VITE_SUPABASE_URL environment variable");
-}
-
-if (!supabaseAnonKey) {
-  console.error("[supabaseClient] VITE_SUPABASE_ANON_KEY is undefined");
-  throw new Error("Missing VITE_SUPABASE_ANON_KEY environment variable");
-}
+// Environment variables are validated in env.ts
+// If we reach here, they are guaranteed to be set
+const supabaseUrl = SUPABASE_URL;
+const supabaseAnonKey = SUPABASE_ANON_KEY;
 
 /* -----------------------------
    Supabase client (SINGLE SOURCE)
@@ -54,11 +44,10 @@ if (import.meta.env.DEV) {
   }
 }
 
-/* -----------------------------
-   Optional exports (DEV tools)
------------------------------- */
-export const SUPABASE_URL = supabaseUrl;
-export const SUPABASE_ANON_KEY = supabaseAnonKey;
+// Re-export for backward compatibility (prefer importing from env.ts)
+export { SUPABASE_URL, SUPABASE_ANON_KEY } from "./env";
 
-console.log("[supabase] connected:", supabaseUrl);
+if (import.meta.env.DEV) {
+  console.log("[supabase] ✅ Connected to:", supabaseUrl);
+}
 

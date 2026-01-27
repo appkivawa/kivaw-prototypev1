@@ -7,6 +7,7 @@ import { fetchSavedIds, saveItem, unsaveItem } from "../../data/savesApi";
 import { requireAuth } from "../../auth/authUtils";
 import { fetchMovies, fetchBooks } from "../../data/providers/externalProviders";
 import { externalToContentItem } from "../../data/providers/contentProviders";
+import { SparkleIcon, MusicIcon, TVIcon, BookIcon } from "../../components/icons/ContentIcons";
 
 function titleCase(s: string) {
   if (!s) return "";
@@ -39,28 +40,20 @@ function displayFocus(focusRaw: string) {
   return titleCase(f);
 }
 
-function focusEmoji(focusRaw: string) {
+function focusIcon(focusRaw: string) {
   const f = (focusRaw || "").toLowerCase().trim();
-  if (f === "music") return "🎵";
-  if (f === "watch") return "📺";
-  if (f === "read") return "📚";
-  if (f === "move") return "🏃";
-  if (f === "create") return "🎨"; // ✅ create umbrella
-  if (f === "reset") return "🧘";
-  return "✨";
+  if (f === "music") return <MusicIcon size={20} />;
+  if (f === "watch") return <TVIcon size={20} />;
+  if (f === "read") return <BookIcon size={20} />;
+  return <SparkleIcon size={20} />;
 }
 
-function kindEmoji(kind?: string) {
+function kindIcon(kind?: string) {
   const k = (kind || "").toLowerCase();
-  if (k.includes("playlist") || k.includes("album") || k.includes("song")) return "🎧";
-  if (k.includes("watch") || k.includes("video") || k.includes("film")) return "📺";
-  if (k.includes("read") || k.includes("book") || k.includes("article")) return "📚";
-  if (k.includes("movement") || k.includes("exercise") || k.includes("move")) return "🧘";
-  if (k.includes("creative") || k.includes("create")) return "🌸";
-  if (k.includes("expansive")) return "🌱";
-  if (k.includes("prompt") || k.includes("reflection")) return "📝";
-  if (k.includes("visual") || k.includes("art")) return "🎨";
-  return "🌿";
+  if (k.includes("playlist") || k.includes("album") || k.includes("song")) return <MusicIcon size={20} />;
+  if (k.includes("watch") || k.includes("video") || k.includes("film")) return <TVIcon size={20} />;
+  if (k.includes("read") || k.includes("book") || k.includes("article")) return <BookIcon size={20} />;
+  return <SparkleIcon size={20} />;
 }
 
 export default function QuizResult() {
@@ -72,7 +65,7 @@ export default function QuizResult() {
   const stateKey = useMemo(() => normalizeState(stateRaw), [stateRaw]);
   const stateLabel = useMemo(() => displayState(stateRaw), [stateRaw]);
   const focusLabel = useMemo(() => displayFocus(focusRaw), [focusRaw]);
-  const focusIcon = useMemo(() => focusEmoji(focusRaw), [focusRaw]);
+  const focusIconElement = useMemo(() => focusIcon(focusRaw), [focusRaw]);
 
   const [items, setItems] = useState<ContentItem[]>([]);
   const [savedIds, setSavedIds] = useState<string[]>([]);
@@ -166,7 +159,7 @@ export default function QuizResult() {
             <h1 className="quiz-title">Results</h1>
             <p className="quiz-subline">
               State: <strong>{stateLabel}</strong> <span style={{ opacity: 0.6 }}>•</span>{" "}
-              Focus: <strong>{focusLabel}</strong> <span aria-hidden="true">{focusIcon}</span>
+              Focus: <strong>{focusLabel}</strong> <span aria-hidden="true" style={{ display: "inline-flex", alignItems: "center", marginLeft: "4px" }}>{focusIconElement}</span>
             </p>
           </div>
 
@@ -208,7 +201,7 @@ export default function QuizResult() {
                         <div className="kivaw-rec-card__top">
                           <div className="kivaw-rec-card__meta">
                             <span aria-hidden="true" style={{ marginRight: 8 }}>
-                              {kindEmoji(it.kind)}
+                              <span style={{ display: "flex", alignItems: "center", justifyContent: "center", color: "var(--text-muted)" }}>{kindIcon(it.kind)}</span>
                             </span>
                             <span>{it.kind || "Item"}</span>
                           </div>

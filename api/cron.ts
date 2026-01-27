@@ -6,8 +6,7 @@ function sendJson(res: any, statusCode: number, body: unknown, extraHeaders?: Re
     res.statusCode = statusCode;
     res.setHeader("Content-Type", "application/json; charset=utf-8");
     res.end(JSON.stringify(body));
-  } catch (e) {
-    // Last-resort fallback
+  } catch {
     try {
       res.statusCode = 500;
       res.setHeader("Content-Type", "application/json; charset=utf-8");
@@ -18,18 +17,40 @@ function sendJson(res: any, statusCode: number, body: unknown, extraHeaders?: Re
   }
 }
 
-export default async function handler(_req: any, res: any) {
-  // Accept any request method (GET/POST/etc.)
+function getHeader(req: any, name: string): string | null {
+  const h = req?.headers?.[name] ?? req?.headers?.[name.toLowerCase()];
+  if (!h) return null;
+  if (Array.isArray(h)) return h[0] ?? null;
+  return String(h);
+}
 
+export default async function handler(req: any, res: any) {
   const cronSecret = process.env.CRON_SECRET;
   if (!cronSecret) {
     console.error("[api/cron] ❌ CRON_SECRET is missing");
     return sendJson(res, 500, { ok: false, error: "CRON_SECRET not set" });
   }
 
-  // Supabase Edge Functions gateway expects a JWT in Authorization unless the function
-  // is deployed with --no-verify-jwt. Using the anon key is sufficient here (cron_runner still
-  // enforces x-cron-secret internally).
+  // ✅ AUTH: require either:
+  // - x-cron-secret header matching CRON_SECRET
+  // - or ?secret=... query (useful if your scheduler can’t set headers)
+  // - or Vercel’s cron header (x-vercel-cron: 1) + secret
+  const headerSecret = getHeader(req, "x-cron-secret");
+  const querySecret = req?.query?.secret ? String(req.query.secret) : null;
+  const isVercelCron = getHeader(req, "x-vercel-cron") === "1";
+
+  const provided = headerSecret || querySecret;
+  if (!provided || provided !== cronSecret) {
+    // If you want to allow ONLY Vercel cron, you could also require isVercelCron === true here.
+    console.warn("[api/cron] ❌ Unauthorized cron hit", {
+      path: req?.url,
+      isVercelCron,
+      hasHeaderSecret: !!headerSecret,
+      hasQuerySecret: !!querySecret,
+    });
+    return sendJson(res, 401, { ok: false, error: "Unauthorized" });
+  }
+
   const supabaseAnonKey = process.env.SUPABASE_ANON_KEY || process.env.VITE_SUPABASE_ANON_KEY;
   if (!supabaseAnonKey) {
     console.error("[api/cron] ❌ SUPABASE_ANON_KEY is missing");
@@ -49,7 +70,7 @@ export default async function handler(_req: any, res: any) {
   const url = `${supabaseBase.replace(/\/+$/, "")}/functions/v1/cron_runner`;
 
   try {
-    console.log("[api/cron] ▶️ Calling Supabase cron_runner");
+    console.log("[api/cron] ▶️ Calling Supabase cron_runner", { url });
 
     const upstream = await fetch(url, {
       method: "POST",
@@ -59,7 +80,7 @@ export default async function handler(_req: any, res: any) {
         Authorization: `Bearer ${supabaseAnonKey}`,
         apikey: supabaseAnonKey,
       },
-      body: JSON.stringify({}),
+      body: JSON.stringify({ source: "vercel_cron" }),
     });
 
     const text = await upstream.text();
@@ -72,19 +93,15 @@ export default async function handler(_req: any, res: any) {
 
     console.log("[api/cron] ⬅️ Supabase response:", upstream.status, upstream.ok);
 
-    return sendJson(
-      res,
-      upstream.status,
-      data,
-      {
-        "x-cron-runner-status": String(upstream.status),
-        "x-cron-runner-ok": upstream.ok ? "true" : "false",
-      }
-    );
+    return sendJson(res, upstream.status, data, {
+      "x-cron-runner-status": String(upstream.status),
+      "x-cron-runner-ok": upstream.ok ? "true" : "false",
+    });
   } catch (e: any) {
     console.error("[api/cron] 🔥 Cron crashed:", e);
     return sendJson(res, 500, { ok: false, error: e?.message ?? String(e) });
   }
 }
+
 
 

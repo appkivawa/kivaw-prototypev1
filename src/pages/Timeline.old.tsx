@@ -249,7 +249,7 @@ function TimelineContent() {
         .delete()
         .eq("user_id", uid)
         .eq("content_id", id)
-        .catch(() => {
+        .then(null, () => {
           // Ignore errors - item might not be in saved_items
         });
     }

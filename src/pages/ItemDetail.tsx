@@ -7,16 +7,12 @@ import { saveItem, unsaveItem, getUserId } from "../data/savesApi";
 import { listWavesForItem } from "../data/wavesApi";
 import { requireAuth } from "../auth/authUtils";
 import { isInternalContentItem } from "../utils/contentFilters";
+import { SparkleIcon, MusicIcon } from "../components/icons/ContentIcons";
 
-function kindEmoji(kind?: string | null) {
+function kindIcon(kind?: string | null) {
   const k = (kind || "").toLowerCase();
-  if (k.includes("movement") || k.includes("walk") || k.includes("exercise")) return "🚶";
-  if (k.includes("music") || k.includes("sound") || k.includes("playlist")) return "🎵";
-  if (k.includes("logic")) return "🧠";
-  if (k.includes("visual") || k.includes("aesthetic") || k.includes("art")) return "🎨";
-  if (k.includes("prompt") || k.includes("reflection")) return "📝";
-  if (k.includes("faith")) return "🙏";
-  return "✦";
+  if (k.includes("music") || k.includes("sound") || k.includes("playlist")) return <MusicIcon size={20} />;
+  return <SparkleIcon size={20} />;
 }
 
 function norm(s: string) {
@@ -199,7 +195,7 @@ export default function ItemDetail() {
                 {item.image_url ? (
                   <img src={item.image_url} alt={item.title} className="kivaw-detail-image" />
                 ) : (
-                  <div className="kivaw-detail-emoji">{kindEmoji(item.kind)}</div>
+                  <div className="kivaw-detail-emoji" style={{ display: "flex", alignItems: "center", justifyContent: "center", color: "var(--text-muted)" }}>{kindIcon(item.kind)}</div>
                 )}
               </div>
 

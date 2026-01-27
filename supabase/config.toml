@@ -24,3 +24,6 @@ verify_jwt = false
 
 [functions.explore_feed_v2]
 verify_jwt = false
+
+[functions.ingest_rss]
+verify_jwt = false

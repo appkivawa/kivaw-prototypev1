@@ -1,6 +1,6 @@
 import React from "react";
 import { type EchoWithContent } from "../../data/echoApi";
-import type { SavedItem } from "../../pages/Timeline";
+import type { SavedItem } from "../../pages/Collection";
 
 type DayDrawerProps = {
   date: string;

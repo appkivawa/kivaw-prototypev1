@@ -2,6 +2,7 @@ import React from "react";
 import ReactDOM from "react-dom/client";
 import { BrowserRouter } from "react-router-dom";
 import App from "./App";
+import ErrorBoundary from "./ui/ErrorBoundary";
 
 // global styles
 import "./index.css"; /* Design token system */
@@ -15,11 +16,13 @@ import { ThemeProvider } from "./theme/ThemeContext";
 
 ReactDOM.createRoot(document.getElementById("root")!).render(
   <React.StrictMode>
-    <ThemeProvider>
-      <BrowserRouter>
-        <App />
-      </BrowserRouter>
-    </ThemeProvider>
+    <ErrorBoundary>
+      <ThemeProvider>
+        <BrowserRouter>
+          <App />
+        </BrowserRouter>
+      </ThemeProvider>
+    </ErrorBoundary>
   </React.StrictMode>
 );
 

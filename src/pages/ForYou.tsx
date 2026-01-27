@@ -6,6 +6,7 @@ import RecommendationCover from "../ui/RecommendationCover";
 import { supabase } from "../lib/supabaseClient";
 import { getUserId } from "../data/savesApi";
 import { requireAuth } from "../auth/authUtils";
+import { SparkleIcon, TVIcon, BookIcon, MusicIcon } from "../components/icons/ContentIcons";
 
 type PublicRecommendation = {
   id: string;
@@ -41,14 +42,14 @@ function norm(s: string) {
   return (s || "").trim().toLowerCase();
 }
 
-const MOOD_CONFIG: Record<string, { emoji: string; label: string }> = {
-  all: { emoji: "✨", label: "All Moods" },
-  reset: { emoji: "🔄", label: "Reset" },
-  beauty: { emoji: "✨", label: "Beauty" },
-  logic: { emoji: "🧠", label: "Logic" },
-  faith: { emoji: "🙏", label: "Faith" },
-  reflect: { emoji: "💭", label: "Reflect" },
-  comfort: { emoji: "🛋️", label: "Comfort" },
+const MOOD_CONFIG: Record<string, { icon: React.ReactNode; label: string }> = {
+  all: { icon: <SparkleIcon size={16} />, label: "All Moods" },
+  reset: { icon: <SparkleIcon size={16} />, label: "Reset" },
+  beauty: { icon: <SparkleIcon size={16} />, label: "Beauty" },
+  logic: { icon: <SparkleIcon size={16} />, label: "Logic" },
+  faith: { icon: <SparkleIcon size={16} />, label: "Faith" },
+  reflect: { icon: <SparkleIcon size={16} />, label: "Reflect" },
+  comfort: { icon: <SparkleIcon size={16} />, label: "Comfort" },
 };
 
 export default function ForYou() {
@@ -251,7 +252,7 @@ export default function ForYou() {
                   style={{ fontSize: 13, padding: "6px 12px" }}
                 >
                   <span className="explore-mood-emoji" style={{ fontSize: 14 }}>
-                    {focus === "All" ? "✨" : focus === "Watch" ? "📺" : "📚"}
+                    {focus === "All" ? <SparkleIcon size={14} /> : focus === "Watch" ? <TVIcon size={14} /> : <BookIcon size={14} />}
                   </span>
                   <span className="explore-mood-label">{focus}</span>
                 </button>
@@ -259,7 +260,7 @@ export default function ForYou() {
             </div>
             <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
               {MOODS.map((m) => {
-                const config = MOOD_CONFIG[m] || { emoji: "✨", label: stateLabel(m) };
+                const config = MOOD_CONFIG[m] || { icon: <SparkleIcon size={16} />, label: stateLabel(m) };
                 return (
                   <button
                     key={m}
@@ -268,7 +269,7 @@ export default function ForYou() {
                     onClick={() => setSelectedMood(m)}
                     style={{ fontSize: 13, padding: "6px 12px" }}
                   >
-                    <span className="explore-mood-emoji" style={{ fontSize: 14 }}>{config.emoji}</span>
+                    <span className="explore-mood-emoji" style={{ fontSize: 14, display: "flex", alignItems: "center", justifyContent: "center" }}>{config.icon}</span>
                     <span className="explore-mood-label">{config.label}</span>
                   </button>
                 );

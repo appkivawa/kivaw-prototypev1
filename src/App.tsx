@@ -1,3 +1,4 @@
+// src/App.tsx
 import { useEffect } from "react";
 import { Navigate, Route, Routes, useNavigate } from "react-router-dom";
 import AppShell from "./layout/AppShell";
@@ -77,7 +78,6 @@ export default function App() {
       <Route path="/login" element={<Login />} />
       <Route path="/auth/callback" element={<AuthCallback />} />
 
-      {/* Optional convenience route: logged-in landing */}
       <Route path="/app" element={<Navigate to="/studio" replace />} />
 
       {/* Creator pages */}
@@ -122,12 +122,11 @@ export default function App() {
         }
       />
 
-      {/* TEMP: admin debug */}
       {import.meta.env.DEV && <Route path="/admin-debug" element={<AdminDebug />} />}
 
-      {/* ✅ Admin (FIX: removed RequireEmployee gate) */}
+      {/* --------- ADMIN (nested) --------- */}
       <Route
-        path="/admin"
+        path="/admin/*"
         element={
           <RequireAdmin>
             <AdminLayout />
@@ -142,6 +141,7 @@ export default function App() {
             </RequirePermission>
           }
         />
+
         <Route
           path="users"
           element={
@@ -269,10 +269,8 @@ export default function App() {
         <Route index element={<Navigate to="/studio" replace />} />
         <Route path="explore" element={<ExplorePage />} />
         <Route path="feed" element={<FeedPage />} />
-        {/* Legacy route for rollback */}
         <Route path="legacy/explore-feed" element={<ExploreFeedLegacy />} />
 
-        {/* Preferences (requires auth) */}
         <Route
           path="preferences"
           element={
@@ -282,7 +280,6 @@ export default function App() {
           }
         />
 
-        {/* Saved (requires auth) */}
         <Route
           path="saved"
           element={
@@ -303,18 +300,11 @@ export default function App() {
             </RequireAuth>
           }
         />
-        <Route
-          path="timeline"
-          element={<Timeline />}
-        />
-        <Route
-          path="timeline/explore"
-          element={<Timeline />}
-        />
-        <Route
-          path="timeline/feed"
-          element={<Timeline />}
-        />
+
+        <Route path="timeline" element={<Timeline />} />
+        <Route path="timeline/explore" element={<Timeline />} />
+        <Route path="timeline/feed" element={<Timeline />} />
+
         <Route
           path="collection"
           element={
@@ -323,6 +313,7 @@ export default function App() {
             </RequireAuth>
           }
         />
+
         <Route path="profile" element={<Profile />} />
         <Route path="echo" element={<Navigate to="/collection" replace />} />
         <Route path="save-echo" element={<Navigate to="/collection" replace />} />
@@ -336,18 +327,20 @@ export default function App() {
 
         <Route path="guide" element={<FAQPage />} />
 
-        {/* Dev-only RSS ingest page */}
         {import.meta.env.DEV && <Route path="dev/rss-ingest" element={<DevRSSIngest />} />}
 
-        {/* shell catch-all */}
         <Route path="*" element={<Navigate to="/studio" replace />} />
       </Route>
 
-      {/* global catch-all */}
       <Route path="*" element={<Navigate to="/studio" replace />} />
     </Routes>
   );
 }
+
+
+
+
+
 
 
 

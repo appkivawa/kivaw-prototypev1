@@ -17,7 +17,6 @@ interface ExploreItemCardProps {
 }
 
 const ExploreItemCard = memo<ExploreItemCardProps>(function ExploreItemCard({
-  id,
   title,
   byline,
   image_url,
@@ -26,14 +25,14 @@ const ExploreItemCard = memo<ExploreItemCardProps>(function ExploreItemCard({
   tags,
   created_at,
 }) {
-  const handleMouseEnter = React.useCallback((e: React.MouseEvent<HTMLDivElement>) => {
+  const handleMouseEnter = React.useCallback((e: React.MouseEvent<HTMLElement>) => {
     if (url) {
       (e.currentTarget as HTMLElement).style.transform = "translateY(-2px)";
       (e.currentTarget as HTMLElement).style.boxShadow = "0 4px 12px rgba(0,0,0,0.1)";
     }
   }, [url]);
 
-  const handleMouseLeave = React.useCallback((e: React.MouseEvent<HTMLDivElement>) => {
+  const handleMouseLeave = React.useCallback((e: React.MouseEvent<HTMLElement>) => {
     (e.currentTarget as HTMLElement).style.transform = "translateY(0)";
     (e.currentTarget as HTMLElement).style.boxShadow = "none";
   }, []);

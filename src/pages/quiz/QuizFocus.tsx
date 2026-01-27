@@ -1,17 +1,18 @@
 import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import Card from "../../ui/Card";
+import { MusicIcon, TVIcon, BookIcon, SparkleIcon } from "../../components/icons/ContentIcons";
 
 const FOCUSES = [
-  { key: "music", emoji: "🎵", label: "Music" },
-  { key: "watch", emoji: "📺", label: "Watch" },
-  { key: "read", emoji: "📚", label: "Read" },
-  { key: "move", emoji: "🏃", label: "Move" },
+  { key: "music", icon: <MusicIcon size={24} />, label: "Music" },
+  { key: "watch", icon: <TVIcon size={24} />, label: "Watch" },
+  { key: "read", icon: <BookIcon size={24} />, label: "Read" },
+  { key: "move", icon: <SparkleIcon size={24} />, label: "Move" },
 
   // ✅ Create includes sound/music creation too (key stays "create")
-  { key: "create", emoji: "🎨", label: "Create" },
+  { key: "create", icon: <SparkleIcon size={24} />, label: "Create" },
 
-  { key: "reset", emoji: "🧘", label: "Reset" },
+  { key: "reset", icon: <SparkleIcon size={24} />, label: "Reset" },
 ] as const;
 
 type FocusKey = (typeof FOCUSES)[number]["key"];
@@ -120,8 +121,8 @@ export default function QuizFocus() {
                     aria-label={`Choose focus: ${f.label}`}
                     title={isSelected ? "Selected" : `Choose ${f.label}`}
                   >
-                    <span className="focus-row__emoji" aria-hidden="true">
-                      {f.emoji}
+                    <span className="focus-row__emoji" aria-hidden="true" style={{ display: "flex", alignItems: "center", justifyContent: "center", color: "var(--text-muted)" }}>
+                      {f.icon}
                     </span>
                     <span className="focus-row__label">{f.label}</span>
 
@@ -147,8 +148,8 @@ export default function QuizFocus() {
                 type="button"
                 onClick={chooseForMe}
               >
-                <span className="focus-row__emoji" aria-hidden="true">
-                  🎲
+                <span className="focus-row__emoji" aria-hidden="true" style={{ display: "flex", alignItems: "center", justifyContent: "center", color: "var(--text-muted)" }}>
+                  <SparkleIcon size={24} />
                 </span>
                 <span className="focus-row__label">Choose for me</span>
               </button>

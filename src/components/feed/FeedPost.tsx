@@ -115,7 +115,7 @@ export default function FeedPost({ item, index, featured = false }: FeedPostProp
             .delete()
             .eq("user_id", sessionData.session.user.id)
             .eq("content_id", item.id)
-            .catch(() => {
+            .then(null, () => {
               // Ignore errors - feed items might not be in saved_items
             });
         }
@@ -137,7 +137,7 @@ export default function FeedPost({ item, index, featured = false }: FeedPostProp
               ],
               { onConflict: "user_id,content_id" }
             )
-            .catch(() => {
+            .then(null, () => {
               // Ignore errors - feed items might not be in saved_items
             });
         }

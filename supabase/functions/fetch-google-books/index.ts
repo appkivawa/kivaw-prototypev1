@@ -1,5 +1,7 @@
 // supabase/functions/fetch-google-books/index.ts
 import { serve } from "https://deno.land/std@0.224.0/http/server.ts";
+import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
+import { logHealthEvent } from "./_shared/logHealthEvent.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -67,7 +69,34 @@ serve(async (req) => {
   const cors = handleCors(req);
   if (cors) return cors;
 
+  // Smoke test
+  if (req.method === "GET") {
+    return json({ ok: true, fn: "fetch-google-books", version: "2026-01-27" });
+  }
+
+  const startTime = Date.now();
+  let supabase: ReturnType<typeof createClient> | null = null;
+
   try {
+    // Initialize supabase for health logging
+    const supabaseUrl = Deno.env.get("SUPABASE_URL");
+    const supabaseServiceKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY");
+    if (supabaseUrl && supabaseServiceKey) {
+      supabase = createClient(supabaseUrl, supabaseServiceKey);
+    }
+    // Check CRON_SECRET if set (for internal cron calls)
+    const CRON_SECRET = (Deno.env.get("CRON_SECRET") ?? "").trim();
+    if (CRON_SECRET) {
+      const got = (req.headers.get("x-cron-secret") ?? "").trim();
+      if (got !== CRON_SECRET) {
+        // Allow service role key as fallback (for direct calls)
+        const authHeader = req.headers.get("Authorization");
+        if (!authHeader || !authHeader.includes("Bearer")) {
+          return json({ error: "Forbidden: Missing or invalid x-cron-secret" }, 403);
+        }
+      }
+    }
+
     // Support GET with query params too (handy for testing)
     let q = "";
     let maxResults = 20;
@@ -167,9 +196,33 @@ serve(async (req) => {
       })
       .filter(Boolean) as GoogleBookCard[];
 
+    const durationMs = Date.now() - startTime;
+    if (supabase) {
+      await logHealthEvent(supabase, {
+        jobName: "fetch-google-books",
+        status: "ok",
+        durationMs,
+        metadata: {
+          returned: feed.length,
+          totalItems: data?.totalItems ?? null,
+        },
+      });
+    }
+    
     return json({ feed, debug: { q, returned: feed.length, totalItems: data?.totalItems ?? null } });
   } catch (e) {
     const msg = e instanceof Error ? e.message : String(e);
+    const durationMs = Date.now() - startTime;
+    
+    if (supabase) {
+      await logHealthEvent(supabase, {
+        jobName: "fetch-google-books",
+        status: "fail",
+        durationMs,
+        errorMessage: msg,
+      });
+    }
+    
     // AbortError is common on timeouts
     return json({ error: msg }, 500);
   }

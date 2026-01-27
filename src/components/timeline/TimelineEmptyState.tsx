@@ -68,7 +68,7 @@ export default function TimelineEmptyState({ viewMode }: TimelineEmptyStateProps
         const items: FeedItem[] = [];
         const seenIds = new Set<string>();
 
-        if (data.fresh && data.fresh.length > 0) {
+        if (data?.fresh && data.fresh.length > 0) {
           for (const item of data.fresh.slice(0, 6)) {
             if (!seenIds.has(item.id)) {
               items.push(item);
@@ -77,7 +77,7 @@ export default function TimelineEmptyState({ viewMode }: TimelineEmptyStateProps
           }
         }
 
-        if (data.today && data.today.length > 0) {
+        if (data?.today && data.today.length > 0) {
           for (const item of data.today.slice(0, 4)) {
             if (!seenIds.has(item.id)) {
               items.push(item);
@@ -87,7 +87,7 @@ export default function TimelineEmptyState({ viewMode }: TimelineEmptyStateProps
         }
 
         // Fallback to main feed if no fresh/today
-        if (items.length === 0 && data.feed) {
+        if (items.length === 0 && data?.feed) {
           setCuratedItems(data.feed.slice(0, 10));
         } else {
           setCuratedItems(items);

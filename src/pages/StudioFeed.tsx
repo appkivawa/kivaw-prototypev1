@@ -10,6 +10,9 @@ import ErrorBoundary from "../ui/ErrorBoundary";
 import "../styles/studio.css";
 
 import { formatProviderName, formatShortDate, normalizeTags, toText } from "../ui/studioNormalize";
+import { SparkleIcon, TVIcon, BookIcon, MusicIcon, NewsIcon, MovieIcon } from "../components/icons/ContentIcons";
+import { LoadingState, EmptyState, ErrorState } from "../components/ui/PageStates";
+import { invokeFunction, type FetchError } from "../lib/supabaseFetch";
 
 interface SocialFeedItem {
   id: string;
@@ -37,11 +40,11 @@ interface SocialFeedResponse {
 
 type FocusKey = "all" | "watch" | "read" | "listen";
 
-const FOCUS_MODES: { key: FocusKey; label: string; icon: string }[] = [
-  { key: "all", label: "All", icon: "✨" },
-  { key: "watch", label: "Watch", icon: "📺" },
-  { key: "read", label: "Read", icon: "📚" },
-  { key: "listen", label: "Listen", icon: "🎧" },
+const FOCUS_MODES: { key: FocusKey; label: string; icon: React.ReactNode }[] = [
+  { key: "all", label: "All", icon: <SparkleIcon size={16} /> },
+  { key: "watch", label: "Watch", icon: <TVIcon size={16} /> },
+  { key: "read", label: "Read", icon: <BookIcon size={16} /> },
+  { key: "listen", label: "Listen", icon: <MusicIcon size={16} /> },
 ];
 
 interface FeedItem {
@@ -93,7 +96,7 @@ export default function StudioFeed({ hideNav = false }: StudioFeedProps = {}) {
 
   const [sections, setSections] = useState<FeedSection[]>([]);
   const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
+  const [error, setError] = useState<FetchError | null>(null);
 
   const [savedIds, setSavedIds] = useState<Set<string>>(new Set());
   const [focus, setFocus] = useState<FocusKey>("all");
@@ -182,12 +185,37 @@ export default function StudioFeed({ hideNav = false }: StudioFeedProps = {}) {
     setError(null);
 
     try {
-      const { data: feedData, error: invokeError } = await supabase.functions.invoke<SocialFeedResponse>("social_feed", {
-        body: { limit: 200 },
+      const result = await invokeFunction<SocialFeedResponse>("social_feed", {
+        limit: 200,
       });
 
-      if (invokeError) throw new Error(invokeError.message || "Failed to fetch social feed");
-      if (!feedData || feedData.error) throw new Error(feedData?.error || "Invalid response from social_feed");
+      if (result.error) {
+        setError(result.error);
+        setSections([]);
+        return;
+      }
+
+      if (!result.data) {
+        setError({
+          requestId: result.requestId,
+          message: "No data returned from server.",
+        });
+        setSections([]);
+        return;
+      }
+
+      // Check for function-level errors
+      if (result.data.error) {
+        setError({
+          requestId: result.requestId,
+          message: result.data.error || "Invalid response from social_feed",
+          details: result.data.message,
+        });
+        setSections([]);
+        return;
+      }
+
+      const feedData = result.data;
 
       const allItems = feedData.feed || [];
       const freshItems = feedData.fresh || [];
@@ -410,22 +438,26 @@ export default function StudioFeed({ hideNav = false }: StudioFeedProps = {}) {
 
           <main className="feed-list-container">
 
-            {loading && (
-              <div className="studio-empty" style={{ padding: 40 }}>
-                <div className="studio-empty__icon">⏳</div>
-                <div className="studio-empty__title">Loading your feed…</div>
-              </div>
-            )}
+            {loading && <LoadingState message="Loading your feed..." />}
 
             {error && (
-              <div className="studio-empty">
-                <div className="studio-empty__icon">⚠️</div>
-                <div className="studio-empty__title">Something went wrong</div>
-                <div className="studio-empty__desc">{error}</div>
-                <button className="studio-btn studio-btn--primary" onClick={loadContent} type="button">
-                  Try again
-                </button>
-              </div>
+              <ErrorState
+                error={error}
+                title="Failed to load feed"
+                onRetry={loadContent}
+                onGoHome={() => navigate("/studio")}
+              />
+            )}
+
+            {!loading && !error && sections.length === 0 && (
+              <EmptyState
+                title="No feed items found"
+                message="Your feed is empty. Try refreshing or adjusting your preferences."
+                action={{
+                  label: "Refresh",
+                  onClick: loadContent,
+                }}
+              />
             )}
 
             {!loading && !error && sections.length > 0 && (
@@ -454,15 +486,26 @@ export default function StudioFeed({ hideNav = false }: StudioFeedProps = {}) {
                             <div className="studio-card__thumb studio-card__thumb--fallback">{item.title?.charAt(0) || "?"}</div>
                           )}
 
-                          <div className="studio-card__body">
-                            <div className="studio-card__kicker">{`${item.kindLabel} · ${formatProviderName(item.provider)}`}</div>
-                            <h3 className="studio-card__title">{item.title}</h3>
+                          <div className="studio-card__body" style={{ position: "relative", padding: "16px", display: "flex", flexDirection: "column", minHeight: "180px" }}>
+                            {/* Kicker with icon */}
+                            <div className="studio-card__kicker" style={{ fontSize: "11px", marginBottom: "10px", letterSpacing: "0.05em", display: "flex", alignItems: "center", gap: "6px", color: "var(--studio-text-muted)" }}>
+                              {item.kindLabel === "NEWS" ? <NewsIcon size={14} /> : item.kindLabel === "WATCH" ? <MovieIcon size={14} /> : item.kindLabel === "READ" ? <BookIcon size={14} /> : item.kindLabel === "LISTEN" ? <MusicIcon size={14} /> : <SparkleIcon size={14} />}
+                              <span>{formatProviderName(item.provider)}</span>
+                            </div>
+                            
+                            <h3 className="studio-card__title" style={{ fontSize: "18px", marginBottom: "8px", lineHeight: 1.4, fontWeight: 600 }}>
+                              {item.title}
+                            </h3>
 
-                            {item.description ? <p className="studio-card__desc">{item.description}</p> : null}
+                            {item.description ? (
+                              <p className="studio-card__desc" style={{ marginTop: "0", marginBottom: "12px", fontSize: "14px", lineHeight: 1.5, color: "var(--studio-text-secondary)", display: "-webkit-box", WebkitLineClamp: 2, lineClamp: 2, WebkitBoxOrient: "vertical", overflow: "hidden" }}>
+                                {item.description}
+                              </p>
+                            ) : null}
 
                             {item.tags.length > 0 ? (
-                              <div className="studio-card__tags">
-                                {item.tags.slice(0, 3).map((t) => (
+                              <div className="studio-card__tags" style={{ marginBottom: "12px" }}>
+                                {item.tags.slice(0, 2).map((t) => (
                                   <span key={t} className="studio-tag">
                                     {t}
                                   </span>
@@ -470,18 +513,43 @@ export default function StudioFeed({ hideNav = false }: StudioFeedProps = {}) {
                               </div>
                             ) : null}
 
-                            <div className="studio-card__byline">
-                              <span>{formatProviderName(item.provider)}</span>
-                              <span>{formatShortDate(item.published_at)}</span>
-                            </div>
+                            {/* Bottom section with byline and action button */}
+                            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginTop: "auto", paddingTop: "8px" }}>
+                              <div className="studio-card__byline" style={{ fontSize: "12px", color: "var(--studio-text-muted)" }}>
+                                <span>{formatShortDate(item.published_at)}</span>
+                              </div>
 
-                            <div className="studio-card__actions">
+                              {/* Action button in bottom right */}
                               <button
-                                className="studio-btn studio-btn--ghost studio-btn--sm"
+                                className="studio-card__action-btn"
                                 onClick={(e) => handleToggleSave(item, e)}
                                 type="button"
+                                style={{
+                                  width: "32px",
+                                  height: "32px",
+                                  borderRadius: "50%",
+                                  border: "none",
+                                  background: item.isSaved ? "var(--studio-coral)" : "var(--studio-gray-100)",
+                                  color: item.isSaved ? "white" : "var(--studio-text-secondary)",
+                                  cursor: "pointer",
+                                  display: "flex",
+                                  alignItems: "center",
+                                  justifyContent: "center",
+                                  fontSize: "16px",
+                                  transition: "all 0.15s ease",
+                                }}
+                                onMouseEnter={(e) => {
+                                  if (!item.isSaved) {
+                                    e.currentTarget.style.background = "var(--studio-gray-200)";
+                                  }
+                                }}
+                                onMouseLeave={(e) => {
+                                  if (!item.isSaved) {
+                                    e.currentTarget.style.background = "var(--studio-gray-100)";
+                                  }
+                                }}
                               >
-                                {item.isSaved ? "✓ Saved" : "💾 Save"}
+                                {item.isSaved ? "✓" : item.kindLabel === "WATCH" ? "🔖" : "+"}
                               </button>
                             </div>
                           </div>
@@ -494,19 +562,14 @@ export default function StudioFeed({ hideNav = false }: StudioFeedProps = {}) {
             )}
 
             {!loading && !error && sections.length === 0 && (
-              <div className="studio-empty">
-                <div className="studio-empty__icon">📭</div>
-                <div className="studio-empty__title">Your feed is empty</div>
-                <div className="studio-empty__desc">We're still gathering content. Try Explore or update preferences.</div>
-                <div style={{ display: "flex", gap: 10, justifyContent: "center" }}>
-                  <button className="studio-btn studio-btn--secondary" onClick={() => navigate("/studio/explore")} type="button">
-                    Explore
-                  </button>
-                  <button className="studio-btn studio-btn--primary" onClick={() => navigate("/preferences")} type="button">
-                    Edit preferences
-                  </button>
-                </div>
-              </div>
+              <EmptyState
+                title="Your feed is empty"
+                message="We're still gathering content. Try Explore or update preferences."
+                action={{
+                  label: "Go to Explore",
+                  onClick: () => navigate("/studio/explore"),
+                }}
+              />
             )}
           </main>
         </div>

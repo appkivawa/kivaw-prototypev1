@@ -1,81 +1,22 @@
 /**
  * ============================================================
- * SYNC EXTERNAL CONTENT EDGE FUNCTION
+ * SYNC EXTERNAL CONTENT EDGE FUNCTION (FIXED)
  * ============================================================
- * 
- * This function syncs content from external providers (TMDB and Open Library)
- * into public.external_content_cache table.
- * 
- * REQUIRED SECRETS:
- * - TMDB_API_KEY: Must be set in Supabase secrets dashboard
- *   (Settings > Edge Functions > Secrets)
- * 
- * USAGE:
- * POST /functions/v1/sync-external-content
- * Body: {} (no parameters needed)
- * 
- * The function will:
- * 1. Fetch watch content from TMDB (movies + TV) using predefined queries
- * 2. Fetch read content from Open Library using predefined queries
- * 3. Upsert results into external_content_cache (using service role for RLS bypass)
- * 
- * Returns: { inserted, updated, errorsCount }
- * 
- * ============================================================
+ *
+ * - TMDB: trending + popular (movies + tv)
+ * - Open Library: trending-ish via Search API sorted by trending
+ * - Fixes Open Library URL construction (work IDs vs /works paths)
+ * - Adds better book byline/description using author_name
  */
 
 import { serve } from "https://deno.land/std@0.224.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
-import { corsHeaders, handleCors, jsonResponse } from "../_shared/cors.ts";
+import { logHealthEvent } from "./_shared/logHealthEvent.ts";
+import { handleCors, jsonResponse } from "../_shared/cors.ts";
 
 // ============================================================
 // Types
 // ============================================================
-
-type TMDBMovie = {
-  id: number;
-  title: string;
-  overview: string | null;
-  poster_path: string | null;
-  backdrop_path: string | null;
-  release_date: string | null;
-  vote_average: number;
-  [key: string]: unknown;
-};
-
-type TMDBTV = {
-  id: number;
-  name: string;
-  overview: string | null;
-  poster_path: string | null;
-  backdrop_path: string | null;
-  first_air_date: string | null;
-  vote_average: number;
-  [key: string]: unknown;
-};
-
-type TMDBResponse = {
-  results: (TMDBMovie | TMDBTV)[];
-  page: number;
-  total_pages: number;
-  total_results: number;
-};
-
-type OpenLibraryDoc = {
-  key?: string;
-  title?: string;
-  first_sentence?: string | string[];
-  cover_i?: number;
-  edition_key?: string[];
-  [key: string]: unknown;
-};
-
-type OpenLibraryResponse = {
-  docs?: OpenLibraryDoc[];
-  numFound?: number;
-  start?: number;
-  [key: string]: unknown;
-};
 
 type NormalizedContent = {
   provider: string;
@@ -88,493 +29,506 @@ type NormalizedContent = {
   raw: Record<string, unknown>;
 };
 
+type TMDBItem = {
+  id: number;
+  title?: string;
+  name?: string;
+  overview?: string | null;
+  poster_path?: string | null;
+  backdrop_path?: string | null;
+  release_date?: string | null;
+  first_air_date?: string | null;
+  vote_average?: number;
+  media_type?: string;
+  [key: string]: unknown;
+};
+
+type TMDBResponse = {
+  results: TMDBItem[];
+};
+
+type OpenLibraryDoc = {
+  key?: string; // Often "OL27448W" (work id), sometimes "/works/OL..."
+  title?: string;
+  author_name?: string[];
+  first_sentence?: string | string[];
+  cover_i?: number;
+  edition_key?: string[];
+  [key: string]: unknown;
+};
+
+type OpenLibraryResponse = {
+  docs?: OpenLibraryDoc[];
+};
+
 // ============================================================
-// Predefined Queries
+// Config
 // ============================================================
 
-const TMDB_MOVIE_QUERIES = ["comfort", "cozy", "feel good", "reflection", "faith"];
-const TMDB_TV_QUERIES = ["comfort", "cozy", "feel good", "reflection", "faith"];
-const OPEN_LIBRARY_QUERIES = ["cozy fiction", "self help", "inspiration", "faith", "journaling"];
+const ITEMS_PER_SECTION = 25;
 
-const ITEMS_PER_QUERY = 10;
+const TMDB_IMAGE_BASE = "https://image.tmdb.org/t/p/w500";
+
+// “Trending/popular” book slices by subject (feel free to tweak)
+const OPEN_LIBRARY_SUBJECT_QUERIES = [
+  "subject:fantasy",
+  "subject:romance",
+  "subject:science_fiction",
+  "subject:mystery",
+  "subject:thriller",
+  "subject:young_adult",
+  "subject:history",
+  "subject:self-help",
+];
 
 // ============================================================
-// TMDB API Integration
+// TMDB
 // ============================================================
 
-async function fetchTMDBMovies(
+async function fetchTMDB(
   apiKey: string,
-  query: string,
-  limit = 10
-): Promise<TMDBMovie[]> {
-  const baseUrl = "https://api.themoviedb.org/3";
-  const url = `${baseUrl}/search/movie?api_key=${encodeURIComponent(apiKey)}&query=${encodeURIComponent(query)}&page=1`;
+  path: string,
+  limit: number
+): Promise<TMDBItem[]> {
+  const url = `https://api.themoviedb.org/3${path}${path.includes("?") ? "&" : "?"}api_key=${encodeURIComponent(apiKey)}`;
 
-  console.log(`[TMDB Movies] Fetching query: "${query}"`);
-  const response = await fetch(url, {
-    method: "GET",
-    headers: { "Accept": "application/json" },
-  });
-
-  console.log(`[TMDB Movies] Status: ${response.status} ${response.statusText}`);
-  
-  if (!response.ok) {
-    const errorText = await response.text().catch(() => "");
-    console.error(`[TMDB Movies] API error: ${response.status}`, errorText);
-    throw new Error(`TMDB Movies API error: ${response.status}`);
+  const resp = await fetch(url, { headers: { Accept: "application/json" } });
+  if (!resp.ok) {
+    const text = await resp.text().catch(() => "");
+    throw new Error(`TMDB error ${resp.status}: ${text}`);
   }
-
-  const data: TMDBResponse = await response.json();
-  const results = (data.results as TMDBMovie[]).slice(0, limit);
-  console.log(`[TMDB Movies] Fetched ${results.length} items for "${query}"`);
-  return results;
+  const data: TMDBResponse = await resp.json();
+  return (data.results || []).slice(0, limit);
 }
 
-async function fetchTMDBTV(
-  apiKey: string,
-  query: string,
-  limit = 10
-): Promise<TMDBTV[]> {
-  const baseUrl = "https://api.themoviedb.org/3";
-  const url = `${baseUrl}/search/tv?api_key=${encodeURIComponent(apiKey)}&query=${encodeURIComponent(query)}&page=1`;
+function normalizeTMDB(item: TMDBItem, kind: "movie" | "tv"): NormalizedContent {
+  const title = (kind === "movie" ? item.title : item.name) || "Untitled";
+  const poster = item.poster_path ? `${TMDB_IMAGE_BASE}${item.poster_path}` : null;
+  const url =
+    kind === "movie"
+      ? `https://www.themoviedb.org/movie/${item.id}`
+      : `https://www.themoviedb.org/tv/${item.id}`;
 
-  console.log(`[TMDB TV] Fetching query: "${query}"`);
-  const response = await fetch(url, {
-    method: "GET",
-    headers: { "Accept": "application/json" },
-  });
-
-  console.log(`[TMDB TV] Status: ${response.status} ${response.statusText}`);
-  
-  if (!response.ok) {
-    const errorText = await response.text().catch(() => "");
-    console.error(`[TMDB TV] API error: ${response.status}`, errorText);
-    throw new Error(`TMDB TV API error: ${response.status}`);
-  }
-
-  const data: TMDBResponse = await response.json();
-  const results = (data.results as TMDBTV[]).slice(0, limit);
-  console.log(`[TMDB TV] Fetched ${results.length} items for "${query}"`);
-  return results;
-}
-
-function normalizeTMDBMovie(movie: TMDBMovie): NormalizedContent {
-  const imageBaseUrl = "https://image.tmdb.org/t/p/w500";
-  
   return {
     provider: "tmdb",
-    provider_id: String(movie.id), // Use just the ID, not "movie_" prefix
+    provider_id: `${kind}:${item.id}`, // avoids collisions movie vs tv
     type: "watch",
-    title: movie.title,
-    description: movie.overview || null,
-    image_url: movie.poster_path ? `${imageBaseUrl}${movie.poster_path}` : null,
-    url: `https://www.themoviedb.org/movie/${movie.id}`,
-    raw: movie as Record<string, unknown>,
-  };
-}
-
-function normalizeTMDBTV(tv: TMDBTV): NormalizedContent {
-  const imageBaseUrl = "https://image.tmdb.org/t/p/w500";
-  
-  return {
-    provider: "tmdb",
-    provider_id: String(tv.id), // Use just the ID, not "tv_" prefix
-    type: "watch",
-    title: tv.name,
-    description: tv.overview || null,
-    image_url: tv.poster_path ? `${imageBaseUrl}${tv.poster_path}` : null,
-    url: `https://www.themoviedb.org/tv/${tv.id}`,
-    raw: tv as Record<string, unknown>,
+    title,
+    description: item.overview ? String(item.overview) : null,
+    image_url: poster,
+    url,
+    raw: item as Record<string, unknown>,
   };
 }
 
 // ============================================================
-// Open Library API Integration
+// Open Library (Search API)
 // ============================================================
 
-async function fetchOpenLibrary(
-  query: string,
-  limit = 10
-): Promise<OpenLibraryDoc[]> {
-  const baseUrl = "https://openlibrary.org/search.json";
-  const params = new URLSearchParams();
-  params.append("q", query);
-  params.append("limit", String(Math.min(limit, 100)));
+function normalizeOpenLibraryKeyToUrl(keyRaw?: string | null): string | null {
+  if (!keyRaw) return null;
 
-  const url = `${baseUrl}?${params.toString()}`;
+  // Key can be:
+  // - "OL27448W" (work id)  <-- common in search docs
+  // - "/works/OL27448W"
+  // - "/books/OL....M"
+  const key = String(keyRaw).trim();
 
-  console.log(`[Open Library] Fetching query: "${query}"`);
-  const response = await fetch(url, {
-    method: "GET",
-    headers: { "Accept": "application/json" },
-  });
-
-  console.log(`[Open Library] Status: ${response.status} ${response.statusText}`);
-  
-  if (!response.ok) {
-    const errorText = await response.text().catch(() => "");
-    console.error(`[Open Library] API error: ${response.status}`, errorText);
-    throw new Error(`Open Library API error: ${response.status}`);
+  if (key.startsWith("/works/") || key.startsWith("/books/")) {
+    return `https://openlibrary.org${key}`;
   }
 
-  const data: OpenLibraryResponse = await response.json();
-  const results = (data.docs || []).slice(0, limit);
-  console.log(`[Open Library] Fetched ${results.length} items for "${query}"`);
-  return results;
+  // If it looks like a Work ID, assume /works
+  if (/^OL\d+W$/i.test(key)) {
+    return `https://openlibrary.org/works/${key}`;
+  }
+
+  // If it looks like an Edition ID, assume /books
+  if (/^OL\d+M$/i.test(key)) {
+    return `https://openlibrary.org/books/${key}`;
+  }
+
+  // Fallback: at least make it a valid path
+  return `https://openlibrary.org/works/${encodeURIComponent(key)}`;
 }
 
-function normalizeOpenLibraryBook(doc: OpenLibraryDoc): NormalizedContent {
-  const providerId = doc.key || (doc.edition_key && doc.edition_key[0] ? doc.edition_key[0] : null);
-  
-  if (!providerId) {
-    throw new Error("Open Library doc missing both key and edition_key");
-  }
+function normalizeOpenLibraryBook(doc: OpenLibraryDoc): NormalizedContent | null {
+  const providerId =
+    (doc.key ? String(doc.key) : null) ||
+    (doc.edition_key?.[0] ? String(doc.edition_key[0]) : null);
 
-  const title = doc.title || "Untitled";
+  if (!providerId) return null;
 
-  let description: string | null = null;
+  const title = doc.title ? String(doc.title) : "Untitled";
+  const author = doc.author_name?.length ? doc.author_name.join(", ") : null;
+
+  let firstSentence: string | null = null;
   if (doc.first_sentence) {
-    if (Array.isArray(doc.first_sentence)) {
-      description = doc.first_sentence.join(" ");
-    } else {
-      description = String(doc.first_sentence);
-    }
+    firstSentence = Array.isArray(doc.first_sentence)
+      ? doc.first_sentence.join(" ")
+      : String(doc.first_sentence);
   }
 
-  const imageUrl = doc.cover_i 
+  const description = author
+    ? (firstSentence ? `${author} — ${firstSentence}` : author)
+    : (firstSentence || null);
+
+  const image_url = doc.cover_i
     ? `https://covers.openlibrary.org/b/id/${doc.cover_i}-L.jpg`
     : null;
 
-  const url = doc.key 
-    ? `https://openlibrary.org${doc.key}`
-    : null;
+  const url = normalizeOpenLibraryKeyToUrl(doc.key ?? null);
+
+  // Extract first_publish_year from raw doc
+  const firstPublishYear = (doc as any).first_publish_year;
 
   return {
     provider: "open_library",
     provider_id: providerId,
     type: "read",
-    title: title,
-    description: description,
-    image_url: imageUrl,
-    url: url,
-    raw: doc as Record<string, unknown>,
+    title,
+    description,
+    image_url,
+    url,
+    raw: {
+      ...(doc as Record<string, unknown>),
+      first_publish_year: firstPublishYear,
+    },
   };
 }
 
+async function fetchOpenLibraryTrendingish(query: string, limit: number): Promise<OpenLibraryDoc[]> {
+  const params = new URLSearchParams();
+  params.set("q", query);
+  params.set("limit", String(Math.min(limit * 3, 100))); // Fetch more to filter by year
+  params.set("sort", "new"); // Sort by newest first
+  params.set("fields", "key,title,author_name,first_sentence,cover_i,edition_key,first_publish_year");
+
+  const url = `https://openlibrary.org/search.json?${params.toString()}`;
+
+  const resp = await fetch(url, { headers: { Accept: "application/json" } });
+  if (!resp.ok) {
+    const text = await resp.text().catch(() => "");
+    throw new Error(`OpenLibrary error ${resp.status}: ${text}`);
+  }
+
+  const data: OpenLibraryResponse = await resp.json();
+  const allDocs = data.docs || [];
+  
+  // Filter to modern books (2000+), exclude obvious classics (< 1950)
+  // Prioritize very recent (2020+), then 2010+, then 2000+
+  const veryRecent = allDocs.filter((doc) => {
+    const year = (doc as any).first_publish_year;
+    return year && typeof year === "number" && year >= 2020 && year >= 1950;
+  });
+  
+  // Sort by year descending (newest first)
+  veryRecent.sort((a, b) => {
+    const yearA = ((a as any).first_publish_year as number) || 0;
+    const yearB = ((b as any).first_publish_year as number) || 0;
+    return yearB - yearA;
+  });
+  
+  if (veryRecent.length >= limit) {
+    return veryRecent.slice(0, limit);
+  }
+  
+  // Fallback to 2010+ if not enough 2020+ books
+  const modern2010 = allDocs.filter((doc) => {
+    const year = (doc as any).first_publish_year;
+    return year && typeof year === "number" && year >= 2010 && year >= 1950;
+  });
+  
+  // Sort by year descending
+  modern2010.sort((a, b) => {
+    const yearA = ((a as any).first_publish_year as number) || 0;
+    const yearB = ((b as any).first_publish_year as number) || 0;
+    return yearB - yearA;
+  });
+  
+  if (modern2010.length >= limit) {
+    return modern2010.slice(0, limit);
+  }
+  
+  // Final fallback to 2000+ if still not enough (but still exclude < 1950)
+  const modern2000 = allDocs.filter((doc) => {
+    const year = (doc as any).first_publish_year;
+    return year && typeof year === "number" && year >= 2000 && year >= 1950;
+  });
+  
+  modern2000.sort((a, b) => {
+    const yearA = ((a as any).first_publish_year as number) || 0;
+    const yearB = ((b as any).first_publish_year as number) || 0;
+    return yearB - yearA;
+  });
+  
+  return modern2000.slice(0, limit);
+}
+
+// Fetch Work or Edition details for description
+async function fetchOpenLibraryDetails(workKey: string): Promise<{ description?: string | { value?: string } } | null> {
+  try {
+    // Try Work endpoint first (e.g., /works/OL27448W.json)
+    const workUrl = `https://openlibrary.org${workKey.startsWith("/") ? workKey : `/${workKey}`}.json`;
+    const response = await fetch(workUrl, {
+      headers: { "Accept": "application/json" },
+    });
+    
+    if (response.ok) {
+      const data = await response.json();
+      return data;
+    }
+  } catch (e) {
+    // Fail silently
+  }
+  return null;
+}
+
 // ============================================================
-// Main Handler
+// Handler
 // ============================================================
 
 serve(async (req) => {
-  // Handle CORS
-  const corsResponse = handleCors(req);
-  if (corsResponse) return corsResponse;
+  const cors = handleCors(req);
+  if (cors) return cors;
+
+  // Smoke test
+  if (req.method === "GET") {
+    return jsonResponse({ ok: true, fn: "sync-external-content", version: "2026-01-27" });
+  }
+
+  const startTime = Date.now();
+  let supabase: ReturnType<typeof createClient> | null = null;
 
   try {
-    // Get Supabase client with SERVICE ROLE KEY (bypasses RLS)
+    // Check CRON_SECRET if set (for internal cron calls)
+    const CRON_SECRET = (Deno.env.get("CRON_SECRET") ?? "").trim();
+    if (CRON_SECRET) {
+      const got = (req.headers.get("x-cron-secret") ?? "").trim();
+      if (got !== CRON_SECRET) {
+        // Allow service role key as fallback (for direct calls)
+        const authHeader = req.headers.get("Authorization");
+        if (!authHeader || !authHeader.includes("Bearer")) {
+          return jsonResponse({ error: "Forbidden: Missing or invalid x-cron-secret" }, 403);
+        }
+      }
+    }
+
     const supabaseUrl = Deno.env.get("SUPABASE_URL");
     const supabaseServiceKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY");
-    
+    const tmdbApiKey = (Deno.env.get("TMDB_API_KEY") || "").trim();
+
     if (!supabaseUrl || !supabaseServiceKey) {
-      console.error("Missing Supabase environment variables");
-      return jsonResponse({ 
-        error: "Missing Supabase configuration",
-        inserted: 0,
-        updated: 0,
-        errorsCount: 1,
-      }, 500);
+      return jsonResponse({ error: "Missing SUPABASE_URL or SUPABASE_SERVICE_ROLE_KEY" }, 500);
     }
-    
-    const supabase = createClient(supabaseUrl, supabaseServiceKey);
-    console.log("[Sync] Using service role key for RLS bypass");
-
-    // Get TMDB API key from secrets
-    const TMDB_API_KEY = Deno.env.get("TMDB_API_KEY");
-    
-    if (!TMDB_API_KEY || TMDB_API_KEY.trim() === "") {
-      console.error("TMDB_API_KEY is missing or empty");
-      return jsonResponse({ 
-        error: "TMDB_API_KEY not configured. Please set the secret in Supabase dashboard (Settings > Edge Functions > Secrets)." 
-      }, 500);
+    if (!tmdbApiKey) {
+      return jsonResponse({ error: "TMDB_API_KEY not configured (Edge Function secret missing)" }, 500);
     }
-    
-    const tmdbApiKey = TMDB_API_KEY.trim();
 
-    // Counters for results
-    let tmdbMoviesCount = 0;
-    let tmdbTVCount = 0;
-    let openLibraryCount = 0;
+    supabase = createClient(supabaseUrl, supabaseServiceKey);
+
     let inserted = 0;
     let updated = 0;
     let errorsCount = 0;
 
-    // ============================================================
-    // Fetch TMDB Movies
-    // ============================================================
-    const allTMDBMovies: NormalizedContent[] = [];
-    
-    for (const query of TMDB_MOVIE_QUERIES) {
-      try {
-        const movies = await fetchTMDBMovies(tmdbApiKey, query, ITEMS_PER_QUERY);
-        const normalized = movies.map(normalizeTMDBMovie);
-        allTMDBMovies.push(...normalized);
-        tmdbMoviesCount += normalized.length;
-      } catch (error) {
-        console.error(`[TMDB Movies] Error fetching for query "${query}":`, error);
-        errorsCount++;
+    const all: NormalizedContent[] = [];
+
+    // --------------------
+    // TMDB: trending + popular
+    // --------------------
+    try {
+      const trendingAll = await fetchTMDB(tmdbApiKey, "/trending/all/week", ITEMS_PER_SECTION);
+      for (const it of trendingAll) {
+        const mt = String(it.media_type || "");
+        if (mt === "movie") all.push(normalizeTMDB(it, "movie"));
+        if (mt === "tv") all.push(normalizeTMDB(it, "tv"));
       }
+    } catch (e) {
+      console.error("[TMDB] trending/all/week failed:", e);
+      errorsCount++;
     }
 
-    // ============================================================
-    // Fetch TMDB TV
-    // ============================================================
-    const allTMDBTV: NormalizedContent[] = [];
-    
-    for (const query of TMDB_TV_QUERIES) {
-      try {
-        const tvShows = await fetchTMDBTV(tmdbApiKey, query, ITEMS_PER_QUERY);
-        const normalized = tvShows.map(normalizeTMDBTV);
-        allTMDBTV.push(...normalized);
-        tmdbTVCount += normalized.length;
-      } catch (error) {
-        console.error(`[TMDB TV] Error fetching for query "${query}":`, error);
-        errorsCount++;
-      }
+    try {
+      const popularMovies = await fetchTMDB(tmdbApiKey, "/movie/popular", ITEMS_PER_SECTION);
+      all.push(...popularMovies.map((m) => normalizeTMDB(m, "movie")));
+    } catch (e) {
+      console.error("[TMDB] movie/popular failed:", e);
+      errorsCount++;
     }
 
-    // ============================================================
-    // Fetch Open Library Books
-    // ============================================================
-    const allOpenLibrary: NormalizedContent[] = [];
-    
-    for (const query of OPEN_LIBRARY_QUERIES) {
+    try {
+      const popularTv = await fetchTMDB(tmdbApiKey, "/tv/popular", ITEMS_PER_SECTION);
+      all.push(...popularTv.map((t) => normalizeTMDB(t, "tv")));
+    } catch (e) {
+      console.error("[TMDB] tv/popular failed:", e);
+      errorsCount++;
+    }
+
+    // --------------------
+    // Open Library: subject + sort=trending
+    // --------------------
+    for (const q of OPEN_LIBRARY_SUBJECT_QUERIES) {
       try {
-        const books = await fetchOpenLibrary(query, ITEMS_PER_QUERY);
-        const normalized = books
-          .map((doc) => {
+        const docs = await fetchOpenLibraryTrendingish(q, 12);
+        let normalized = docs
+          .map(normalizeOpenLibraryBook)
+          .filter((x): x is NormalizedContent => !!x)
+          // keep only "real" cards (cover or url)
+          .filter((x) => !!x.url && (!!x.image_url || x.title.length > 0));
+
+        // For selected items, fetch Work details to get descriptions
+        // Only fetch for final selected set (not all results)
+        for (const content of normalized) {
+          const workKey = content.raw?.key as string | undefined;
+          if (workKey && !content.description) {
             try {
-              return normalizeOpenLibraryBook(doc);
-            } catch (error) {
-              console.error("[Open Library] Error normalizing doc:", error, doc);
-              errorsCount++;
-              return null;
+              const details = await fetchOpenLibraryDetails(workKey);
+              if (details?.description) {
+                // Extract description - can be string or {value: string}
+                let desc: string | null = null;
+                if (typeof details.description === "string") {
+                  desc = details.description;
+                } else if (details.description && typeof details.description === "object" && "value" in details.description) {
+                  desc = String(details.description.value || "");
+                }
+                
+                if (desc) {
+                  content.description = desc;
+                  // Also update raw
+                  content.raw = {
+                    ...content.raw,
+                    description: desc,
+                  };
+                }
+              }
+            } catch (e) {
+              // Fail silently - continue with existing description or null
             }
-          })
-          .filter((item): item is NormalizedContent => item !== null);
-        allOpenLibrary.push(...normalized);
-        openLibraryCount += normalized.length;
-      } catch (error) {
-        console.error(`[Open Library] Error fetching for query "${query}":`, error);
+          }
+        }
+
+        all.push(...normalized);
+      } catch (e) {
+        console.error(`[OpenLibrary] query failed "${q}":`, e);
         errorsCount++;
       }
     }
 
-    // ============================================================
-    // Combine all content
-    // ============================================================
-    const allContent = [...allTMDBMovies, ...allTMDBTV, ...allOpenLibrary];
-    const totalFetched = allContent.length;
-    console.log(`[Sync] Total fetched: ${totalFetched} items`);
+    // --------------------
+    // Deduplicate: provider + provider_id
+    // --------------------
+    const scoreItem = (x: NormalizedContent) => (x.url ? 10 : 0) + (x.image_url ? 5 : 0) + (x.description ? 2 : 0);
+    const map = new Map<string, NormalizedContent>();
 
-    // ============================================================
-    // Deduplicate by (provider, provider_id) before upsert
-    // ============================================================
-    // Helper to score an item (prefer items with more complete data)
-    function scoreItem(item: NormalizedContent): number {
-      let score = 0;
-      if (item.url) score += 10;
-      if (item.description) score += 5;
-      if (item.image_url) score += 3;
-      return score;
+    for (const x of all) {
+      const key = `${x.provider}:${x.provider_id}`;
+      const existing = map.get(key);
+      if (!existing || scoreItem(x) > scoreItem(existing)) map.set(key, x);
     }
 
-    // Deduplicate using Map, keeping the best item for each (provider, provider_id)
-    const dedupeMap = new Map<string, NormalizedContent>();
-    const duplicateKeys: string[] = [];
+    const deduped = Array.from(map.values());
 
-    for (const content of allContent) {
-      const key = `${content.provider}:${content.provider_id}`;
-      
-      if (dedupeMap.has(key)) {
-        duplicateKeys.push(key);
-        // Keep the item with higher score (more complete data)
-        const existing = dedupeMap.get(key)!;
-        if (scoreItem(content) > scoreItem(existing)) {
-          dedupeMap.set(key, content);
-        }
-      } else {
-        dedupeMap.set(key, content);
+    // --------------------
+    // Upsert
+    // --------------------
+    // Determine insert vs update
+    const existingKeys = new Set<string>();
+    if (deduped.length) {
+      const byProvider = new Map<string, string[]>();
+      for (const x of deduped) {
+        const arr = byProvider.get(x.provider) || [];
+        arr.push(x.provider_id);
+        byProvider.set(x.provider, arr);
       }
-    }
 
-    const deduplicatedContent = Array.from(dedupeMap.values());
-    const totalAfterDedupe = deduplicatedContent.length;
-    const duplicatesRemoved = totalFetched - totalAfterDedupe;
-
-    console.log(`[Sync] After deduplication: ${totalAfterDedupe} items (removed ${duplicatesRemoved} duplicates)`);
-    if (duplicateKeys.length > 0) {
-      console.log(`[Sync] Sample duplicate keys (first 5): ${duplicateKeys.slice(0, 5).join(", ")}`);
-    }
-
-    // ============================================================
-    // Upsert to external_content_cache
-    // ============================================================
-    console.log(`[Sync] Preparing to upsert ${totalAfterDedupe} items to external_content_cache`);
-    
-    const cacheInserts = deduplicatedContent.map((content) => ({
-      provider: content.provider,
-      provider_id: content.provider_id,
-      type: content.type,
-      title: content.title,
-      description: content.description,
-      image_url: content.image_url,
-      url: content.url,
-      raw: content.raw,
-      fetched_at: new Date().toISOString(),
-    }));
-
-    // Check which items already exist to determine inserted vs updated
-    const existingProviderIds = new Set<string>();
-    if (deduplicatedContent.length > 0) {
-      const providers = [...new Set(deduplicatedContent.map(c => c.provider))];
-      for (const provider of providers) {
-        const providerItems = deduplicatedContent.filter(c => c.provider === provider);
-        const providerIds = providerItems.map(c => c.provider_id);
-        
-        const { data: existing } = await supabase
+      for (const [provider, ids] of byProvider.entries()) {
+        const { data } = await supabase
           .from("external_content_cache")
           .select("provider, provider_id")
           .eq("provider", provider)
-          .in("provider_id", providerIds);
-        
-        if (existing) {
-          existing.forEach(item => {
-            existingProviderIds.add(`${item.provider}:${item.provider_id}`);
-          });
-        }
+          .in("provider_id", ids);
+
+        (data || []).forEach((r) => existingKeys.add(`${r.provider}:${r.provider_id}`));
       }
     }
 
-    const { data: cachedData, error: cacheError } = await supabase
+    const rows = deduped.map((x) => ({
+      provider: x.provider,
+      provider_id: x.provider_id,
+      type: x.type,
+      title: x.title,
+      description: x.description,
+      image_url: x.image_url,
+      url: x.url,
+      raw: x.raw,
+      fetched_at: new Date().toISOString(),
+    }));
+
+    const { data: upserted, error: upsertErr } = await supabase
       .from("external_content_cache")
-      .upsert(cacheInserts, {
-        onConflict: "provider,provider_id",
-        ignoreDuplicates: false,
-      })
-      .select("id, provider, provider_id, title, url");
+      .upsert(rows, { onConflict: "provider,provider_id" })
+      .select("provider, provider_id");
 
-    if (cacheError) {
-      console.error("[Sync] Error upserting to external_content_cache:", cacheError);
-      errorsCount++;
-      return jsonResponse({ 
-        error: "Failed to upsert to cache", 
-        details: cacheError.message,
-        inserted: 0,
-        updated: 0,
-        errorsCount: 1,
-      }, 500);
+    if (upsertErr) {
+      console.error("[Sync] upsert error:", upsertErr);
+      return jsonResponse({ error: upsertErr.message }, 500);
     }
 
-    // Count inserted vs updated
-    if (cachedData) {
-      for (const item of cachedData) {
-        const key = `${item.provider}:${item.provider_id}`;
-        if (existingProviderIds.has(key)) {
-          updated++;
-        } else {
-          inserted++;
-        }
-      }
+    for (const r of upserted || []) {
+      const k = `${r.provider}:${r.provider_id}`;
+      if (existingKeys.has(k)) updated++;
+      else inserted++;
     }
 
-    console.log(`[Sync] Cache upsert complete: ${inserted} inserted, ${updated} updated`);
-
-    // ============================================================
-    // Return results
-    // ============================================================
-    console.log(`[Sync] Complete: ${inserted} inserted, ${updated} updated, ${errorsCount} errors`);
-    
-    const result = {
+    return jsonResponse({
       inserted,
       updated,
       errorsCount,
       details: {
-        tmdb_movies: tmdbMoviesCount,
-        tmdb_tv: tmdbTVCount,
-        open_library_read: openLibraryCount,
-        total_fetched: totalFetched,
-        total_after_dedupe: totalAfterDedupe,
-        duplicates_removed: duplicatesRemoved,
+        total_written: (upserted || []).length,
+        total_deduped: deduped.length,
       },
-    };
-
-    // Log successful run to job_runs
-    try {
-      const summaryMessage = `inserted=${inserted} updated=${updated} errors=${errorsCount}`;
-      
-      await supabase
-        .from("job_runs")
-        .upsert(
-          {
-            job_name: "sync_external_content",
-            last_run_at: new Date().toISOString(),
-            status: "success",
-            error_message: summaryMessage,
-            result_summary: {
-              inserted,
-              updated,
-              errorsCount,
-              tmdb_movies: tmdbMoviesCount,
-              tmdb_tv: tmdbTVCount,
-              open_library_read: openLibraryCount,
-              total_fetched: totalFetched,
-              total_after_dedupe: totalAfterDedupe,
-              duplicates_removed: duplicatesRemoved,
-            },
-          },
-          { onConflict: "job_name" }
-        );
-    } catch (logErr) {
-      console.error("[sync-external-content] Error logging to job_runs:", logErr);
-      // Don't fail the request if logging fails
+    });
+    
+    const durationMs = Date.now() - startTime;
+    await logHealthEvent(supabase, {
+      jobName: "sync-external-content",
+      status: "ok",
+      durationMs,
+      metadata: {
+        inserted,
+        updated,
+        errorsCount,
+      },
+    });
+    
+    return jsonResponse({
+      ok: true,
+      inserted,
+      updated,
+      errorsCount,
+      details: {
+        total_written: (upserted || []).length,
+        total_deduped: deduped.length,
+      },
+    });
+  } catch (e: any) {
+    console.error("[sync-external-content] fatal:", e);
+    const durationMs = Date.now() - startTime;
+    const errorMsg = e?.message || String(e);
+    
+    if (supabase) {
+      await logHealthEvent(supabase, {
+        jobName: "sync-external-content",
+        status: "fail",
+        durationMs,
+        errorMessage: errorMsg,
+      });
     }
     
-    return jsonResponse(result);
-
-  } catch (error) {
-    const errorMessage = error instanceof Error ? error.message : "Unknown error";
-    console.error("Error in sync-external-content:", error);
-    
-    // Log error to job_runs
-    try {
-      const supabaseUrl = Deno.env.get("SUPABASE_URL");
-      const supabaseServiceKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY");
-      if (supabaseUrl && supabaseServiceKey) {
-        const supabase = createClient(supabaseUrl, supabaseServiceKey);
-        await supabase
-          .from("job_runs")
-          .upsert(
-            {
-              job_name: "sync_external_content",
-              last_run_at: new Date().toISOString(),
-              status: "error",
-              error_message: errorMessage,
-              result_summary: null,
-            },
-            { onConflict: "job_name" }
-          );
-      }
-    } catch (logErr) {
-      console.error("[sync-external-content] Error logging error to job_runs:", logErr);
-      // Don't fail the request if logging fails
-    }
-    
-    return jsonResponse(
-      {
-        error: errorMessage,
-      },
-      500
-    );
+    return jsonResponse({ error: errorMsg }, 500);
   }
 });
+
+
 

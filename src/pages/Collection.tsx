@@ -220,6 +220,62 @@ function CollectionContent() {
         }
       }
 
+      // Also check saved_items for manual items (items with metadata)
+      let manualData: any[] = [];
+      if (uid && missingIds.length > 0) {
+        const { data: savedItemsData } = await supabase
+          .from("saved_items")
+          .select("content_id, metadata, created_at")
+          .eq("user_id", uid)
+          .in("content_id", missingIds);
+
+        if (savedItemsData) {
+          manualData = savedItemsData
+            .filter((item: any) => item.metadata && typeof item.metadata === "object" && item.metadata.title)
+            .map((item: any) => ({
+              id: item.content_id,
+              kind: item.metadata.kind || "manual",
+              title: item.metadata.title,
+              byline: null,
+              meta: item.metadata.url ? { url: item.metadata.url } : null,
+              image_url: null,
+              url: item.metadata.url || null,
+              source: item.metadata.source || "manual",
+              created_at: item.metadata.created_at || item.created_at || null,
+              status: "unfinished",
+              isFavorite: false,
+              isArchived: false,
+            }));
+        }
+      }
+
+      // Also check local storage for manual items
+      try {
+        const manualItemsKey = "kivaw_manual_items_v1";
+        const localManual = JSON.parse(localStorage.getItem(manualItemsKey) || "[]");
+        const localManualIds = localManual.map((item: any) => item.id);
+        const localManualInMissing = localManual.filter((item: any) => missingIds.includes(item.id));
+        
+        localManualInMissing.forEach((item: any) => {
+          manualData.push({
+            id: item.id,
+            kind: item.kind || "manual",
+            title: item.title,
+            byline: null,
+            meta: item.url ? { url: item.url } : null,
+            image_url: null,
+            url: item.url || null,
+            source: item.source || "manual",
+            created_at: item.created_at || null,
+            status: "unfinished",
+            isFavorite: false,
+            isArchived: false,
+          });
+        });
+      } catch (e) {
+        // Ignore local storage errors
+      }
+
       // Combine content_items and feed_items
       const contentItems = (contentData || []).map((item: any) => ({
         id: item.id,
@@ -238,7 +294,7 @@ function CollectionContent() {
         board: (item as any).board || null,
       }));
 
-      const combined = [...contentItems, ...feedData] as SavedItem[];
+      const combined = [...contentItems, ...feedData, ...manualData] as SavedItem[];
       // Ensure all items have default status
       combined.forEach((item) => {
         if (!item.status) item.status = "unfinished";
@@ -279,7 +335,7 @@ function CollectionContent() {
         .delete()
         .eq("user_id", uid)
         .eq("content_id", id)
-        .catch(() => {
+        .then(null, () => {
           // Ignore errors - item might not be in saved_items
         });
     }

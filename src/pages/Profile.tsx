@@ -11,6 +11,7 @@ import Button from "../ui/Button";
 import SectionHeader from "../ui/SectionHeader";
 import Tag from "../ui/Tag";
 import EmptyState from "../ui/EmptyState";
+import { BookIcon, MusicIcon } from "../components/icons/ContentIcons";
 import "../styles/studio.css";
 
 type ProfileData = {
@@ -317,8 +318,8 @@ export default function Profile() {
                   e.currentTarget.style.boxShadow = "none";
                 }}
               >
-                <div style={{ width: "100%", height: "120px", background: "var(--studio-gray-100)", display: "flex", alignItems: "center", justifyContent: "center", fontSize: "48px" }}>
-                  📚
+                <div style={{ width: "100%", height: "120px", background: "var(--studio-gray-100)", display: "flex", alignItems: "center", justifyContent: "center", fontSize: "48px", color: "var(--studio-text-muted)" }}>
+                  <BookIcon size={48} />
                 </div>
                 <div style={{ padding: "16px" }}>
                   <h3 style={{ fontSize: "16px", fontWeight: 600, color: "var(--studio-text)", margin: "0 0 8px 0" }}>My Echoes</h3>
@@ -374,7 +375,9 @@ export default function Profile() {
               <div>
                 {stats.echoesCount > 0 ? (
                   <div style={{ display: "flex", gap: "12px", padding: "12px", borderRadius: "8px", backgroundColor: "var(--studio-gray-50)" }}>
-                    <div style={{ fontSize: "32px", flexShrink: 0 }}>🎵</div>
+                    <div style={{ fontSize: "32px", flexShrink: 0, display: "flex", alignItems: "center", justifyContent: "center", color: "var(--studio-text-muted)" }}>
+                      <MusicIcon size={32} />
+                    </div>
                     <div style={{ flex: 1, minWidth: 0 }}>
                       <div style={{ fontSize: "14px", fontWeight: 600, color: "var(--studio-text)", marginBottom: "4px" }}>Your Echoes</div>
                       <div style={{ fontSize: "12px", color: "var(--studio-text-muted)", marginBottom: "4px" }}>Echoes • {stats.echoesCount} items</div>

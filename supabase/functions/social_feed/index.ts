@@ -144,9 +144,31 @@ function sourceWeight(it: FeedItem, prefs: Prefs) {
 // Prefer published_at for recency filtering. 21 days default.
 const DEFAULT_DAYS = 21;
 
+// Generate correlation ID for request tracking
+function generateCorrelationId(): string {
+  return `social_${Date.now()}_${Math.random().toString(36).substring(2, 9)}`;
+}
+
+// Structured logging helper
+function log(level: "info" | "warn" | "error", correlationId: string, message: string, meta?: Record<string, unknown>) {
+  const timestamp = new Date().toISOString();
+  const logEntry = {
+    timestamp,
+    level,
+    fn: "social_feed",
+    correlationId,
+    message,
+    ...meta,
+  };
+  console.log(JSON.stringify(logEntry));
+}
+
 serve(async (req) => {
   const cors = handleCors(req);
   if (cors) return cors;
+
+  const correlationId = generateCorrelationId();
+  const startTime = Date.now();
 
   // handy smoke test
   if (req.method === "GET") {
@@ -165,7 +187,7 @@ serve(async (req) => {
       if (!SUPABASE_URL) missing.push("SUPABASE_URL");
       if (!SUPABASE_ANON_KEY) missing.push("SUPABASE_ANON_KEY");
       
-      console.error("[social_feed] Missing required environment variables:", missing);
+      log("error", correlationId, "Missing environment variables", { missing });
       return jsonResponse(
         {
           feed: [],
@@ -229,9 +251,17 @@ serve(async (req) => {
       }
     } catch (authErr: any) {
       // Auth errors are non-fatal - continue as logged-out user
-      console.warn("[social_feed] Auth check error (non-fatal):", authErr?.message);
+      log("warn", correlationId, "Auth check error (non-fatal)", { error: authErr?.message });
       userId = null;
     }
+
+    log("info", correlationId, "Request received", {
+      userId: userId || "anonymous",
+      limit,
+      types,
+      query: query ? true : false,
+      days,
+    });
 
     // Defaults for logged-out users OR fallback for missing prefs row
     let prefs: Prefs = {
@@ -271,7 +301,7 @@ serve(async (req) => {
       if (prefResult.status === "fulfilled" && !prefResult.value.error && prefResult.value.data) {
         prefs = (prefResult.value.data.prefs as Prefs) ?? prefs;
       } else if (prefResult.status === "rejected") {
-        console.warn("[social_feed] User preferences query failed (non-fatal):", prefResult.reason);
+        log("warn", correlationId, "User preferences query failed (non-fatal)", { error: String(prefResult.reason) });
       }
 
       // Handle follows (isolated error handling)
@@ -285,7 +315,7 @@ serve(async (req) => {
         });
         followKeys = new Set(activeSources.map((f: any) => `${String(f.type)}:${String(f.url)}`));
       } else if (followsResult.status === "rejected") {
-        console.warn("[social_feed] User sources query failed (non-fatal):", followsResult.reason);
+        log("warn", correlationId, "User sources query failed (non-fatal)", { error: String(followsResult.reason) });
       }
 
       // Handle actions (isolated error handling)
@@ -297,7 +327,7 @@ serve(async (req) => {
           actionMap.set(id, arr);
         }
       } else if (actionsResult.status === "rejected") {
-        console.warn("[social_feed] User actions query failed (non-fatal):", actionsResult.reason);
+        log("warn", correlationId, "User actions query failed (non-fatal)", { error: String(actionsResult.reason) });
       }
     }
     // If userId is null (logged out), skip user queries and use defaults above
@@ -325,11 +355,15 @@ serve(async (req) => {
       rows = queryData ?? [];
       rowsErr = queryError ?? null;
     } catch (queryErr: any) {
-      console.error("[social_feed] Query execution error:", queryErr);
+      log("error", correlationId, "Query execution error", { error: queryErr?.message, stack: queryErr?.stack });
       rowsErr = queryErr;
     }
     if (rowsErr) {
-      console.error("[social_feed] Query error:", rowsErr);
+      log("error", correlationId, "Query error", {
+        userId: userId || "anonymous",
+        error: rowsErr.message,
+        code: rowsErr.code,
+      });
       // If table doesn't exist, return empty feed with helpful error
       if (rowsErr.code === "42P01" || rowsErr.message?.includes("does not exist")) {
         return jsonResponse(
@@ -388,7 +422,7 @@ serve(async (req) => {
       }
     } catch (rssErr: any) {
       // Non-fatal - continue without RSS weights
-      console.warn("[social_feed] RSS sources query failed (non-fatal):", rssErr?.message);
+      log("warn", correlationId, "RSS sources query failed (non-fatal)", { error: rssErr?.message });
     }
 
     let items: FeedItem[] = (rows ?? []).map((r: any) => {
@@ -506,6 +540,16 @@ serve(async (req) => {
       })
       .slice(0, 50);
 
+    const duration = Date.now() - startTime;
+    log("info", correlationId, "Request completed", {
+      userId: userId || "anonymous",
+      candidates: items.length,
+      returned: scored.length,
+      freshCount: freshItems.length,
+      todayCount: todayItems.length,
+      durationMs: duration,
+    });
+
     return jsonResponse(
       {
         feed: scored,
@@ -528,12 +572,15 @@ serve(async (req) => {
       req
     );
   } catch (e: any) {
+    const duration = Date.now() - startTime;
     // Log full error details to console for Supabase logs
-    console.error("[social_feed] Unhandled error:", {
-      message: e?.message ?? String(e),
+    log("error", correlationId, "Unhandled exception", {
+      userId: userId || "anonymous",
+      error: e?.message ?? String(e),
       name: e?.name ?? "Unknown",
       stack: e?.stack,
       cause: e?.cause,
+      durationMs: duration,
     });
 
     // Always return a proper JSON response with status code

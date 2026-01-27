@@ -1,23 +1,27 @@
-// Shared CORS helper for Supabase Edge Functions
+// supabase/functions/_shared/cors.ts
 
-export const corsHeaders = {
+export const corsHeaders: Record<string, string> = {
   "Access-Control-Allow-Origin": "*",
   "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
-  "Access-Control-Allow-Methods": "POST, GET, PUT, DELETE, OPTIONS",
+  "Access-Control-Allow-Methods": "GET, POST, OPTIONS",
+  "Access-Control-Max-Age": "86400",
 };
 
 export function handleCors(req: Request): Response | null {
+  // Preflight
   if (req.method === "OPTIONS") {
     return new Response("ok", { headers: corsHeaders });
   }
   return null;
 }
 
-export function jsonResponse(body: unknown, status = 200): Response {
-  return new Response(JSON.stringify(body), {
+export function jsonResponse(data: unknown, status = 200): Response {
+  return new Response(JSON.stringify(data), {
     status,
     headers: { ...corsHeaders, "Content-Type": "application/json" },
   });
 }
+
+
 
 

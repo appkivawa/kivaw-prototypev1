@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import Card from "../../ui/Card";
 import { supabase } from "../../lib/supabaseClient";
 
@@ -16,10 +16,48 @@ type HealthCheckResult = {
   };
 };
 
+type CronJobHealth = {
+  job_name: string;
+  ran_at: string;
+  status: "ok" | "fail";
+  duration_ms: number | null;
+  error_message: string | null;
+  metadata: Record<string, unknown> | null;
+};
+
 export default function Health() {
   const [loading, setLoading] = useState(false);
   const [results, setResults] = useState<HealthCheckResult | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [cronJobs, setCronJobs] = useState<CronJobHealth[]>([]);
+  const [cronLoading, setCronLoading] = useState(true);
+
+  // Load cron job health on mount and refresh
+  useEffect(() => {
+    loadCronHealth();
+  }, []);
+
+  async function loadCronHealth() {
+    setCronLoading(true);
+    try {
+      const { data, error: cronError } = await supabase
+        .from("system_health_latest")
+        .select("*")
+        .order("job_name");
+
+      if (cronError) {
+        console.error("Error loading cron health:", cronError);
+        setCronJobs([]);
+      } else {
+        setCronJobs((data || []) as CronJobHealth[]);
+      }
+    } catch (e: any) {
+      console.error("Exception loading cron health:", e);
+      setCronJobs([]);
+    } finally {
+      setCronLoading(false);
+    }
+  }
 
   async function runHealthCheck() {
     setLoading(true);
@@ -131,12 +169,32 @@ export default function Health() {
       }
 
       setResults(healthResults);
+      // Refresh cron health after manual check
+      await loadCronHealth();
     } catch (e: any) {
       console.error("Error running health check:", e);
       setError(e?.message || "Failed to run health check");
     } finally {
       setLoading(false);
     }
+  }
+
+  function formatTimeAgo(dateStr: string): string {
+    const date = new Date(dateStr);
+    const now = new Date();
+    const diffMs = now.getTime() - date.getTime();
+    const diffMins = Math.floor(diffMs / 60000);
+    const diffHours = Math.floor(diffMs / 3600000);
+    const diffDays = Math.floor(diffMs / 86400000);
+
+    if (diffMins < 1) return "just now";
+    if (diffMins < 60) return `${diffMins}m ago`;
+    if (diffHours < 24) return `${diffHours}h ago`;
+    return `${diffDays}d ago`;
+  }
+
+  function getCronStatusColor(status: "ok" | "fail"): string {
+    return status === "ok" ? "#10b981" : "#ef4444";
   }
 
   function getStatusColor(status: "healthy" | "warning" | "unhealthy"): string {
@@ -156,14 +214,24 @@ export default function Health() {
     <div className="admin-system-health">
       <div className="admin-section-header">
         <h3 className="admin-section-title">System Health</h3>
-        <button
-          className="btn"
-          type="button"
-          onClick={runHealthCheck}
-          disabled={loading}
-        >
-          {loading ? "Running…" : "🔍 Run Health Check"}
-        </button>
+        <div style={{ display: "flex", gap: 8 }}>
+          <button
+            className="btn"
+            type="button"
+            onClick={loadCronHealth}
+            disabled={cronLoading}
+          >
+            {cronLoading ? "Loading…" : "🔄 Refresh Cron Status"}
+          </button>
+          <button
+            className="btn"
+            type="button"
+            onClick={runHealthCheck}
+            disabled={loading}
+          >
+            {loading ? "Running…" : "🔍 Run Health Check"}
+          </button>
+        </div>
       </div>
 
       {error && (
@@ -242,6 +310,103 @@ export default function Health() {
           </Card>
         </div>
       )}
+
+      {/* Cron Jobs Health */}
+      <div style={{ marginTop: 24 }}>
+        <h4 className="admin-subsection-title" style={{ marginBottom: 16 }}>
+          <span className="admin-section-icon">⏰</span>
+          Cron Jobs & Ingest Health
+        </h4>
+        {cronLoading ? (
+          <Card className="admin-section-card">
+            <p className="muted" style={{ textAlign: "center", padding: 24 }}>
+              Loading cron job status…
+            </p>
+          </Card>
+        ) : cronJobs.length === 0 ? (
+          <Card className="admin-section-card">
+            <p className="muted" style={{ textAlign: "center", padding: 24 }}>
+              No cron job health data found. Jobs may not have run yet.
+            </p>
+          </Card>
+        ) : (
+          <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
+            {cronJobs.map((job) => (
+              <Card key={job.job_name} className="admin-section-card">
+                <div style={{ display: "flex", alignItems: "flex-start", gap: 12 }}>
+                  <div
+                    style={{
+                      width: 12,
+                      height: 12,
+                      borderRadius: "50%",
+                      backgroundColor: getCronStatusColor(job.status),
+                      marginTop: 4,
+                    }}
+                  />
+                  <div style={{ flex: 1 }}>
+                    <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: 8 }}>
+                      <div>
+                        <div style={{ fontWeight: 600, marginBottom: 4 }}>
+                          {job.job_name}
+                        </div>
+                        <div style={{ fontSize: 13, color: "var(--textSecondary)" }}>
+                          Last run: {formatTimeAgo(job.ran_at)} ({new Date(job.ran_at).toLocaleString()})
+                        </div>
+                      </div>
+                      <div style={{ textAlign: "right" }}>
+                        <div style={{ fontSize: 12, color: "var(--textSecondary)", marginBottom: 4 }}>
+                          {job.status === "ok" ? "✓ OK" : "✗ FAILED"}
+                        </div>
+                        {job.duration_ms !== null && (
+                          <div style={{ fontSize: 11, color: "var(--textSecondary)" }}>
+                            {job.duration_ms}ms
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                    {job.error_message && (
+                      <div
+                        style={{
+                          marginTop: 8,
+                          padding: 8,
+                          background: "var(--surface-2)",
+                          borderRadius: 4,
+                          fontSize: 12,
+                          color: "var(--textSecondary)",
+                          fontFamily: "monospace",
+                          wordBreak: "break-word",
+                        }}
+                      >
+                        <strong>Error:</strong> {job.error_message}
+                      </div>
+                    )}
+                    {job.metadata && Object.keys(job.metadata).length > 0 && (
+                      <details style={{ marginTop: 8 }}>
+                        <summary style={{ cursor: "pointer", fontSize: 12, color: "var(--textSecondary)" }}>
+                          Metadata
+                        </summary>
+                        <pre
+                          style={{
+                            marginTop: 8,
+                            padding: 8,
+                            background: "var(--surface-2)",
+                            borderRadius: 4,
+                            fontSize: 11,
+                            overflow: "auto",
+                            maxHeight: 200,
+                          }}
+                        >
+                          {JSON.stringify(job.metadata, null, 2)}
+                        </pre>
+                      </details>
+                    )}
+                  </div>
+                </div>
+              </Card>
+            ))}
+          </div>
+        )}
+      </div>
 
       {!results && !loading && (
         <Card className="admin-section-card">

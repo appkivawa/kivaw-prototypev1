@@ -152,7 +152,7 @@ export default function FeedPostTumblr({ item, index, allItems = [], badge: prov
             .delete()
             .eq("user_id", sessionData.session.user.id)
             .eq("content_id", item.id)
-            .catch(() => {});
+            ; // Ignore errors silently
         }
       } else {
         saveLocal(item.id);
@@ -170,7 +170,7 @@ export default function FeedPostTumblr({ item, index, allItems = [], badge: prov
               ],
               { onConflict: "user_id,content_id" }
             )
-            .catch(() => {});
+            ; // Ignore errors silently
         }
       }
     } catch (error) {

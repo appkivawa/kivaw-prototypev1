@@ -1,58 +1,37 @@
-import { useNavigate, useLocation, Outlet } from "react-router-dom";
-import { useEffect, useState } from "react";
-import { supabase } from "../lib/supabaseClient";
-import { useRoles } from "../auth/useRoles";
-import { canViewTab } from "./permissions";
+// src/admin/AdminLayout.tsx
+import { useEffect, useMemo, useState } from "react";
+import { useLocation, useNavigate, Outlet } from "react-router-dom";
 import TopNav from "../ui/TopNav";
-
-import Overview from "./tabs/Overview";
-import Users from "./tabs/Users";
-import Content from "./tabs/Content";
-import Analytics from "./tabs/Analytics";
-import Operations from "./tabs/Operations";
-import Settings from "./tabs/Settings";
-import Support from "./tabs/Support";
-import Health from "./tabs/Health";
-import Security from "./tabs/Security";
-import Finance from "./tabs/Finance";
-import Experiments from "./tabs/Experiments";
-import CreatorRequests from "./tabs/CreatorRequests";
-import Integrations from "./tabs/Integrations";
-import RecommendationsPreview from "./tabs/RecommendationsPreview";
-import PublishToExplore from "./tabs/PublishToExplore";
+import { supabase } from "../lib/supabaseClient";
+import { useMyPermissions } from "../auth/useMyPermissions";
+import { canViewTab } from "./permissions";
 
 export default function AdminLayout() {
   const navigate = useNavigate();
   const location = useLocation();
 
-  const [userEmail, setUserEmail] = useState<string>("");
-  const { roleKeys, isSuperAdmin, loading: rolesLoading } = useRoles();
+  const { perms, loading: permsLoading } = useMyPermissions();
+  const [userEmail, setUserEmail] = useState("");
 
-  // Sync activeTab with current route
   useEffect(() => {
     let alive = true;
-
     (async () => {
       const { data } = await supabase.auth.getSession();
       if (!alive) return;
-      const email = data.session?.user?.email || "";
-      setUserEmail(email);
+      setUserEmail(data.session?.user?.email || "");
     })();
-
     return () => {
       alive = false;
     };
   }, []);
 
-  // Determine active tab from current location
-  // Converts route paths (hyphens) back to tab names (underscores)
-  const activeTab = (() => {
+  // Convert route → tabName
+  const activeTab = useMemo(() => {
     const path = location.pathname;
     if (path === "/admin" || path === "/admin/") return "overview";
     const segments = path.split("/").filter(Boolean);
     if (segments.length >= 2 && segments[0] === "admin") {
       const routePath = segments[1];
-      // Map route paths back to tab names
       const tabMap: Record<string, string> = {
         "creator-requests": "creator_requests",
         "recommendations-preview": "recommendations_preview",
@@ -61,23 +40,20 @@ export default function AdminLayout() {
       return tabMap[routePath] || routePath;
     }
     return "overview";
-  })();
+  }, [location.pathname]);
 
-  // Helper to get path for a tab
-  // Converts tab names (underscores) to route paths (hyphens where needed)
   function getTabPath(tabName: string): string {
     if (tabName === "overview") return "/admin";
-    
-    // Map tab names to route paths (some use hyphens in URLs)
     const pathMap: Record<string, string> = {
       creator_requests: "creator-requests",
       recommendations_preview: "recommendations-preview",
       publish_to_explore: "publish-to-explore",
     };
-    
-    const path = pathMap[tabName] || tabName;
-    return `/admin/${path}`;
+    return `/admin/${pathMap[tabName] || tabName}`;
   }
+
+  const roleKeys = perms?.role_keys || [];
+  const isSuperAdmin = !!perms?.is_super_admin;
 
   const tabs = [
     { name: "overview", label: "Overview", icon: "📊" },
@@ -97,61 +73,14 @@ export default function AdminLayout() {
     { name: "publish_to_explore", label: "Publish to Explore", icon: "📤" },
   ];
 
-  // Wait for roles to load before filtering tabs to avoid race condition
-  const visibleTabs = (() => {
-    if (rolesLoading) {
-      return []; // Don't show tabs until roles are loaded
-    }
-    
-    return tabs.filter((tab) => canViewTab(roleKeys, isSuperAdmin || false, tab.name));
-  })();
-
-  // This function is no longer needed since we're using React Router nested routes
-  // But keeping it as fallback in case routes don't render correctly
-  function renderTabContent() {
-    switch (activeTab) {
-      case "overview":
-        return <Overview />;
-      case "users":
-        return <Users />;
-      case "content":
-        return <Content />;
-      case "analytics":
-        return <Analytics />;
-      case "operations":
-        return <Operations />;
-      case "settings":
-        return <Settings />;
-      case "support":
-        return <Support />;
-      case "health":
-        return <Health />;
-      case "security":
-        return <Security />;
-      case "finance":
-        return <Finance />;
-      case "experiments":
-        return <Experiments />;
-      case "creator_requests":
-        return <CreatorRequests />;
-      case "integrations":
-        return <Integrations />;
-      case "recommendations_preview":
-        return <RecommendationsPreview />;
-      case "publish_to_explore":
-        return <PublishToExplore />;
-      default:
-        return <Overview />;
-    }
-  }
+  const visibleTabs = useMemo(() => {
+    if (permsLoading) return [];
+    return tabs.filter((t) => canViewTab(roleKeys, isSuperAdmin, t.name));
+  }, [permsLoading, roleKeys, isSuperAdmin]);
 
   async function handleSignOut() {
-    try {
-      await supabase.auth.signOut();
-      navigate("/studio", { replace: true });
-    } catch (error) {
-      console.error("Error signing out:", error);
-    }
+    await supabase.auth.signOut();
+    navigate("/studio", { replace: true });
   }
 
   return (
@@ -164,38 +93,17 @@ export default function AdminLayout() {
             <h1 className="admin-title">Admin Dashboard</h1>
             <p className="admin-subtitle">Manage content, users, and platform settings</p>
 
-            {/* Quick navigation buttons */}
             <div style={{ marginTop: 12, display: "flex", gap: 10, flexWrap: "wrap" }}>
-              <button
-                className="coral-btn-secondary"
-                type="button"
-                onClick={() => navigate("/studio")}
-                style={{ fontSize: 12, padding: "8px 16px" }}
-              >
+              <button className="coral-btn-secondary" type="button" onClick={() => navigate("/studio")} style={{ fontSize: 12, padding: "8px 16px" }}>
                 🏠 Home
               </button>
-              <button
-                className="coral-btn-secondary"
-                type="button"
-                onClick={() => navigate("/feed")}
-                style={{ fontSize: 12, padding: "8px 16px" }}
-              >
+              <button className="coral-btn-secondary" type="button" onClick={() => navigate("/feed")} style={{ fontSize: 12, padding: "8px 16px" }}>
                 🔍 Explore
               </button>
-              <button
-                className="coral-btn-secondary"
-                type="button"
-                onClick={() => navigate("/timeline")}
-                style={{ fontSize: 12, padding: "8px 16px" }}
-              >
+              <button className="coral-btn-secondary" type="button" onClick={() => navigate("/timeline")} style={{ fontSize: 12, padding: "8px 16px" }}>
                 💭 Timeline
               </button>
-              <button
-                className="coral-btn-secondary"
-                type="button"
-                onClick={() => navigate("/waves")}
-                style={{ fontSize: 12, padding: "8px 16px" }}
-              >
+              <button className="coral-btn-secondary" type="button" onClick={() => navigate("/waves")} style={{ fontSize: 12, padding: "8px 16px" }}>
                 🌊 Waves
               </button>
             </div>
@@ -209,19 +117,14 @@ export default function AdminLayout() {
               </div>
             )}
 
-            <button
-              className="coral-btn-secondary"
-              type="button"
-              onClick={handleSignOut}
-              style={{ fontSize: 12, padding: "8px 16px" }}
-            >
+            <button className="coral-btn-secondary" type="button" onClick={handleSignOut} style={{ fontSize: 12, padding: "8px 16px" }}>
               Sign Out
             </button>
           </div>
         </div>
 
         <div className="admin-tabs">
-          {rolesLoading ? (
+          {permsLoading ? (
             <div style={{ padding: 20, textAlign: "center", color: "var(--coral-text-muted)" }}>
               Loading tabs...
             </div>
@@ -233,15 +136,11 @@ export default function AdminLayout() {
             visibleTabs.map((tab) => {
               const tabPath = getTabPath(tab.name);
               const isActive = activeTab === tab.name;
-              
               return (
                 <button
                   key={tab.name}
                   type="button"
-                  onClick={(e) => {
-                    e.preventDefault();
-                    navigate(tabPath);
-                  }}
+                  onClick={() => navigate(tabPath)}
                   className={`admin-tab ${isActive ? "admin-tab-active" : ""}`}
                 >
                   <span className="admin-tab-icon">{tab.icon}</span>
@@ -252,32 +151,23 @@ export default function AdminLayout() {
           )}
         </div>
 
-        {/* Content is rendered by React Router nested routes */}
         <div className="coral-card" style={{ padding: 32 }}>
-          {/* Show loading state if roles are still loading */}
-          {rolesLoading ? (
+          {permsLoading ? (
             <div style={{ padding: 40, textAlign: "center" }}>
               <p style={{ color: "var(--coral-text-muted)" }}>Loading permissions...</p>
             </div>
           ) : (
-            /* Render content - try Outlet first, fallback to direct rendering if needed */
-            (() => {
-              // If we're on an admin route, try Outlet first
-              if (location.pathname.startsWith("/admin")) {
-                // Check if Outlet rendered anything by checking if we're still on an admin route after a brief moment
-                return <Outlet />;
-              }
-              return (
-                <div style={{ padding: 20, textAlign: "center" }}>
-                  <p>Route mismatch: {location.pathname}</p>
-                  <button onClick={() => navigate("/admin")}>Go to Admin Overview</button>
-                </div>
-              );
-            })()
+            <Outlet />
           )}
         </div>
       </div>
     </div>
   );
 }
+
+
+
+
+
+
 

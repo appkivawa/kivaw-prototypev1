@@ -1,5 +1,6 @@
 import { serve } from "https://deno.land/std@0.224.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
+import { logHealthEvent } from "./_shared/logHealthEvent.ts";
 
 // ============================================================
 // CORS Headers
@@ -33,6 +34,7 @@ type OpenLibraryDoc = {
   first_sentence?: string | string[];
   cover_i?: number;
   edition_key?: string[];
+  first_publish_year?: number;
   [key: string]: unknown;
 };
 
@@ -68,7 +70,8 @@ async function fetchOpenLibrary(
   // Build query - default to popular books if no query provided
   const searchQuery = query || "popular";
   params.append("q", searchQuery);
-  params.append("limit", String(Math.min(limit, 100))); // Open Library max is 100
+  params.append("limit", String(Math.min(limit * 3, 100))); // Fetch more to filter by year
+  params.append("sort", "new"); // Sort by newest first when available
 
   const url = `${baseUrl}?${params.toString()}`;
   
@@ -91,7 +94,75 @@ async function fetchOpenLibrary(
   }
 
   const data: OpenLibraryResponse = await response.json();
-  return data.docs || [];
+  const allDocs = data.docs || [];
+  
+  // Filter to modern books (2000+), exclude obvious classics (< 1950)
+  // Prioritize very recent (2020+), then 2010+, then 2000+
+  const veryRecent = allDocs.filter((doc) => {
+    const year = doc.first_publish_year;
+    return year && typeof year === "number" && year >= 2020 && year >= 1950;
+  });
+  
+  // Sort by year descending (newest first)
+  veryRecent.sort((a, b) => {
+    const yearA = (a.first_publish_year as number) || 0;
+    const yearB = (b.first_publish_year as number) || 0;
+    return yearB - yearA;
+  });
+  
+  if (veryRecent.length >= limit) {
+    return veryRecent.slice(0, limit);
+  }
+  
+  // Fallback to 2010+ if not enough 2020+ books
+  const modern2010 = allDocs.filter((doc) => {
+    const year = doc.first_publish_year;
+    return year && typeof year === "number" && year >= 2010 && year >= 1950;
+  });
+  
+  // Sort by year descending
+  modern2010.sort((a, b) => {
+    const yearA = (a.first_publish_year as number) || 0;
+    const yearB = (b.first_publish_year as number) || 0;
+    return yearB - yearA;
+  });
+  
+  if (modern2010.length >= limit) {
+    return modern2010.slice(0, limit);
+  }
+  
+  // Final fallback to 2000+ if still not enough (but still exclude < 1950)
+  const modern2000 = allDocs.filter((doc) => {
+    const year = doc.first_publish_year;
+    return year && typeof year === "number" && year >= 2000 && year >= 1950;
+  });
+  
+  modern2000.sort((a, b) => {
+    const yearA = (a.first_publish_year as number) || 0;
+    const yearB = (b.first_publish_year as number) || 0;
+    return yearB - yearA;
+  });
+  
+  return modern2000.slice(0, limit);
+}
+
+// Fetch Work or Edition details for description
+async function fetchOpenLibraryDetails(workKey: string): Promise<{ description?: string | { value?: string } } | null> {
+  try {
+    // Try Work endpoint first (e.g., /works/OL27448W.json)
+    const workUrl = `https://openlibrary.org${workKey.startsWith("/") ? workKey : `/${workKey}`}.json`;
+    const response = await fetch(workUrl, {
+      headers: { "Accept": "application/json" },
+    });
+    
+    if (response.ok) {
+      const data = await response.json();
+      return data;
+    }
+  } catch (e) {
+    // Fail silently
+  }
+  return null;
 }
 
 function normalizeOpenLibraryBook(doc: OpenLibraryDoc): NormalizedContent {
@@ -125,6 +196,9 @@ function normalizeOpenLibraryBook(doc: OpenLibraryDoc): NormalizedContent {
     ? `https://openlibrary.org${doc.key}`
     : null;
 
+  // Extract first_publish_year from raw doc
+  const firstPublishYear = (doc as any).first_publish_year;
+
   return {
     provider: "open_library",
     provider_id: providerId,
@@ -133,7 +207,10 @@ function normalizeOpenLibraryBook(doc: OpenLibraryDoc): NormalizedContent {
     description: description,
     image_url: imageUrl,
     url: url,
-    raw: doc as Record<string, unknown>,
+    raw: {
+      ...(doc as Record<string, unknown>),
+      first_publish_year: firstPublishYear,
+    },
   };
 }
 
@@ -154,11 +231,32 @@ serve(async (req) => {
   // Handle OPTIONS preflight
   if (req.method === "OPTIONS") return new Response("ok", { headers: corsHeaders });
 
+  // Smoke test
+  if (req.method === "GET") {
+    return jsonResponse({ ok: true, fn: "fetch-open-library", version: "2026-01-27" });
+  }
+
+  const startTime = Date.now();
+  let supabase: ReturnType<typeof createClient> | null = null;
+
   try {
+    // Check CRON_SECRET if set (for internal cron calls)
+    const CRON_SECRET = (Deno.env.get("CRON_SECRET") ?? "").trim();
+    if (CRON_SECRET) {
+      const got = (req.headers.get("x-cron-secret") ?? "").trim();
+      if (got !== CRON_SECRET) {
+        // Allow service role key as fallback (for direct calls)
+        const authHeader = req.headers.get("Authorization");
+        if (!authHeader || !authHeader.includes("Bearer")) {
+          return jsonResponse({ error: "Forbidden: Missing or invalid x-cron-secret" }, 403);
+        }
+      }
+    }
+
     // Get Supabase client
     const supabaseUrl = Deno.env.get("SUPABASE_URL")!;
     const supabaseServiceKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
-    const supabase = createClient(supabaseUrl, supabaseServiceKey);
+    supabase = createClient(supabaseUrl, supabaseServiceKey);
 
     // Parse request body
     const body: OpenLibraryRequest = await req.json().catch(() => ({}));
@@ -184,8 +282,8 @@ serve(async (req) => {
     // Fetch books from Open Library
     const books = await fetchOpenLibrary(query, limit);
 
-    // Normalize and upsert to cache
-    const normalizedContent = books
+    // Normalize first (without descriptions from detail endpoints)
+    let normalizedContent = books
       .map((doc) => {
         try {
           return normalizeOpenLibraryBook(doc);
@@ -195,6 +293,37 @@ serve(async (req) => {
         }
       })
       .filter((item): item is NormalizedContent => item !== null);
+
+    // For selected items, fetch Work details to get descriptions
+    // Only fetch for final selected set (not all results)
+    for (const content of normalizedContent) {
+      const workKey = content.raw?.key as string | undefined;
+      if (workKey && !content.description) {
+        try {
+          const details = await fetchOpenLibraryDetails(workKey);
+          if (details?.description) {
+            // Extract description - can be string or {value: string}
+            let desc: string | null = null;
+            if (typeof details.description === "string") {
+              desc = details.description;
+            } else if (details.description && typeof details.description === "object" && "value" in details.description) {
+              desc = String(details.description.value || "");
+            }
+            
+            if (desc) {
+              content.description = desc;
+              // Also update raw
+              content.raw = {
+                ...content.raw,
+                description: desc,
+              };
+            }
+          }
+        } catch (e) {
+          // Fail silently - continue with existing description or null
+        }
+      }
+    }
     
     const cacheInserts = normalizedContent.map((content) => ({
       provider: content.provider,
@@ -264,11 +393,38 @@ serve(async (req) => {
     return jsonResponse({
       items: normalizedContent,
     });
+    
+    const durationMs = Date.now() - startTime;
+    await logHealthEvent(supabase, {
+      jobName: "fetch-open-library",
+      status: "ok",
+      durationMs,
+      metadata: {
+        items: normalizedContent.length,
+      },
+    });
+    
+    return jsonResponse({
+      ok: true,
+      items: normalizedContent,
+    });
   } catch (error) {
     console.error("Error in fetch-open-library:", error);
+    const durationMs = Date.now() - startTime;
+    const errorMsg = error instanceof Error ? error.message : "Unknown error";
+    
+    if (supabase) {
+      await logHealthEvent(supabase, {
+        jobName: "fetch-open-library",
+        status: "fail",
+        durationMs,
+        errorMessage: errorMsg,
+      });
+    }
+    
     return jsonResponse(
       {
-        error: error instanceof Error ? error.message : "Unknown error",
+        error: errorMsg,
       },
       500
     );

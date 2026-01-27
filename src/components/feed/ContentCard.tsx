@@ -107,8 +107,8 @@ export default function ContentCard({ item, index = 0, featured = false }: Conte
             .from("saved_items")
             .delete()
             .eq("user_id", sessionData.session.user.id)
-            .eq("content_id", item.id)
-            .catch(() => {});
+            .eq("content_id", item.id);
+          // Ignore errors silently
         }
       } else {
         saveLocal(item.id);
@@ -119,8 +119,8 @@ export default function ContentCard({ item, index = 0, featured = false }: Conte
             .from("saved_items")
             .upsert([{ user_id: sessionData.session.user.id, content_id: item.id }], {
               onConflict: "user_id,content_id",
-            })
-            .catch(() => {});
+            });
+          // Ignore errors silently
         }
       }
     } catch (error) {

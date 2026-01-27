@@ -3,6 +3,7 @@ import { supabase } from "../lib/supabaseClient";
 import Card from "../ui/Card";
 import { useRoles } from "../auth/useRoles";
 import { useSession } from "../auth/useSession";
+import { DEV_ADMIN_EMAILS } from "../lib/env";
 
 /**
  * Admin Debug Page - Diagnostic tool to help debug admin access issues
@@ -163,10 +164,10 @@ export default function AdminDebug() {
                   {JSON.stringify(
                     {
                       DEV: import.meta.env.DEV,
-                      VITE_DEV_ADMIN_EMAILS: import.meta.env.VITE_DEV_ADMIN_EMAILS,
-                      parsedEmails: import.meta.env.VITE_DEV_ADMIN_EMAILS?.split(",").map((e: string) => e.trim()).filter(Boolean) || [],
+                      VITE_DEV_ADMIN_EMAILS: DEV_ADMIN_EMAILS.join(","),
+                      parsedEmails: DEV_ADMIN_EMAILS,
                       userEmail: session?.user?.email,
-                      emailMatches: import.meta.env.VITE_DEV_ADMIN_EMAILS?.split(",").map((e: string) => e.trim()).some((email: string) => email.toLowerCase() === session?.user?.email?.toLowerCase()) || false,
+                      emailMatches: DEV_ADMIN_EMAILS.some((email: string) => email.toLowerCase() === session?.user?.email?.toLowerCase()),
                     },
                     null,
                     2

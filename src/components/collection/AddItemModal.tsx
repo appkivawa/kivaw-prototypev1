@@ -2,8 +2,14 @@
 // Modal for adding new items to collection
 
 import React, { useState } from "react";
-import { saveItem } from "../../data/savesApi";
+import { supabase } from "../../lib/supabaseClient";
+import { saveLocal } from "../../data/savedLocal";
 import { showToast } from "../ui/Toast";
+
+// Generate unique ID for manual items
+function generateId(): string {
+  return `manual_${Date.now()}_${Math.random().toString(36).substring(2, 9)}`;
+}
 
 interface AddItemModalProps {
   isOpen: boolean;
@@ -21,25 +27,107 @@ export default function AddItemModal({ isOpen, onClose, onItemAdded }: AddItemMo
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
     if (!title.trim()) {
-      showToast("Title is required", "error");
+      showToast("Title is required");
       return;
     }
 
     setLoading(true);
     try {
-      // For now, we'll create a placeholder item
-      // In a real implementation, this would:
-      // 1. Fetch metadata from URL if provided
-      // 2. Create a content_item in the database
-      // 3. Save it to saved_items
-      
-      // Since we don't have a content_item ID yet, we'll show a message
-      showToast("Add item functionality coming soon. Use the Save button on items in your feed.", "info");
+      // Get user ID if logged in
+      const { data: sessionData } = await supabase.auth.getSession();
+      const userId = sessionData.session?.user?.id;
+
+      if (userId) {
+        // For logged-in users, try to create a content_item first, then save it
+        // Generate a unique external_id
+        const externalId = generateId();
+        
+        // Try to insert into content_items (may fail due to RLS, that's ok)
+        const { data: contentItem, error: contentError } = await supabase
+          .from("content_items")
+          .insert({
+            external_id: externalId,
+            kind: "manual",
+            title: title.trim(),
+            byline: null,
+            meta: url ? { url } : null,
+            image_url: null,
+            url: url || null,
+            source: "manual",
+            state_tags: [],
+            focus_tags: [],
+            usage_tags: [],
+          })
+          .select("id")
+          .single();
+
+        if (contentItem?.id) {
+          // Successfully created content_item, now save it
+          const { error: saveError } = await supabase
+            .from("saves_v2")
+            .insert({
+              user_id: userId,
+              content_item_id: contentItem.id,
+            });
+
+          if (saveError) {
+            console.warn("Failed to save item:", saveError);
+            showToast("Item created but couldn't be saved. Please try again.");
+            return;
+          }
+        } else if (contentError) {
+          // If content_items insert fails (RLS), save to saved_items with metadata
+          const { error: savedError } = await supabase
+            .from("saved_items")
+            .insert({
+              user_id: userId,
+              content_id: externalId, // Use external_id as content_id
+              metadata: {
+                title: title.trim(),
+                url: url || null,
+                source: "manual",
+                kind: "manual",
+                created_at: new Date().toISOString(),
+              },
+            });
+
+          if (savedError) {
+            console.error("Failed to save item:", savedError);
+            showToast("Failed to add item. Please try again.");
+            return;
+          }
+        }
+      } else {
+        // For non-logged-in users, save to local storage
+        const itemId = generateId();
+        saveLocal(itemId);
+        
+        // Also store item details in a separate local storage key
+        try {
+          const manualItemsKey = "kivaw_manual_items_v1";
+          const existing = JSON.parse(localStorage.getItem(manualItemsKey) || "[]");
+          existing.push({
+            id: itemId,
+            title: title.trim(),
+            url: url || null,
+            source: "manual",
+            kind: "manual",
+            created_at: new Date().toISOString(),
+          });
+          localStorage.setItem(manualItemsKey, JSON.stringify(existing));
+        } catch (e) {
+          console.warn("Failed to store manual item details:", e);
+        }
+      }
+
+      showToast("Item added to your collection");
       onClose();
       setUrl("");
       setTitle("");
+      onItemAdded(); // Refresh the collection list
     } catch (error: any) {
-      showToast(error?.message || "Failed to add item", "error");
+      console.error("Error adding item:", error);
+      showToast(error?.message || "Failed to add item");
     } finally {
       setLoading(false);
     }

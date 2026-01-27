@@ -2,7 +2,7 @@ import React, { useState, useMemo } from "react";
 import CalendarGrid from "./CalendarGrid";
 import DayDrawer from "./DayDrawer";
 import { type EchoWithContent } from "../../data/echoApi";
-import type { SavedItem } from "../../pages/Timeline";
+import type { SavedItem } from "../../pages/Collection";
 
 type CalendarViewMode = "month" | "week";
 type ViewMode = "echo" | "saved";
