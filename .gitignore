@@ -31,3 +31,6 @@ dist-ssr
 *.sln
 *.sw?
 .vercel
+
+# Supabase temp
+supabase/.temp/

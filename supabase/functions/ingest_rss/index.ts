@@ -1,106 +1,54 @@
 // supabase/functions/ingest_rss/index.ts
-import { serve } from "https://deno.land/std@0.224.0/http/server.ts";
+import "jsr:@supabase/functions-js/edge-runtime.d.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 import { XMLParser } from "https://esm.sh/fast-xml-parser@4.4.1";
-import { logHealthEvent } from "../_shared/logHealthEvent.ts";
-import { logIngestionRun } from "../_shared/logIngestionRun.ts";
 
 // --------------------
 // CORS
 // --------------------
 const corsHeaders: Record<string, string> = {
   "Access-Control-Allow-Origin": "*",
-  "Access-Control-Allow-Headers":
-    "authorization, apikey, x-client-info, content-type, x-ingest-secret",
   "Access-Control-Allow-Methods": "GET, POST, OPTIONS",
+  "Access-Control-Allow-Headers":
+    "authorization, x-ingest-secret, x-client-info, apikey, content-type",
   "Access-Control-Max-Age": "86400",
 };
 
-function withCors(res: Response) {
-  const h = new Headers(res.headers);
-  for (const [k, v] of Object.entries(corsHeaders)) h.set(k, v);
-  return new Response(res.body, { status: res.status, headers: h });
-}
-
-function json(body: unknown, status = 200) {
-  return withCors(
-    new Response(JSON.stringify(body), {
-      status,
-      headers: { "Content-Type": "application/json" },
-    }),
-  );
+function json(status: number, body: unknown) {
+  return new Response(JSON.stringify(body), {
+    status,
+    headers: { ...corsHeaders, "Content-Type": "application/json" },
+  });
 }
 
 // --------------------
 // Helpers
 // --------------------
-function decodeHtmlEntities(input: string): string {
-  let s = input;
-
-  s = s.replace(/&#(\d+);/g, (_, n) => {
-    const code = Number(n);
-    return Number.isFinite(code) ? String.fromCharCode(code) : _;
-  });
-  s = s.replace(/&#x([0-9a-fA-F]+);/g, (_, hex) => {
-    const code = parseInt(hex, 16);
-    return Number.isFinite(code) ? String.fromCharCode(code) : _;
-  });
-
-  const map: Record<string, string> = {
-    "&amp;": "&",
-    "&lt;": "<",
-    "&gt;": ">",
-    "&quot;": '"',
-    "&apos;": "'",
-    "&nbsp;": " ",
-    "&mdash;": "—",
-    "&ndash;": "–",
-    "&hellip;": "…",
-  };
-  for (const k of Object.keys(map)) s = s.split(k).join(map[k]);
-
-  // common mojibake
-  s = s
-    .split("â€™").join("’")
-    .split("â€œ").join("“")
-    .split("â€�").join("”")
-    .split("â€“").join("–")
-    .split("â€”").join("—")
-    .split("â€¦").join("…");
-
-  // common "Â" junk
-  s = s.replace(/\u00c2/g, "");
-
-  return s;
-}
-
-function stripHtml(html?: string | null): string {
-  const s = String(html ?? "");
-  return s.replace(/<[^>]*>/g, " ");
-}
-
-function normalizeText(v: any): string {
-  if (v == null) return "";
-  if (typeof v !== "string") {
-    if (typeof v === "object") {
-      if (Array.isArray(v)) return v.map(normalizeText).filter(Boolean).join(" ").trim();
-      return normalizeText(v["#text"] ?? v.text ?? v.value ?? JSON.stringify(v));
+function cleanText(s?: string | null | any) {
+  if (s == null) return "";
+  if (typeof s !== "string") {
+    if (typeof s === "object") {
+      if (Array.isArray(s)) {
+        return s
+          .map((item) => cleanText(item))
+          .filter(Boolean)
+          .join(" ")
+          .replace(/\s+/g, " ")
+          .trim();
+      }
+      return cleanText(s["#text"] ?? s.text ?? s.value ?? JSON.stringify(s));
     }
-    return String(v);
+    return String(s).replace(/\s+/g, " ").trim();
   }
+  return s.replace(/\s+/g, " ").trim();
+}
 
-  let s = v;
-  s = decodeHtmlEntities(s);
-  s = stripHtml(s);
-
-  // strip control chars
-  s = s.replace(/[\u0000-\u0008\u000B\u000C\u000E-\u001F\u007F]/g, "");
-
-  // strip zero-width + bidi marks (these cause “invisible garbage”)
-  s = s.replace(/[\u200B-\u200F\u202A-\u202E\u2060-\u206F\uFEFF]/g, "");
-
-  s = s.replace(/\s+/g, " ").trim();
-  return s;
+function toIsoDate(v: any): string | null {
+  const s = cleanText(String(v ?? ""));
+  if (!s) return null;
+  const t = new Date(s).getTime();
+  if (!Number.isFinite(t)) return null;
+  return new Date(t).toISOString();
 }
 
 function pickFirst<T>(v: T | T[] | undefined | null): T | null {
@@ -108,219 +56,414 @@ function pickFirst<T>(v: T | T[] | undefined | null): T | null {
   return (v ?? null) as T | null;
 }
 
-// Strict date parsing: returns ISO string and milliseconds, or null if invalid
-function parsePublishedDate(v: any): { iso: string; ms: number } | null {
-  const s = normalizeText(String(v ?? ""));
-  if (!s) return null;
-  
-  const date = new Date(s);
-  const ms = date.getTime();
-  
-  // Validate: must be a valid date and not invalid (NaN)
-  if (!Number.isFinite(ms)) return null;
-  
-  // Validate: date must be reasonable (not too far in past/future)
-  // Reject dates before 1970 or more than 1 year in the future
-  const now = Date.now();
-  const oneYearFromNow = now + 365 * 24 * 60 * 60 * 1000;
-  if (ms < 0 || ms > oneYearFromNow) return null;
-  
-  return { iso: date.toISOString(), ms };
+function extractImage(item: any): string | null {
+  const mediaThumb =
+    item?.["media:thumbnail"]?.["@_url"] ?? item?.["media:thumbnail"]?.url;
+  const mediaContent =
+    item?.["media:content"]?.["@_url"] ?? item?.["media:content"]?.url;
+  const enclosure = item?.enclosure?.["@_url"] ?? item?.enclosure?.url;
+
+  const img =
+    cleanText(mediaThumb) ||
+    cleanText(mediaContent) ||
+    cleanText(enclosure) ||
+    null;
+
+  if (!img) return null;
+  if (!/^https?:\/\//i.test(img)) return null;
+  return img;
 }
 
-function looksLikeImageUrl(url: string): boolean {
-  const u = url.toLowerCase();
-  if (!/^https?:\/\//i.test(u)) return false;
-  if (u.includes("doubleclick") || u.includes("adservice")) return false;
-  if (u.includes("pixel") || u.includes("1x1")) return false;
+function stripHtml(html?: string | null): string {
+  const s = String(html ?? "");
+  return cleanText(s.replace(/<[^>]*>/g, " "));
+}
 
-  if (/\.(jpg|jpeg|png|gif|webp|bmp)(\?|#|$)/i.test(u)) return true;
+// Normalize feed URLs so we don't treat the same feed as multiple sources
+// (e.g. trailing slash differences, host casing, default ports).
+function normalizeFeedUrl(input: string): string {
+  const trimmed = cleanText(input);
+  if (!trimmed) return "";
 
-  if (u.includes("image") || u.includes("img") || u.includes("thumb") || u.includes("thumbnail")) return true;
+  try {
+    const u = new URL(trimmed);
 
+    u.protocol = u.protocol.toLowerCase();
+    u.hostname = u.hostname.toLowerCase();
+
+    // remove default ports
+    if (
+      (u.protocol === "https:" && u.port === "443") ||
+      (u.protocol === "http:" && u.port === "80")
+    ) {
+      u.port = "";
+    }
+
+    // remove trailing slash (not root)
+    if (u.pathname !== "/" && u.pathname.endsWith("/")) {
+      u.pathname = u.pathname.slice(0, -1);
+    }
+
+    return u.toString();
+  } catch {
+    // If URL parsing fails, fall back to trimmed string.
+    return trimmed;
+  }
+}
+
+function normalizeTag(tag: string | null | undefined): string | null {
+  if (!tag || typeof tag !== "string") return null;
+  let normalized = tag.trim().toLowerCase();
+  if (!normalized) return null;
+  normalized = normalized.replace(/[\s_]+/g, "-");
+  normalized = normalized.replace(/[^a-z0-9\-\.]/g, "");
+  normalized = normalized.replace(/^[\-\.]+|[\-\.]+$/g, "");
+  if (normalized.length < 2 || normalized.length > 50) return null;
+  return normalized;
+}
+
+function normalizeTags(tags: (string | null | undefined)[]): string[] {
+  const normalized = tags
+    .map(normalizeTag)
+    .filter((t): t is string => t !== null);
+  return Array.from(new Set(normalized));
+}
+
+function extractKeywordsFromText(
+  text: string | null | undefined,
+  maxKeywords = 5
+): string[] {
+  if (!text || typeof text !== "string") return [];
+  const clean = text.replace(/<[^>]*>/g, " ").replace(/\s+/g, " ").trim();
+  if (!clean) return [];
+  const stopWords = new Set([
+    "the",
+    "a",
+    "an",
+    "and",
+    "or",
+    "but",
+    "in",
+    "on",
+    "at",
+    "to",
+    "for",
+    "of",
+    "with",
+    "by",
+    "from",
+    "as",
+    "is",
+    "was",
+    "are",
+    "were",
+    "be",
+    "been",
+    "being",
+    "have",
+    "has",
+    "had",
+    "do",
+    "does",
+    "did",
+    "will",
+    "would",
+    "could",
+    "should",
+    "may",
+    "might",
+    "must",
+    "can",
+    "this",
+    "that",
+    "these",
+    "those",
+    "it",
+    "its",
+    "they",
+    "them",
+    "their",
+    "what",
+    "which",
+    "who",
+    "when",
+    "where",
+    "why",
+    "how",
+    "all",
+    "each",
+    "every",
+    "some",
+    "any",
+    "no",
+    "not",
+    "only",
+    "just",
+    "more",
+    "most",
+    "very",
+    "too",
+    "so",
+    "than",
+    "then",
+    "there",
+    "here",
+    "up",
+    "down",
+    "out",
+    "off",
+    "over",
+    "under",
+    "again",
+    "further",
+    "once",
+    "twice",
+  ]);
+  const words = clean
+    .toLowerCase()
+    .split(/\s+/)
+    .map((w) => w.replace(/[^a-z0-9]/g, ""))
+    .filter((w) => w.length >= 3 && !stopWords.has(w));
+
+  const freq = new Map<string, number>();
+  for (const word of words) freq.set(word, (freq.get(word) || 0) + 1);
+
+  const sorted = Array.from(freq.entries())
+    .sort((a, b) => (b[1] !== a[1] ? b[1] - a[1] : a[0].localeCompare(b[0])))
+    .slice(0, maxKeywords)
+    .map(([word]) => word);
+
+  return normalizeTags(sorted);
+}
+
+// Stable hash for dedupe keys
+async function sha1(input: string) {
+  const data = new TextEncoder().encode(input);
+  const hash = await crypto.subtle.digest("SHA-1", data);
+  return Array.from(new Uint8Array(hash))
+    .map((b) => b.toString(16).padStart(2, "0"))
+    .join("");
+}
+
+// Per-feed fetch timeout so one bad feed doesn't hang the run
+async function fetchWithTimeout(url: string, ms: number) {
+  const controller = new AbortController();
+  const t = setTimeout(() => controller.abort(), ms);
+  try {
+    return await fetch(url, { signal: controller.signal });
+  } finally {
+    clearTimeout(t);
+  }
+}
+
+// --------------------
+// Auth gate
+// --------------------
+function isLocalDev(req: Request): boolean {
+  // Request URL (Kong may rewrite this internally, so not always reliable)
+  try {
+    const u = new URL(req.url);
+    const host = (u.hostname ?? "").toLowerCase();
+    if (host === "127.0.0.1" || host === "localhost") return true;
+  } catch {
+    // ignore
+  }
+  // Host header (when curling 127.0.0.1:54321; Kong may rewrite this when forwarding)
+  const hostHeader = (req.headers.get("Host") ?? "").toLowerCase();
+  if (hostHeader.startsWith("127.0.0.1") || hostHeader.startsWith("localhost"))
+    return true;
+  // X-Forwarded-Host (Kong often preserves original client host here)
+  const forwardedHost = (req.headers.get("X-Forwarded-Host") ?? "")
+    .toLowerCase()
+    .split(",")[0]
+    .trim();
+  if (forwardedHost.startsWith("127.0.0.1") || forwardedHost.startsWith("localhost"))
+    return true;
+  // SUPABASE_URL in local dev (may be set to gateway URL)
+  const supabaseUrl = (Deno.env.get("SUPABASE_URL") ?? "").trim();
+  if (
+    supabaseUrl.includes("127.0.0.1") ||
+    supabaseUrl.includes("localhost") ||
+    (supabaseUrl.includes("http://") && supabaseUrl.includes(":54321"))
+  )
+    return true;
+  // Explicit local override: set LOCAL_DEV=1 in supabase/functions/.env (see .env.example)
+  if (Deno.env.get("LOCAL_DEV") === "1") return true;
   return false;
 }
 
-function extractImageIfValid(item: any): string | null {
-  const candidates: any[] = [];
-
-  candidates.push(item?.["media:thumbnail"]?.["@_url"]);
-  candidates.push(item?.["media:thumbnail"]?.url);
-  candidates.push(item?.["media:content"]?.["@_url"]);
-  candidates.push(item?.["media:content"]?.url);
-
-  candidates.push(item?.enclosure?.["@_url"]);
-  candidates.push(item?.enclosure?.url);
-
-  candidates.push(item?.["itunes:image"]?.["@_href"]);
-  candidates.push(item?.image?.url);
-
-  for (const c of candidates) {
-    const u = normalizeText(c);
-    if (u && looksLikeImageUrl(u)) return u;
+async function authorize(req: Request, authClient: ReturnType<typeof createClient>) {
+  // ✅ LOCAL DEV BYPASS: no JWT/secret required when request is to localhost (Supabase local).
+  if (isLocalDev(req)) {
+    console.log("[ingest_rss] local dev auth bypass (request to localhost/127.0.0.1)");
+    return { ok: true as const, mode: "local" as const, userId: null as string | null };
   }
-  return null;
-}
 
-function hostFromUrl(u: string): string {
-  try {
-    return new URL(u).hostname.replace(/^www\./, "");
-  } catch {
-    return "rss";
+  // Secret mode (cron/curl)
+  const ingestSecret = (Deno.env.get("INGEST_SECRET") ?? "").trim();
+  const gotSecret = (req.headers.get("x-ingest-secret") ?? "").trim();
+
+  if (ingestSecret && gotSecret && gotSecret === ingestSecret) {
+    return { ok: true as const, mode: "secret" as const, userId: null as string | null };
   }
-}
 
-// Extract meta description from HTML
-async function fetchArticleDescription(url: string, timeoutMs = 4000): Promise<string | null> {
-  try {
-    const controller = new AbortController();
-    const timeoutId = setTimeout(() => controller.abort(), timeoutMs);
-
-    const response = await fetch(url, {
-      signal: controller.signal,
-      headers: {
-        "User-Agent": "KivawRSSBot/1.0 (+https://kivaw.com)",
-        "Accept": "text/html",
-      },
-    });
-
-    clearTimeout(timeoutId);
-
-    if (!response.ok) return null;
-
-    const html = await response.text();
-    
-    // Extract og:description
-    const ogMatch = html.match(/<meta\s+property=["']og:description["']\s+content=["']([^"']+)["']/i);
-    if (ogMatch && ogMatch[1]) {
-      return normalizeText(ogMatch[1]).slice(0, 400);
-    }
-
-    // Extract meta name="description"
-    const metaMatch = html.match(/<meta\s+name=["']description["']\s+content=["']([^"']+)["']/i);
-    if (metaMatch && metaMatch[1]) {
-      return normalizeText(metaMatch[1]).slice(0, 400);
-    }
-
-    return null;
-  } catch (e) {
-    // Timeout or network error - fail silently
-    return null;
+  // JWT admin mode
+  const authHeader = req.headers.get("Authorization") || "";
+  if (!authHeader.startsWith("Bearer ")) {
+    return { ok: false as const, status: 401, error: "Missing Authorization Bearer token" };
   }
-}
 
-// RSS freshness threshold: 7 days (configurable)
-const MAX_AGE_DAYS = 7;
+  const { data: userData, error: userErr } = await authClient.auth.getUser();
+  if (userErr || !userData?.user) {
+    return {
+      ok: false as const,
+      status: 401,
+      error: "Invalid session token",
+      details: userErr?.message,
+    };
+  }
+
+  const userId = userData.user.id;
+
+  const { data: isAdmin, error: adminErr } = await authClient.rpc("is_admin", { check_uid: userId });
+  if (adminErr) {
+    return { ok: false as const, status: 500, error: "Admin check failed", details: adminErr.message };
+  }
+  if (!isAdmin) {
+    return { ok: false as const, status: 403, error: "Forbidden: admin only" };
+  }
+
+  return { ok: true as const, mode: "jwt" as const, userId };
+}
 
 // --------------------
 // Main
 // --------------------
-serve(async (req) => {
-  if (req.method === "OPTIONS") {
-    return withCors(new Response(null, { status: 204 }));
-  }
+Deno.serve(async (req) => {
+  if (req.method === "OPTIONS") return new Response("ok", { headers: corsHeaders });
+  if (req.method === "GET") return json(200, { ok: true, fn: "ingest_rss" });
+  if (req.method !== "POST") return json(405, { error: "POST only" });
 
-  const startTime = Date.now();
-  const startedAtISO = new Date().toISOString();
-  let supabase: ReturnType<typeof createClient> | null = null;
-  let runId: string | null = null;
+  const startedAll = Date.now();
 
   try {
-    if (req.method === "GET") {
-      return json({ ok: true, fn: "ingest_rss", version: "2026-01-26-explicit-content_kind-provider" });
-    }
-
-    // Initialize supabase early for error logging
     const SUPABASE_URL = Deno.env.get("SUPABASE_URL") ?? "";
     const SERVICE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") ?? "";
     if (!SUPABASE_URL || !SERVICE_KEY) {
-      return json({ error: "Missing SUPABASE_URL or SUPABASE_SERVICE_ROLE_KEY" }, 500);
+      return json(500, { error: "Missing SUPABASE_URL or SUPABASE_SERVICE_ROLE_KEY" });
     }
-    supabase = createClient(SUPABASE_URL, SERVICE_KEY, {
+
+    const userAuthHeader = req.headers.get("Authorization") || "";
+
+    const authClient = createClient(SUPABASE_URL, SERVICE_KEY, {
+      auth: { persistSession: false },
+      global: userAuthHeader ? { headers: { Authorization: userAuthHeader } } : undefined,
+    });
+
+    const dbClient = createClient(SUPABASE_URL, SERVICE_KEY, {
       auth: { persistSession: false },
     });
 
-    // Log start of ingestion run
-    await logIngestionRun(supabase, {
-      jobName: "ingest_rss",
-      status: "running",
-      startedAt: startedAtISO,
-    });
-
-    if (req.method !== "POST") return json({ error: "Method not allowed" }, 405);
-
-    // Check CRON_SECRET if set (for internal cron calls)
-    const CRON_SECRET = (Deno.env.get("CRON_SECRET") ?? "").trim();
-    if (CRON_SECRET) {
-      const got = (req.headers.get("x-cron-secret") ?? "").trim();
-      if (got !== CRON_SECRET) {
-        // Allow service role key as fallback (for direct calls)
-        const authHeader = req.headers.get("Authorization");
-        if (!authHeader || !authHeader.includes("Bearer")) {
-          return json({ error: "Forbidden: Missing or invalid x-cron-secret" }, 403);
-        }
-      }
-    }
-
-    const INGEST_SECRET = (Deno.env.get("INGEST_SECRET") ?? "").trim();
-    if (INGEST_SECRET) {
-      const got = (req.headers.get("x-ingest-secret") ?? "").trim();
-      if (got !== INGEST_SECRET) return json({ error: "Forbidden" }, 403);
-    }
+    const authz = await authorize(req, authClient);
+    if (!authz.ok) return json(authz.status, authz);
 
     const body = await req.json().catch(() => ({}));
+
     const maxFeeds =
       typeof body.maxFeeds === "number" ? Math.min(Math.max(body.maxFeeds, 1), 50) : 25;
+
     const perFeedLimit =
-      typeof body.perFeedLimit === "number" ? Math.min(Math.max(body.perFeedLimit, 25), 200) : 100;
+      typeof body.perFeedLimit === "number"
+        ? Math.min(Math.max(body.perFeedLimit, 100), 200)
+        : 100;
 
-    // Pull feeds
-    const allUrls = new Set<string>();
+    // Load feeds
+    let feeds: string[] = [];
 
-    const { data: sourcesData } = await supabase
-      .from("sources")
-      .select("url, is_active")
-      .eq("type", "rss")
-      .eq("enabled", true);
+    if (Array.isArray(body.urls) && body.urls.length > 0) {
+      feeds = body.urls
+        .map((url: any) => normalizeFeedUrl(cleanText(String(url ?? ""))))
+        .filter((url: string) => {
+          try {
+            new URL(url);
+            return true;
+          } catch {
+            return false;
+          }
+        })
+        .slice(0, maxFeeds);
+    } else {
+      const allUrls = new Set<string>();
 
-    if (sourcesData?.length) {
-      const activeSources = sourcesData.filter((s: any) => !("is_active" in s) || s.is_active !== false);
-      for (const s of activeSources) {
-        const url = normalizeText(String(s.url ?? ""));
-        if (!url) continue;
-        try {
-          new URL(url);
-          allUrls.add(url);
-        } catch {
-          /* skip */
+      let sourcesQuery = dbClient
+        .from("sources")
+        .select("url, is_active")
+        .eq("type", "rss")
+        .eq("enabled", true);
+
+      if (body.user_id) sourcesQuery = sourcesQuery.eq("user_id", body.user_id);
+
+      const { data: sourcesData } = await sourcesQuery;
+      if (sourcesData?.length) {
+        const activeSources = sourcesData.filter((s: any) => {
+          if (!("is_active" in s)) return true;
+          return s.is_active !== false;
+        });
+
+        for (const s of activeSources) {
+          const url = normalizeFeedUrl(cleanText(String(s.url ?? "")));
+          if (!url) continue;
+          try {
+            new URL(url);
+            allUrls.add(url);
+          } catch {
+            // ignore
+          }
         }
       }
-    }
 
-    const { data: defaultSources } = await supabase
-      .from("rss_sources")
-      .select("url")
-      .eq("active", true)
-      .order("weight", { ascending: false })
-      .limit(maxFeeds * 2);
+      const { data: defaultSources } = await dbClient
+        .from("rss_sources")
+        .select("url")
+        .eq("active", true)
+        .order("weight", { ascending: false })
+        .limit(maxFeeds * 2);
 
-    if (defaultSources?.length) {
-      for (const s of defaultSources) {
-        const url = normalizeText(String(s.url ?? ""));
-        if (!url) continue;
-        try {
-          new URL(url);
-          allUrls.add(url);
-        } catch {
-          /* skip */
+      if (defaultSources?.length) {
+        for (const s of defaultSources) {
+          const url = normalizeFeedUrl(cleanText(String(s.url ?? "")));
+          if (!url) continue;
+          try {
+            new URL(url);
+            allUrls.add(url);
+          } catch {
+            // ignore
+          }
         }
       }
-    }
 
-    const feeds = Array.from(allUrls).slice(0, maxFeeds);
+      feeds = Array.from(allUrls)
+        .filter((url: string) => {
+          try {
+            new URL(url);
+            return true;
+          } catch {
+            return false;
+          }
+        })
+        .slice(0, maxFeeds);
+    }
 
     if (!feeds.length) {
-      return json({ ok: true, feeds: 0, ingested: 0, note: "No active RSS sources found." });
+      return json(200, {
+        ok: true,
+        ingested: 0,
+        feeds: 0,
+        note: body.urls
+          ? "No valid URLs provided in request body."
+          : "No active RSS sources found in sources or rss_sources tables.",
+        auth: { mode: authz.mode, userId: authz.userId },
+      });
     }
 
     const parser = new XMLParser({
@@ -329,24 +472,20 @@ serve(async (req) => {
       isArray: (name) => name === "item" || name === "entry",
     });
 
+    const SOURCE_TYPE = "rss";
     let totalUpserted = 0;
     const feedResults: any[] = [];
 
-    for (const feedUrl of feeds) {
-      const started = Date.now();
-      const provider = hostFromUrl(feedUrl);
+    for (const feedUrlRaw of feeds) {
+      const feedUrl = normalizeFeedUrl(feedUrlRaw);
+      if (!feedUrl) continue;
 
+      const started = Date.now();
       let fetched = 0;
       let upserted = 0;
 
       try {
-        const res = await fetch(feedUrl, {
-          headers: {
-            "User-Agent": "KivawRSSBot/1.0 (+https://kivaw.com)",
-            "Accept": "application/rss+xml, application/atom+xml, application/xml, text/xml",
-          },
-        });
-
+        const res = await fetchWithTimeout(feedUrl, 15000); // 15s per feed
         if (!res.ok) {
           feedResults.push({ feedUrl, ok: false, error: `Fetch failed: ${res.status} ${res.statusText}` });
           continue;
@@ -361,259 +500,196 @@ serve(async (req) => {
         const items = Array.isArray(rssItems) ? rssItems : [];
         const entries = Array.isArray(atomEntries) ? atomEntries : [];
 
-        // Parse all items and extract publish dates with strict validation
-        const allItems = [
+        const unified = [
           ...items.map((it: any) => ({ kind: "rss", it })),
           ...entries.map((it: any) => ({ kind: "atom", it })),
-        ];
+        ].slice(0, perFeedLimit);
 
-        // Compute cutoff: last 7 days (86400_000 ms per day)
-        const cutoffMs = Date.now() - MAX_AGE_DAYS * 86400_000;
+        fetched = unified.length;
 
-        // Parse dates strictly - skip items with missing/invalid dates
-        const itemsWithDates = allItems
-          .map((u) => {
-            const it = u.it;
-            // Try multiple date fields in order of preference
-            const dateFields = [
-              it.pubDate,
-              it.published,
-              it.updated,
-              it["dc:date"],
-            ];
-            
-            let parsed: { iso: string; ms: number } | null = null;
-            for (const field of dateFields) {
-              parsed = parsePublishedDate(field);
-              if (parsed) break;
-            }
-            
-            // SKIP items with missing/invalid dates (no fallback to now())
-            if (!parsed) return null;
-            
-            return {
-              ...u,
-              publishedISO: parsed.iso,
-              publishedMs: parsed.ms,
-            };
-          })
-          .filter((u): u is NonNullable<typeof u> => u !== null)
-          // Filter to fresh items only (within last 7 days)
-          .filter((u) => u.publishedMs >= cutoffMs)
-          // Sort by published date DESC (newest first)
-          .sort((a, b) => b.publishedMs - a.publishedMs)
-          // Then take limit
-          .slice(0, perFeedLimit);
-
-        fetched = allItems.length; // Total fetched from feed
-        const fresh = itemsWithDates.length; // Items that passed freshness filter
-
-        const rows: any[] = [];
-        let newestPublishedAt: string | null = null;
-        let oldestPublishedAt: string | null = null;
-        
-        for (const u of itemsWithDates) {
+        // Build "pre-rows" first (no hashing yet)
+        const preRows = unified.map((u: any) => {
           const it = u.it;
 
-          const title = normalizeText(pickFirst(it.title)) || "Untitled";
+          const title = cleanText(pickFirst(it.title)) || "Untitled";
 
           const link =
             u.kind === "atom"
-              ? normalizeText(pickFirst(it.link?.["@_href"] ?? it.link?.href ?? it.link))
-              : normalizeText(pickFirst(it.link));
+              ? cleanText(pickFirst(it.link?.["@_href"] ?? it.link?.href ?? it.link))
+              : cleanText(pickFirst(it.link));
 
-          const guid = normalizeText(pickFirst(it.guid?.["#text"] ?? it.guid));
-          const atomId = normalizeText(pickFirst(it.id));
-          const externalId = guid || atomId || link || `${feedUrl}:${title}`;
+          const guid = cleanText(pickFirst(it.guid?.["#text"] ?? it.guid));
+          const atomId = cleanText(pickFirst(it.id));
+          const rawExternal = guid || atomId || link || `${feedUrl}:${title}`;
 
           const author =
             u.kind === "atom"
-              ? normalizeText(pickFirst(it.author?.name ?? it.author))
-              : normalizeText(pickFirst(it["dc:creator"] ?? it.author));
+              ? cleanText(pickFirst(it.author?.name ?? it.author))
+              : cleanText(pickFirst(it["dc:creator"] ?? it.author));
 
-          // Use parsed ISO date (strictly validated)
-          const publishedISO = u.publishedISO;
+          const published = toIsoDate(it.pubDate ?? it.published ?? it.updated ?? it["dc:date"]) ?? null;
+
           const ingestedAt = new Date().toISOString();
 
-          // Track newest/oldest for verification
-          if (!newestPublishedAt || publishedISO > newestPublishedAt) {
-            newestPublishedAt = publishedISO;
-          }
-          if (!oldestPublishedAt || publishedISO < oldestPublishedAt) {
-            oldestPublishedAt = publishedISO;
-          }
+          const summaryRaw =
+            it["content:encoded"] ?? it.content ?? it.summary ?? it.description ?? null;
 
-          let summaryRaw = it["content:encoded"] ?? it.content ?? it.summary ?? it.description ?? null;
-          let summary = normalizeText(summaryRaw);
+          const summary = stripHtml(summaryRaw);
+          const imageUrl = extractImage(it);
 
-          // If summary is missing or too short (< 40 chars), try to fetch from article page
-          // Only run enrichment after freshness filter passes (avoid heavy scraping)
-          if ((!summary || summary.length < 40) && link) {
-            try {
-              const fetchedDesc = await fetchArticleDescription(link);
-              if (fetchedDesc && fetchedDesc.length >= 40) {
-                summary = fetchedDesc;
-              }
-            } catch (e) {
-              // Fail silently - use existing summary or null
-            }
+          const categoryTags: string[] = [];
+          const rssCategories = Array.isArray(it.category)
+            ? it.category
+            : it.category
+              ? [it.category]
+              : [];
+
+          for (const cat of rssCategories) {
+            const catText = cleanText(
+              typeof cat === "string" ? cat : (cat?.["#text"] ?? cat?.term ?? String(cat))
+            );
+            if (catText) categoryTags.push(catText);
           }
 
-          const imageUrl = extractImageIfValid(it);
+          let derivedTags = normalizeTags(categoryTags);
+          if (derivedTags.length < 3) {
+            const text = [title, summary].filter(Boolean).join(" ");
+            const keywords = extractKeywordsFromText(text, 5);
+            derivedTags = Array.from(new Set([...derivedTags, ...keywords])).slice(0, 10);
+          }
+          if (derivedTags.length === 0) derivedTags = ["rss"];
 
-          rows.push({
-            // ✅ explicit, no triggers needed
-            content_kind: "rss",
-            provider, // hostname(feedUrl) with www. stripped
-            source: "rss",
+          let score = 1.0;
+          if (imageUrl) score += 0.3;
+          if (summary && summary.length > 50) score += 0.2;
+          if (author) score += 0.1;
+          if (published) score += 0.2;
+          if (derivedTags.length > 0) score += 0.2;
 
-            external_id: externalId,
+          return {
+            feedUrl,
+            rawExternal,
             url: link || feedUrl,
             title,
             summary: summary ? summary.slice(0, 1200) : null,
             author: author || null,
             image_url: imageUrl || null,
-            published_at: publishedISO, // Store parsed ISO date
+            published_at: published,
             ingested_at: ingestedAt,
-            tags: ["rss"],
-            topics: null,
+            tags: derivedTags,
             is_discoverable: true,
+            score,
+          };
+        });
 
-            // baseline, the explore scoring can boost later
-            score: 1.0,
+        // Batch hash creation (fast + avoids sequential await)
+        const rows = await Promise.all(
+          preRows.map(async (p) => {
+            const source_item_id = await sha1(`${SOURCE_TYPE}:${p.feedUrl}:${p.rawExternal}`);
 
-            metadata: { feed_url: feedUrl, follow_key: `rss:${feedUrl}`, raw_id: externalId },
-          });
+            return {
+              source_type: SOURCE_TYPE,
+              source_item_id,
+
+              // Keep external_id globally unique (you have unique indexes on external_id)
+              external_id: source_item_id,
+
+              url: p.url,
+              title: p.title,
+              summary: p.summary,
+              author: p.author,
+              image_url: p.image_url,
+              published_at: p.published_at,
+              ingested_at: p.ingested_at,
+              tags: p.tags,
+              is_discoverable: p.is_discoverable,
+              score: p.score,
+              metadata: {
+                feed_url: p.feedUrl,
+                raw_id: p.rawExternal,
+              },
+            };
+          })
+        );
+
+        // Deduplicate within batch by (source_type, source_item_id)
+        const dedupeMap = new Map<string, any>();
+        for (const row of rows) {
+          const key = `${row.source_type}:${row.source_item_id}`;
+          if (!dedupeMap.has(key)) dedupeMap.set(key, row);
         }
+        const uniqueRows = Array.from(dedupeMap.values());
 
-        if (!rows.length) {
-          feedResults.push({
-            feedUrl,
-            ok: true,
-            counts: { fetched, fresh: 0, upserted: 0 },
-            newestPublishedAt: null,
-            oldestPublishedAt: null,
-            ms: Date.now() - started,
-          });
-          continue;
-        }
-
-        const dedupe = new Map<string, any>();
-        for (const r of rows) {
-          const key = `${r.source}:${r.external_id}`;
-          if (!dedupe.has(key)) dedupe.set(key, r);
-        }
-        const uniqueRows = Array.from(dedupe.values());
-
-        const { data: upData, error: upErr } = await supabase
+        const { data: upData, error: upErr } = await dbClient
           .from("feed_items")
-          .upsert(uniqueRows, { onConflict: "source,external_id" })
+          .upsert(uniqueRows, { onConflict: "source_type,source_item_id" })
           .select("id");
 
         if (upErr) {
-          feedResults.push({
-            feedUrl,
-            ok: false,
-            error: upErr.message,
-            counts: { fetched, fresh, upserted: 0 },
-            ms: Date.now() - started,
-          });
+          feedResults.push({ feedUrl, ok: false, error: upErr.message, fetched, ms: Date.now() - started });
           continue;
         }
 
         upserted = upData?.length ?? 0;
         totalUpserted += upserted;
 
-        feedResults.push({
-          feedUrl,
-          ok: true,
-          counts: { fetched, fresh, upserted },
-          newestPublishedAt,
-          oldestPublishedAt,
-          ms: Date.now() - started,
-        });
+        feedResults.push({ feedUrl, ok: true, fetched, upserted, ms: Date.now() - started });
       } catch (e: any) {
-        feedResults.push({
-          feedUrl,
-          ok: false,
-          error: e?.message ?? String(e),
-          counts: { fetched: fetched || 0, fresh: 0, upserted: 0 },
-          ms: Date.now() - started,
-        });
+        const msg =
+          e?.name === "AbortError" ? "Fetch timed out" : (e?.message ?? String(e));
+        feedResults.push({ feedUrl, ok: false, error: msg, fetched, ms: Date.now() - started });
       }
     }
 
-    const durationMs = Date.now() - startTime;
-    const finishedAtISO = new Date().toISOString();
-    
-    // Calculate totals from feedResults
-    const totalFetched = feedResults.reduce((sum, r) => sum + (r.counts?.fetched || 0), 0);
-    const totalSkipped = feedResults.reduce((sum, r) => sum + (r.counts?.fetched || 0) - (r.counts?.upserted || 0), 0);
-    
-    const result = { ok: true, feeds: feeds.length, ingested: totalUpserted, results: feedResults };
-    
-    // Log ingestion run (success)
-    await logIngestionRun(supabase, {
-      jobName: "ingest_rss",
-      status: "ok",
-      startedAt: startedAtISO,
-      finishedAt: finishedAtISO,
-      durationMs,
-      feedsProcessed: feeds.length,
-      itemsFetched: totalFetched,
-      itemsUpserted: totalUpserted,
-      itemsSkipped: totalSkipped,
-      metadata: {
-        feedResults: feedResults.length,
-        results: feedResults,
-      },
-    });
-    
-    // Also log health event (for backward compatibility)
-    await logHealthEvent(supabase, {
-      jobName: "ingest_rss",
-      status: "ok",
-      durationMs,
-      metadata: {
-        feeds: feeds.length,
-        ingested: totalUpserted,
-        results: feedResults.length,
-      },
-    });
-    
-    return json(result);
-  } catch (e: any) {
-    const durationMs = Date.now() - startTime;
-    const finishedAtISO = new Date().toISOString();
-    const errorMsg = e?.message ?? String(e);
-    
-    // Log ingestion run (failure)
-    if (supabase) {
-      await logIngestionRun(supabase, {
-        jobName: "ingest_rss",
-        status: "fail",
-        startedAt: startedAtISO,
-        finishedAt: finishedAtISO,
-        durationMs,
-        errorMessage: errorMsg,
-        metadata: {
-          error: errorMsg,
-          stack: e?.stack,
-        },
-      });
-      
-      // Also log health event (for backward compatibility)
-      await logHealthEvent(supabase, {
-        jobName: "ingest_rss",
-        status: "fail",
-        durationMs,
-        errorMessage: errorMsg,
-      });
+    const result = {
+      ok: true,
+      feeds: feeds.length,
+      ingested: totalUpserted,
+      results: feedResults,
+      duration_ms: Date.now() - startedAll,
+      auth: { mode: authz.mode, userId: authz.userId },
+    };
+
+    // Best-effort job_runs logging (dbClient bypasses RLS)
+    try {
+      const successfulFeeds = feedResults.filter((r) => r.ok).length;
+      const failedFeeds = feedResults.filter((r) => !r.ok).length;
+      const summaryMessage = `ingested=${totalUpserted} feeds=${feeds.length} successful=${successfulFeeds} failed=${failedFeeds}`;
+
+      await dbClient
+        .from("job_runs")
+        .upsert(
+          {
+            job_name: "rss_ingest",
+            last_run_at: new Date().toISOString(),
+            status: "success",
+            error_message: summaryMessage,
+            result_summary: result,
+          },
+          { onConflict: "job_name" }
+        );
+    } catch (logErr) {
+      console.error("[ingest_rss] job_runs logging error:", logErr);
     }
-    
-    return json({ error: errorMsg }, 500);
+
+    return json(200, result);
+  } catch (e: any) {
+    return json(500, { error: e?.message ?? String(e) });
   }
 });
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 
 
