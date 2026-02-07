@@ -79,38 +79,6 @@ function stripHtml(html?: string | null): string {
   return cleanText(s.replace(/<[^>]*>/g, " "));
 }
 
-// Normalize feed URLs so we don't treat the same feed as multiple sources
-// (e.g. trailing slash differences, host casing, default ports).
-function normalizeFeedUrl(input: string): string {
-  const trimmed = cleanText(input);
-  if (!trimmed) return "";
-
-  try {
-    const u = new URL(trimmed);
-
-    u.protocol = u.protocol.toLowerCase();
-    u.hostname = u.hostname.toLowerCase();
-
-    // remove default ports
-    if (
-      (u.protocol === "https:" && u.port === "443") ||
-      (u.protocol === "http:" && u.port === "80")
-    ) {
-      u.port = "";
-    }
-
-    // remove trailing slash (not root)
-    if (u.pathname !== "/" && u.pathname.endsWith("/")) {
-      u.pathname = u.pathname.slice(0, -1);
-    }
-
-    return u.toString();
-  } catch {
-    // If URL parsing fails, fall back to trimmed string.
-    return trimmed;
-  }
-}
-
 function normalizeTag(tag: string | null | undefined): string | null {
   if (!tag || typeof tag !== "string") return null;
   let normalized = tag.trim().toLowerCase();
@@ -123,101 +91,21 @@ function normalizeTag(tag: string | null | undefined): string | null {
 }
 
 function normalizeTags(tags: (string | null | undefined)[]): string[] {
-  const normalized = tags
-    .map(normalizeTag)
-    .filter((t): t is string => t !== null);
+  const normalized = tags.map(normalizeTag).filter((t): t is string => t !== null);
   return Array.from(new Set(normalized));
 }
 
-function extractKeywordsFromText(
-  text: string | null | undefined,
-  maxKeywords = 5
-): string[] {
+function extractKeywordsFromText(text: string | null | undefined, maxKeywords = 5): string[] {
   if (!text || typeof text !== "string") return [];
   const clean = text.replace(/<[^>]*>/g, " ").replace(/\s+/g, " ").trim();
   if (!clean) return [];
   const stopWords = new Set([
-    "the",
-    "a",
-    "an",
-    "and",
-    "or",
-    "but",
-    "in",
-    "on",
-    "at",
-    "to",
-    "for",
-    "of",
-    "with",
-    "by",
-    "from",
-    "as",
-    "is",
-    "was",
-    "are",
-    "were",
-    "be",
-    "been",
-    "being",
-    "have",
-    "has",
-    "had",
-    "do",
-    "does",
-    "did",
-    "will",
-    "would",
-    "could",
-    "should",
-    "may",
-    "might",
-    "must",
-    "can",
-    "this",
-    "that",
-    "these",
-    "those",
-    "it",
-    "its",
-    "they",
-    "them",
-    "their",
-    "what",
-    "which",
-    "who",
-    "when",
-    "where",
-    "why",
-    "how",
-    "all",
-    "each",
-    "every",
-    "some",
-    "any",
-    "no",
-    "not",
-    "only",
-    "just",
-    "more",
-    "most",
-    "very",
-    "too",
-    "so",
-    "than",
-    "then",
-    "there",
-    "here",
-    "up",
-    "down",
-    "out",
-    "off",
-    "over",
-    "under",
-    "again",
-    "further",
-    "once",
-    "twice",
+    "the","a","an","and","or","but","in","on","at","to","for","of","with","by","from","as",
+    "is","was","are","were","be","been","being","have","has","had","do","does","did",
+    "will","would","could","should","may","might","must","can","this","that","these","those",
+    "it","its","they","them","their","what","which","who","when","where","why","how",
+    "all","each","every","some","any","no","not","only","just","more","most","very","too","so",
+    "than","then","there","here","up","down","out","off","over","under","again","further","once","twice",
   ]);
   const words = clean
     .toLowerCase()
@@ -240,9 +128,7 @@ function extractKeywordsFromText(
 async function sha1(input: string) {
   const data = new TextEncoder().encode(input);
   const hash = await crypto.subtle.digest("SHA-1", data);
-  return Array.from(new Uint8Array(hash))
-    .map((b) => b.toString(16).padStart(2, "0"))
-    .join("");
+  return Array.from(new Uint8Array(hash)).map((b) => b.toString(16).padStart(2, "0")).join("");
 }
 
 // Per-feed fetch timeout so one bad feed doesn't hang the run
@@ -256,11 +142,57 @@ async function fetchWithTimeout(url: string, ms: number) {
   }
 }
 
+// ✅ Normalize feed URLs so you don't split sources by trivial differences
+function normalizeFeedUrl(input: string): string {
+  const raw = cleanText(input);
+  if (!raw) return raw;
+
+  try {
+    const u = new URL(raw);
+
+    // Lowercase host + remove fragment
+    u.hostname = u.hostname.toLowerCase();
+    u.hash = "";
+
+    // Remove default ports
+    if ((u.protocol === "http:" && u.port === "80") || (u.protocol === "https:" && u.port === "443")) {
+      u.port = "";
+    }
+
+    // Remove trailing slash for non-root paths
+    if (u.pathname.length > 1 && u.pathname.endsWith("/")) {
+      u.pathname = u.pathname.slice(0, -1);
+    }
+
+    // Sort query params (stable)
+    if (u.searchParams && [...u.searchParams.keys()].length > 1) {
+      const entries = [...u.searchParams.entries()].sort((a, b) => {
+        if (a[0] !== b[0]) return a[0].localeCompare(b[0]);
+        return a[1].localeCompare(b[1]);
+      });
+      u.search = "";
+      for (const [k, v] of entries) u.searchParams.append(k, v);
+    }
+
+    return u.toString();
+  } catch {
+    return raw;
+  }
+}
+
+function isValidHttpUrl(url: string): boolean {
+  try {
+    const u = new URL(url);
+    return u.protocol === "http:" || u.protocol === "https:";
+  } catch {
+    return false;
+  }
+}
+
 // --------------------
 // Auth gate
 // --------------------
 function isLocalDev(req: Request): boolean {
-  // Request URL (Kong may rewrite this internally, so not always reliable)
   try {
     const u = new URL(req.url);
     const host = (u.hostname ?? "").toLowerCase();
@@ -268,34 +200,32 @@ function isLocalDev(req: Request): boolean {
   } catch {
     // ignore
   }
-  // Host header (when curling 127.0.0.1:54321; Kong may rewrite this when forwarding)
+
   const hostHeader = (req.headers.get("Host") ?? "").toLowerCase();
-  if (hostHeader.startsWith("127.0.0.1") || hostHeader.startsWith("localhost"))
-    return true;
-  // X-Forwarded-Host (Kong often preserves original client host here)
+  if (hostHeader.startsWith("127.0.0.1") || hostHeader.startsWith("localhost")) return true;
+
   const forwardedHost = (req.headers.get("X-Forwarded-Host") ?? "")
     .toLowerCase()
     .split(",")[0]
     .trim();
-  if (forwardedHost.startsWith("127.0.0.1") || forwardedHost.startsWith("localhost"))
-    return true;
-  // SUPABASE_URL in local dev (may be set to gateway URL)
+  if (forwardedHost.startsWith("127.0.0.1") || forwardedHost.startsWith("localhost")) return true;
+
   const supabaseUrl = (Deno.env.get("SUPABASE_URL") ?? "").trim();
   if (
     supabaseUrl.includes("127.0.0.1") ||
     supabaseUrl.includes("localhost") ||
     (supabaseUrl.includes("http://") && supabaseUrl.includes(":54321"))
-  )
-    return true;
-  // Explicit local override: set LOCAL_DEV=1 in supabase/functions/.env (see .env.example)
+  ) return true;
+
   if (Deno.env.get("LOCAL_DEV") === "1") return true;
+
   return false;
 }
 
 async function authorize(req: Request, authClient: ReturnType<typeof createClient>) {
-  // ✅ LOCAL DEV BYPASS: no JWT/secret required when request is to localhost (Supabase local).
+  // ✅ LOCAL DEV BYPASS
   if (isLocalDev(req)) {
-    console.log("[ingest_rss] local dev auth bypass (request to localhost/127.0.0.1)");
+    console.log("[ingest_rss] local dev auth bypass");
     return { ok: true as const, mode: "local" as const, userId: null as string | null };
   }
 
@@ -315,12 +245,7 @@ async function authorize(req: Request, authClient: ReturnType<typeof createClien
 
   const { data: userData, error: userErr } = await authClient.auth.getUser();
   if (userErr || !userData?.user) {
-    return {
-      ok: false as const,
-      status: 401,
-      error: "Invalid session token",
-      details: userErr?.message,
-    };
+    return { ok: false as const, status: 401, error: "Invalid session token", details: userErr?.message };
   }
 
   const userId = userData.user.id;
@@ -370,88 +295,50 @@ Deno.serve(async (req) => {
     const body = await req.json().catch(() => ({}));
 
     const maxFeeds =
-      typeof body.maxFeeds === "number" ? Math.min(Math.max(body.maxFeeds, 1), 50) : 25;
+      typeof body.maxFeeds === "number"
+        ? Math.min(Math.max(body.maxFeeds, 1), 50)
+        : 25;
 
     const perFeedLimit =
       typeof body.perFeedLimit === "number"
-        ? Math.min(Math.max(body.perFeedLimit, 100), 200)
+        ? Math.min(Math.max(body.perFeedLimit, 1), 200)
         : 100;
 
+    // --------------------
     // Load feeds
+    // --------------------
     let feeds: string[] = [];
 
+    // 1) Explicit override
     if (Array.isArray(body.urls) && body.urls.length > 0) {
       feeds = body.urls
-        .map((url: any) => normalizeFeedUrl(cleanText(String(url ?? ""))))
-        .filter((url: string) => {
-          try {
-            new URL(url);
-            return true;
-          } catch {
-            return false;
-          }
-        })
+        .map((url: any) => normalizeFeedUrl(String(url ?? "")))
+        .filter((url: string) => isValidHttpUrl(url))
         .slice(0, maxFeeds);
     } else {
-      const allUrls = new Set<string>();
-
-      let sourcesQuery = dbClient
-        .from("sources")
-        .select("url, is_active")
-        .eq("type", "rss")
-        .eq("enabled", true);
-
-      if (body.user_id) sourcesQuery = sourcesQuery.eq("user_id", body.user_id);
-
-      const { data: sourcesData } = await sourcesQuery;
-      if (sourcesData?.length) {
-        const activeSources = sourcesData.filter((s: any) => {
-          if (!("is_active" in s)) return true;
-          return s.is_active !== false;
-        });
-
-        for (const s of activeSources) {
-          const url = normalizeFeedUrl(cleanText(String(s.url ?? "")));
-          if (!url) continue;
-          try {
-            new URL(url);
-            allUrls.add(url);
-          } catch {
-            // ignore
-          }
-        }
-      }
-
-      const { data: defaultSources } = await dbClient
-        .from("rss_sources")
-        .select("url")
-        .eq("active", true)
+      // 2) Canonical defaults: public.feed_sources
+      // Schema exists locally: public.feed_sources
+      // Columns we know you have: source_type, feed_url, weight
+      const { data: feedSources, error: feedSourcesErr } = await dbClient
+        .from("feed_sources")
+        .select("feed_url, source_type, weight")
+        .eq("source_type", "rss")
         .order("weight", { ascending: false })
-        .limit(maxFeeds * 2);
+        .limit(maxFeeds * 3);
 
-      if (defaultSources?.length) {
-        for (const s of defaultSources) {
-          const url = normalizeFeedUrl(cleanText(String(s.url ?? "")));
-          if (!url) continue;
-          try {
-            new URL(url);
-            allUrls.add(url);
-          } catch {
-            // ignore
-          }
-        }
+      if (feedSourcesErr) {
+        console.error("[ingest_rss] feed_sources load error:", feedSourcesErr.message);
       }
 
-      feeds = Array.from(allUrls)
-        .filter((url: string) => {
-          try {
-            new URL(url);
-            return true;
-          } catch {
-            return false;
-          }
-        })
-        .slice(0, maxFeeds);
+      const allUrls = new Set<string>();
+      for (const s of feedSources ?? []) {
+        const url = normalizeFeedUrl(String((s as any).feed_url ?? ""));
+        if (!url) continue;
+        if (!isValidHttpUrl(url)) continue;
+        allUrls.add(url);
+      }
+
+      feeds = Array.from(allUrls).slice(0, maxFeeds);
     }
 
     if (!feeds.length) {
@@ -461,7 +348,7 @@ Deno.serve(async (req) => {
         feeds: 0,
         note: body.urls
           ? "No valid URLs provided in request body."
-          : "No active RSS sources found in sources or rss_sources tables.",
+          : "No active RSS sources found in feed_sources table.",
         auth: { mode: authz.mode, userId: authz.userId },
       });
     }
@@ -476,16 +363,13 @@ Deno.serve(async (req) => {
     let totalUpserted = 0;
     const feedResults: any[] = [];
 
-    for (const feedUrlRaw of feeds) {
-      const feedUrl = normalizeFeedUrl(feedUrlRaw);
-      if (!feedUrl) continue;
-
+    for (const feedUrl of feeds) {
       const started = Date.now();
       let fetched = 0;
       let upserted = 0;
 
       try {
-        const res = await fetchWithTimeout(feedUrl, 15000); // 15s per feed
+        const res = await fetchWithTimeout(feedUrl, 15000);
         if (!res.ok) {
           feedResults.push({ feedUrl, ok: false, error: `Fetch failed: ${res.status} ${res.statusText}` });
           continue;
@@ -527,12 +411,17 @@ Deno.serve(async (req) => {
               ? cleanText(pickFirst(it.author?.name ?? it.author))
               : cleanText(pickFirst(it["dc:creator"] ?? it.author));
 
-          const published = toIsoDate(it.pubDate ?? it.published ?? it.updated ?? it["dc:date"]) ?? null;
+          const published =
+            toIsoDate(it.pubDate ?? it.published ?? it.updated ?? it["dc:date"]) ?? null;
 
           const ingestedAt = new Date().toISOString();
 
           const summaryRaw =
-            it["content:encoded"] ?? it.content ?? it.summary ?? it.description ?? null;
+            it["content:encoded"] ??
+            it.content ??
+            it.summary ??
+            it.description ??
+            null;
 
           const summary = stripHtml(summaryRaw);
           const imageUrl = extractImage(it);
@@ -540,9 +429,7 @@ Deno.serve(async (req) => {
           const categoryTags: string[] = [];
           const rssCategories = Array.isArray(it.category)
             ? it.category
-            : it.category
-              ? [it.category]
-              : [];
+            : it.category ? [it.category] : [];
 
           for (const cat of rssCategories) {
             const catText = cleanText(
@@ -582,7 +469,7 @@ Deno.serve(async (req) => {
           };
         });
 
-        // Batch hash creation (fast + avoids sequential await)
+        // Batch hash creation
         const rows = await Promise.all(
           preRows.map(async (p) => {
             const source_item_id = await sha1(`${SOURCE_TYPE}:${p.feedUrl}:${p.rawExternal}`);
@@ -590,8 +477,6 @@ Deno.serve(async (req) => {
             return {
               source_type: SOURCE_TYPE,
               source_item_id,
-
-              // Keep external_id globally unique (you have unique indexes on external_id)
               external_id: source_item_id,
 
               url: p.url,
@@ -612,7 +497,7 @@ Deno.serve(async (req) => {
           })
         );
 
-        // Deduplicate within batch by (source_type, source_item_id)
+        // Deduplicate within batch
         const dedupeMap = new Map<string, any>();
         for (const row of rows) {
           const key = `${row.source_type}:${row.source_item_id}`;
@@ -636,7 +521,9 @@ Deno.serve(async (req) => {
         feedResults.push({ feedUrl, ok: true, fetched, upserted, ms: Date.now() - started });
       } catch (e: any) {
         const msg =
-          e?.name === "AbortError" ? "Fetch timed out" : (e?.message ?? String(e));
+          e?.name === "AbortError"
+            ? "Fetch timed out"
+            : (e?.message ?? String(e));
         feedResults.push({ feedUrl, ok: false, error: msg, fetched, ms: Date.now() - started });
       }
     }
@@ -650,7 +537,7 @@ Deno.serve(async (req) => {
       auth: { mode: authz.mode, userId: authz.userId },
     };
 
-    // Best-effort job_runs logging (dbClient bypasses RLS)
+    // Best-effort job_runs logging (only if table exists)
     try {
       const successfulFeeds = feedResults.filter((r) => r.ok).length;
       const failedFeeds = feedResults.filter((r) => !r.ok).length;
@@ -677,6 +564,7 @@ Deno.serve(async (req) => {
     return json(500, { error: e?.message ?? String(e) });
   }
 });
+
 
 
 
