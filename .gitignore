@@ -34,3 +34,9 @@ dist-ssr
 
 # Supabase temp
 supabase/.temp/
+# Supabase local temp / cli artifacts
+supabase/.temp/
+supabase/.branches/
+supabase/.cache/
+supabase/**/.DS_Store
+
